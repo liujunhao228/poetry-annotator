@@ -1,0 +1,69 @@
+[LLM]
+# 并发设置
+max_workers = 5
+# 重试设置
+max_retries = 3
+retry_delay = 1
+
+[Database]
+# 数据库配置
+db_path = poetry.db
+
+[Data]
+# 数据路径配置
+source_dir = data/source_json
+output_dir = data/output
+
+[Categories]
+# 情感分类配置
+xml_path = config/emotion_categories.xml
+md_path = config/中国古典诗词情感分类体系.md
+
+[Prompt]
+# 提示词配置（全局默认）
+template_path = config/prompt_template.txt
+system_prompt_template = config/system_prompt_template.txt
+user_prompt_template = config/user_prompt_template.txt 
+
+# --- Model Configurations ---
+# 使用 [Model.<your_alias>] 来定义不同的模型配置
+# <your_alias> 是你在命令行中使用的别名，例如 --model deepseek-chat
+
+[Model.deepseek-chat]
+provider = siliconflow
+model_name = deepseek-chat
+api_key = your_siliconflow_api_key_here
+base_url = https://api.siliconflow.cn
+temperature = 0.3
+max_tokens = 1000
+timeout = 30
+top_p = 1.0
+top_k = 
+frequency_penalty = 0.0
+presence_penalty = 0.0
+stop = 
+seed = 
+
+stream = false
+enable_thinking = false
+thinking_budget = 
+# 模型特定的提示词模板配置（必选）
+system_prompt_template = config/system_prompt_template.txt
+user_prompt_template = config/user_prompt_template.txt
+
+[Model.gemini-pro]
+provider = gemini
+model_name = gemini-pro
+api_key = your_gemini_api_key_here
+base_url = https://generativelanguage.googleapis.com
+temperature = 0.3
+max_tokens = 1000
+timeout = 30
+top_p = 1.0
+top_k = 40
+candidate_count = 1
+stop_sequences = 
+thinking_budget = 
+# 模型特定的提示词模板配置（必选）
+system_prompt_template = config/system_prompt_template.txt
+user_prompt_template = config/user_prompt_template.txt
