@@ -229,7 +229,10 @@ class SiliconFlowService(BaseLLMService):
             self._log_token_usage_details(usage)
             
             # 统一调用基类的 validate_response 方法进行通用解析和业务内容验证
-            return self.validate_response(response_text)
+            result = self.validate_response(response_text)
+            if isinstance(result, list):
+                return result[0] if result else {}
+            return result
 
         except httpx.HTTPStatusError as e:
             # 重新抛出错误处理逻辑，以触发 tenacity 的重试

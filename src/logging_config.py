@@ -77,7 +77,7 @@ class LoggingConfig:
                 
                 # 生成日志文件名
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                log_file = logs_dir / f"poetry_annotator_{timestamp}.log"
+                log_file = str(logs_dir / f"poetry_annotator_{timestamp}.log")
             
             # 创建文件处理器，支持日志轮转
             file_handler = logging.handlers.RotatingFileHandler(
@@ -167,8 +167,8 @@ class LoggingConfig:
 logging_config = LoggingConfig()
 
 
-def setup_default_logging(log_level: str = None, 
-                         enable_file_log: bool = None,
+def setup_default_logging(log_level: Optional[str] = None, 
+                         enable_file_log: Optional[bool] = None,
                          log_file: Optional[str] = None) -> None:
     """
     设置默认日志配置，支持从配置文件读取

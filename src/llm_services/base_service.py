@@ -238,7 +238,8 @@ class BaseLLMService(ABC):
                       error: Optional[str] = None):
         """记录标注日志"""
         if success:
-            self.logger.info(f"诗词 {poem_id} 标注成功: {result.get('primary_emotion', '未知')}")
+            primary_emotion = result.get('primary_emotion', '未知') if result is not None else '未知'
+            self.logger.info(f"诗词 {poem_id} 标注成功: {primary_emotion}")
         else:
             self.logger.error(f"诗词 {poem_id} 标注失败: {error}")
 

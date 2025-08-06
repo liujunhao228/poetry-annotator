@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent / 'src'))
 # 设置环境变量以避免相对导入问题
 os.environ['PYTHONPATH'] = str(Path(__file__).parent / 'src')
 
-from data_manager import DataManager
+from src.data_manager import DataManager
 
 def main():
     """初始化数据库"""

@@ -9,7 +9,7 @@ from typing import Dict, List, Any, Optional
 class LabelParser:
     """Markdown情感体系解析器，支持从Markdown文件解析并生成XML配置"""
     
-    def __init__(self, xml_path: str = None, md_path: str = None):
+    def __init__(self, xml_path: Optional[str] = None, md_path: Optional[str] = None):
         """
         初始化标签解析器
         
