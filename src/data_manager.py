@@ -25,12 +25,12 @@ class DataManager:
         self._init_database()
     
     def _init_database(self):
-        """初始化数据库 - 采用新表结构"""
+        """初始化数据库 - 采用新表结构，时间戳字段不再用CURRENT_TIMESTAMP，需手动插入带时区的ISO时间字符串"""
         self.logger.info("开始初始化数据库...")
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        # 创建诗词表 (简化)
+
+        # 创建诗词表
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS poems (
                 id INTEGER PRIMARY KEY,
@@ -39,12 +39,12 @@ class DataManager:
                 paragraphs TEXT,
                 full_text TEXT,
                 author_desc TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT,
+                updated_at TEXT
             )
         ''')
-        
-        # 创建标注结果表 (新增)
+
+        # 创建标注结果表
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS annotations (
                 id INTEGER PRIMARY KEY,
@@ -53,28 +53,28 @@ class DataManager:
                 status TEXT NOT NULL CHECK(status IN ('completed', 'failed')),
                 annotation_result TEXT,
                 error_message TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT,
+                updated_at TEXT,
                 FOREIGN KEY(poem_id) REFERENCES poems(id)
             )
         ''')
-        
+
         # 创建作者表
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS authors (
                 name TEXT PRIMARY KEY,
                 description TEXT,
                 short_description TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT
             )
         ''')
-        
+
         # 创建索引
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_poem_author ON poems(author)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_annotation_poem_model ON annotations(poem_id, model_identifier)')
         cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS uidx_poem_model ON annotations(poem_id, model_identifier)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_annotation_status ON annotations(status)')
-        
+
         conn.commit()
         conn.close()
         self.logger.info("数据库初始化完成")
@@ -139,63 +139,72 @@ class DataManager:
     
     def batch_insert_authors(self, authors_data: List[Dict[str, Any]]) -> int:
         """批量插入作者信息"""
+        from datetime import datetime, timezone, timedelta
         self.logger.info(f"开始批量插入 {len(authors_data)} 位作者信息...")
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         inserted_count = 0
+        tz = timezone(timedelta(hours=8))  # 东八区
+        now = datetime.now(tz).isoformat()
         for author_data in authors_data:
             try:
                 cursor.execute('''
                     INSERT OR REPLACE INTO authors 
-                    (name, description, short_description)
-                    VALUES (?, ?, ?)
+                    (name, description, short_description, created_at)
+                    VALUES (?, ?, ?, ?)
                 ''', (
                     author_data.get('name', ''),
                     author_data.get('description', ''),
-                    author_data.get('short_description', '')
+                    author_data.get('short_description', ''),
+                    now
                 ))
                 inserted_count += 1
             except Exception as e:
                 self.logger.error(f"插入作者 {author_data.get('name', 'Unknown')} 时出错: {e}")
-        
+
         conn.commit()
         conn.close()
-        
+
         self.logger.info(f"作者信息插入完成，成功插入 {inserted_count} 位作者")
         return inserted_count
     
     def batch_insert_poems(self, poems_data: List[Dict[str, Any]], start_id: Optional[int] = None) -> int:
         """批量插入诗词到数据库"""
+        from datetime import datetime, timezone, timedelta
         self.logger.info(f"开始批量插入 {len(poems_data)} 首诗词...")
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         inserted_count = 0
         current_id = start_id or 1
-        
+        tz = timezone(timedelta(hours=8))
+        now = datetime.now(tz).isoformat()
+
         for poem_data in poems_data:
             paragraphs = poem_data.get('paragraphs', [])
             full_text = '\n'.join(paragraphs)
-            
+
             cursor.execute('''
                 INSERT OR REPLACE INTO poems 
-                (id, rhythmic, author, paragraphs, full_text, author_desc)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (id, rhythmic, author, paragraphs, full_text, author_desc, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 current_id,
                 poem_data.get('rhythmic', ''),
                 poem_data.get('author', ''),
                 json.dumps(paragraphs, ensure_ascii=False),
                 full_text,
-                poem_data.get('author_desc', '')
+                poem_data.get('author_desc', ''),
+                now,
+                now
             ))
             inserted_count += 1
             current_id += 1
-        
+
         conn.commit()
         conn.close()
-        
+
         self.logger.info(f"诗词插入完成，成功插入 {inserted_count} 首诗词")
         return inserted_count
     
@@ -313,23 +322,26 @@ class DataManager:
     def save_annotation(self, poem_id: int, model_identifier: str, status: str,
                         annotation_result: Optional[str] = None, 
                         error_message: Optional[str] = None) -> bool:
-        """保存标注结果到annotations表 (UPSERT)"""
+        """保存标注结果到annotations表 (UPSERT)，时间戳带时区"""
+        from datetime import datetime, timezone, timedelta
         self.logger.debug(f"保存标注结果 - 诗词ID: {poem_id}, 模型: {model_identifier}, 状态: {status}")
-        
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+        tz = timezone(timedelta(hours=8))
+        now = datetime.now(tz).isoformat()
+
         try:
             cursor.execute('''
-                INSERT INTO annotations (poem_id, model_identifier, status, annotation_result, error_message, updated_at)
-                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO annotations (poem_id, model_identifier, status, annotation_result, error_message, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(poem_id, model_identifier) DO UPDATE SET
                     status = excluded.status,
                     annotation_result = excluded.annotation_result,
                     error_message = excluded.error_message,
-                    updated_at = CURRENT_TIMESTAMP
-            ''', (poem_id, model_identifier, status, annotation_result, error_message))
-            
+                    updated_at = excluded.updated_at
+            ''', (poem_id, model_identifier, status, annotation_result, error_message, now, now))
+
             conn.commit()
             success = cursor.rowcount > 0
             if success:

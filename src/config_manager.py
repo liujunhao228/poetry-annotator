@@ -55,7 +55,8 @@ class ConfigManager:
             defaults = {
                 'provider': '', 'model_name': '', 'api_key': '', 'base_url': '',
                 'temperature': '0.3', 'max_tokens': '1000', 'timeout': '30',
-                'system_prompt_template': 'config/system_prompt_template.txt',
+                'system_prompt_instruction_template': 'config/system_prompt_instruction.txt',
+                'system_prompt_example_template': 'config/system_prompt_example.txt',
                 'user_prompt_template': 'config/user_prompt_template.txt'
             }
             for key, value in defaults.items():
@@ -150,7 +151,8 @@ class ConfigManager:
         """获取提示词配置"""
         return {
             'template_path': self.config.get('Prompt', 'template_path'),
-            'system_prompt_template': self.config.get('Prompt', 'system_prompt_template', fallback='config/system_prompt_template.txt'),
+            'system_prompt_instruction_template': self.config.get('Prompt', 'system_prompt_instruction_template', fallback='config/system_prompt_instruction.txt'),
+            'system_prompt_example_template': self.config.get('Prompt', 'system_prompt_example_template', fallback='config/system_prompt_example.txt'),
             'user_prompt_template': self.config.get('Prompt', 'user_prompt_template', fallback='config/user_prompt_template.txt')
         }
     
@@ -173,7 +175,8 @@ class ConfigManager:
         # 合并配置，模型特定配置优先
         prompt_config = {
             'template_path': model_config.get('template_path', global_config['template_path']),
-            'system_prompt_template': model_config.get('system_prompt_template', global_config['system_prompt_template']),
+            'system_prompt_instruction_template': model_config.get('system_prompt_instruction_template', global_config['system_prompt_instruction_template']),
+            'system_prompt_example_template': model_config.get('system_prompt_example_template', global_config['system_prompt_example_template']),
             'user_prompt_template': model_config.get('user_prompt_template', global_config['user_prompt_template'])
         }
         

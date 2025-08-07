@@ -31,7 +31,8 @@ class BaseLLMService(ABC):
             raise ValueError(f"模型配置 '{model_config_name}' 的API密钥未正确配置。 ")
 
         # 初始化模板变量
-        self.system_prompt_template: Optional[str] = None
+        self.system_prompt_instruction_template: Optional[str] = None
+        self.system_prompt_example_template: Optional[str] = None
         self.user_prompt_template: Optional[str] = None
 
         # 加载提示词模板
@@ -48,16 +49,20 @@ class BaseLLMService(ABC):
         except Exception as e:
             self.logger.warning(f"无法获取模型 '{self.model_config_name}' 的特定提示词配置，将回退到全局默认配置: {e} ")
             prompt_config = config_manager.get_prompt_config()
-
-        system_path = prompt_config.get('system_prompt_template')
+        # [修改] 加载拆分后的系统提示词模板
+        instruction_path = prompt_config.get('system_prompt_instruction_template')
+        example_path = prompt_config.get('system_prompt_example_template')
         user_path = prompt_config.get('user_prompt_template')
-
-        if system_path:
-            self.system_prompt_template = self._load_template_file(system_path)
-            self.logger.info(f"系统提示词模板加载成功: {system_path} ")
+        if instruction_path:
+            self.system_prompt_instruction_template = self._load_template_file(instruction_path)
+            self.logger.info(f"系统提示词（指令部分）加载成功: {instruction_path} ")
         else:
-            raise ValueError("系统提示词模板路径未配置 ")
-
+            raise ValueError("系统提示词（指令部分）路径未配置 ")
+        if example_path:
+            self.system_prompt_example_template = self._load_template_file(example_path)
+            self.logger.info(f"系统提示词（示例部分）加载成功: {example_path} ")
+        else:
+            raise ValueError("系统提示词（示例部分）路径未配置 ")
         if user_path:
             self.user_prompt_template = self._load_template_file(user_path)
             self.logger.info(f"用户提示词模板加载成功: {user_path} ")
@@ -126,11 +131,20 @@ class BaseLLMService(ABC):
 
     def _build_system_prompt(self, emotion_schema: str) -> str:
         """
-        [新] 构建系统提示词的内部方法
+        [修改] 构建系统提示词的内部方法。
+        现在会格式化指令部分，然后拼接静态的示例部分。
         """
-        if self.system_prompt_template is None:
-            raise RuntimeError("系统提示词模板未加载。 ")
-        return self.system_prompt_template.format(emotion_schema=emotion_schema)
+        if self.system_prompt_instruction_template is None or self.system_prompt_example_template is None:
+            raise RuntimeError("系统提示词模板（指令或示例）未加载。")
+        
+        # 1. 格式化包含变量的指令部分
+        formatted_instruction = self.system_prompt_instruction_template.format(emotion_schema=emotion_schema)
+        
+        # 2. 拼接指令和静态示例，用换行符分隔
+        # 示例模板是静态的，无需格式化
+        full_system_prompt = f"{formatted_instruction}\n\n{self.system_prompt_example_template}"
+        
+        return full_system_prompt
 
     def _build_user_prompt(self, author: str, rhythmic: str, sentences_with_id_json: str) -> str:
         """
@@ -186,23 +200,30 @@ class BaseLLMService(ABC):
         masked_body = self._mask_sensitive_data(request_body)
         masked_headers = self._mask_sensitive_data(headers)
         
+        # 详细日志信息（DEBUG级别，写入文件）
         self.logger.debug("=" * 80)
         self.logger.debug(f"[{self.provider.upper()}] 请求详情")
         self.logger.debug(f"请求体 (Payload):\n{json.dumps(masked_body, ensure_ascii=False, indent=2)}")
         self.logger.debug(f"请求头 (Headers):\n{json.dumps(masked_headers, ensure_ascii=False, indent=2)}")
-        if prompt:
-            self.logger.debug(f"用户提示词长度: {len(prompt)}")
         self.logger.debug("=" * 80)
 
-    def log_response_details(self, response_data: Dict[str, Any], usage: Optional[Dict[str, Any]] = None):
-        """记录完整的响应详情"""
+        # 提示词长度信息（INFO级别，显示在控制台）
+        if prompt:
+            self.logger.info(f"[{self.provider.upper()}] 系统提示词长度: {len(prompt)}")
+
+    def log_response_details(self, parsed_data: Any, usage: Optional[Dict[str, Any]] = None):
+        """
+        只展示已通过验证的结构化解析结果，不再重复解析和验证。
+        parsed_data: 已经是结构化的、通过验证的数据（如已入库的内容）。
+        """
         self.logger.debug("=" * 80)
         self.logger.debug(f"[{self.provider.upper()}] 完整响应详情:")
         self.logger.debug(f"响应状态: 成功")
         if usage:
             self.logger.debug(f"Token使用情况: {usage}")
-        self.logger.debug(f"完整原始响应数据: {json.dumps(response_data, ensure_ascii=False, indent=2)}")
         self.logger.debug("=" * 80)
+        # 直接展示入库的内容
+        self.logger.info(f"[{self.provider.upper()}] 解析结果:\n{json.dumps(parsed_data, ensure_ascii=False, indent=2)}")
 
     def log_error_details(self, error: Exception, request_data: Optional[Dict[str, Any]] = None, prompt: Optional[str] = None):
         """记录错误详情"""

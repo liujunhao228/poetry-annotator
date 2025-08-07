@@ -3,6 +3,8 @@
 """
 
 import json
+import demjson3 as demjson
+import json5
 import re
 from typing import Any, List, Dict, Optional
 
@@ -27,6 +29,10 @@ class LLMResponseParser:
             if not isinstance(item, dict):
                 raise ValueError(f"列表第 {i+1} 项不是字典格式: {item}")
             
+            # 自动去除ID首尾空格
+            if 'id' in item and isinstance(item['id'], str):
+                item['id'] = item['id'].strip()
+                            
             # 验证必需字段
             required_fields = ['id', 'primary', 'secondary']
             for field in required_fields:
@@ -50,6 +56,64 @@ class LLMResponseParser:
         
         # 验证通过，直接返回原始列表
         return result_list
+
+    def _pre_process_and_fix_json(self, s: str) -> str:
+        """
+        [新增] 在解析前对JSON字符串进行清理和修复，提高解析成功率。
+        """
+        # 1. 移除模型可能添加的解释性前缀，例如 "Here is the JSON output:"
+        s = re.sub(r'^\s*.*?[\:\[\{]', '', s, 1) if not s.lstrip().startswith(('[', '{')) else s
+        s = s.strip()
+        # 2. 替换非标准的Unicode引号
+        s = s.replace('“', '"').replace('”', '"').replace("‘", "'").replace("’", "'")
+        # 3. 移除各类注释
+        s = re.sub(r'//.*', '', s)  # 移除 // 行注释
+        s = re.sub(r'/\*[\s\S]*?\*/', '', s, flags=re.MULTILINE) # 移除 /* */ 块注释
+        # 4. 修复悬尾逗号 (trailing commas)
+        s = re.sub(r',\s*([\}\]])', r'\1', s)
+        
+        # 5. 尝试修复对象间缺失的逗号
+        s = re.sub(r'\}\s*\{', '}, {', s)
+        # 6. 将Python风格的布尔/None值转为JSON标准
+        s = re.sub(r'\bTrue\b', 'true', s)
+        s = re.sub(r'\bFalse\b', 'false', s)
+        s = re.sub(r'\bNone\b', 'null', s)
+        # 7. 智能地将用单引号包裹的键转为双引号（风险较低的方式）
+        s = re.sub(r"(?<=[\{\,]\s*)'([^']+)':", r'"\1":', s)
+        return s
+
+    def _try_parse_with_multiple_libs(self, json_str: str) -> Any:
+        """
+        [新增] 按顺序使用多个解析库尝试解析字符串，从最严格到最宽容。
+        """
+        processed_str = self._pre_process_and_fix_json(json_str)
+        
+        # 策略 1: 标准库 json (最快, 最严格)
+        try:
+            return json.loads(processed_str)
+        except json.JSONDecodeError:
+            pass
+        # 策略 2: json5 (处理注释, 单引号, 悬尾逗号等)
+        if json5:
+            try:
+                return json5.loads(processed_str)
+            except Exception: # json5 异常类型不统一
+                pass
+        else:
+            # 如果未安装，可以记录一个警告
+            # logger.warning("json5 library not installed. Skipping.")
+            pass
+        # 策略 3: demjson (非常宽容，作为最后手段)
+        if demjson:
+            try:
+                return demjson.decode(processed_str)
+            except demjson.JSONDecodeError:
+                pass
+        else:
+            # logger.warning("demjson3 library not installed. Skipping.")
+            pass
+        # 如果所有库都失败了
+        raise ValueError("所有解析库都无法解析该字符串。")
 
     def parse(self, text: str) -> List[Dict[str, Any]]:
         """
@@ -144,12 +208,14 @@ class LLMResponseParser:
 
     def _parse_and_validate_structure(self, json_str: str) -> List[Dict[str, Any]]:
         """
-        [修改] 解析字符串，并立即对其内容进行深度验证。
+        [已增强] 使用多库解析器和预处理来解析字符串，并立即对其内容进行深度验证。
         """
         try:
-            data = json.loads(json_str)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"JSON解码失败: {e}") from e
+            # 核心改动：用我们强大的新函数替换了原始的 json.loads
+            data = self._try_parse_with_multiple_libs(json_str)
+        except ValueError as e:
+            # _try_parse_with_multiple_libs 抛出的异常已经很清晰了
+            raise ValueError(f"JSON解码失败，已尝试多种修复和解析策略。原始错误: {e}") from e
 
         # Case 1: 结果直接就是目标数组，对其进行内容验证
         if isinstance(data, list):
@@ -161,20 +227,19 @@ class LLMResponseParser:
             for key in ['annotations', 'result', 'data', 'choices']:
                 if key in data and isinstance(data[key], list):
                     try:
-                        # 对找到的列表进行内容验证
                         return self._validate_annotation_list_content(data[key])
                     except (ValueError, TypeError):
-                        continue # 此列表内容不合规，继续查找下一个
+                        continue
             # 查找第一个值为列表的键
             for value in data.values():
                 if isinstance(value, list):
                     try:
-                        # 对找到的列表进行内容验证
                         return self._validate_annotation_list_content(value)
                     except (ValueError, TypeError):
-                        continue # 此列表内容不合规，继续查找下一个
+                        continue
 
         raise ValueError(f"解析后的数据既不是合规的字典列表，也不是包含合规字典列表的对象。数据类型: {type(data)}")
+
 
 
 # 创建一个全局单例，方便在其他模块中直接使用

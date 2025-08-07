@@ -361,6 +361,16 @@ class SamplingTab(TaskExecutorTab):
         self.count_var = tk.StringVar(value="100")
         self.count_entry = ttk.Entry(main_options_frame, textvariable=self.count_var, width=15)
         self.count_entry.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+        # --- 新增：过滤选项复选框 ---
+        self.filter_missing_var = tk.BooleanVar(value=False)
+        self.filter_missing_check = ttk.Checkbutton(
+            main_options_frame, 
+            text="过滤缺虚号 (排除任何含'□'的诗词)", 
+            variable=self.filter_missing_var
+        )
+        self.filter_missing_check.grid(row=2, column=0, columnspan=3, padx=5, pady=5, sticky="w")
+        
         main_options_frame.columnconfigure(1, weight=1)
 
         # --- 2. 排序方式 ---
@@ -415,7 +425,8 @@ class SamplingTab(TaskExecutorTab):
         self.stop_button['state'] = 'normal' if is_running else 'disabled'
         self.status_bar['text'] = "状态: 运行中..." if is_running else "状态: 空闲"
 
-        for widget in [self.db_entry, self.db_browse_btn, self.count_entry, self.dir_mode_radio, self.file_mode_radio]:
+        # --- 修改：将新增的复选框加入UI状态管理 ---
+        for widget in [self.db_entry, self.db_browse_btn, self.count_entry, self.filter_missing_check, self.dir_mode_radio, self.file_mode_radio]:
             widget['state'] = state
         # 使用isinstance检查控件类型
         for child in self.sort_frame.winfo_children():
@@ -454,6 +465,10 @@ class SamplingTab(TaskExecutorTab):
         if not (count.isdigit() and int(count) > 0):
             self.log_message(f"错误: 抽样数量 '{count}' 必须为正整数。\n"); return
         command.extend(["-n", count])
+
+        # --- 新增：读取复选框状态并添加到命令中 ---
+        if self.filter_missing_var.get():
+            command.append("--filter-missing")
 
         sort_mode = self.sort_choice_var.get()
         if sort_mode == 'sort': command.append("--sort")

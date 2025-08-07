@@ -214,15 +214,14 @@ __marimo__/
 config/
 logs/
 ids/
+data/
+.progress_cache/
 
 # test
 *test*
 
 # markdown
 docs
-
-# data
-data/
 
 # log
 *.log
