@@ -5,24 +5,80 @@ from typing import Dict, Any, Optional, List
 
 
 class ConfigManager:
-    """配置管理器，负责加载和管理配置文件"""
+    """配置管理器，负责加载、管理和保存配置文件"""
     
     def __init__(self, config_path: str = "config/config.ini"):
+        # 确保目录存在
+        config_dir = os.path.dirname(config_path)
+        if config_dir and not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+            
         self.config_path = config_path
-        self.config = configparser.ConfigParser()
+        self.config = configparser.ConfigParser(interpolation=None) # interpolation=None 防止 % 被解析
         self._load_config()
     
     def _load_config(self):
         """加载配置文件"""
         if not os.path.exists(self.config_path):
-            raise FileNotFoundError(f"配置文件不存在: {self.config_path}")
-        
-        self.config.read(self.config_path, encoding='utf-8')
-    
+            # 如果文件不存在，可以考虑创建一个默认的
+            print(f"警告: 配置文件不存在: {self.config_path}。将使用一个空的配置。")
+            self.config.read_string('') # 初始化一个空的ConfigParser
+        else:
+            self.config.read(self.config_path, encoding='utf-8')
+
+    def save_config(self):
+        """将当前配置写入文件"""
+        with open(self.config_path, 'w', encoding='utf-8') as configfile:
+            self.config.write(configfile)
+
+    def update_setting(self, section: str, option: str, value: Any):
+        """
+        更新一个配置项。如果节不存在，则创建它。
+        """
+        if not self.config.has_section(section):
+            self.config.add_section(section)
+        self.config.set(section, option, str(value))
+
+    def add_model_section(self, model_name: str, template: Optional[Dict[str, Any]] = None):
+        """
+        添加一个新的模型配置节。
+        可以基于一个模板字典来创建。
+        """
+        section_name = f"Model.{model_name}"
+        if self.config.has_section(section_name):
+            raise ValueError(f"模型配置节 '{section_name}' 已存在。")
+        self.config.add_section(section_name)
+        if template:
+            for key, value in template.items():
+                self.config.set(section_name, key, str(value))
+        else: # Add some default empty values
+            defaults = {
+                'provider': '', 'model_name': '', 'api_key': '', 'base_url': '',
+                'temperature': '0.3', 'max_tokens': '1000', 'timeout': '30',
+                'system_prompt_template': 'config/system_prompt_template.txt',
+                'user_prompt_template': 'config/user_prompt_template.txt'
+            }
+            for key, value in defaults.items():
+                 self.config.set(section_name, key, str(value))
+
+    def remove_model_section(self, model_name: str):
+        """删除一个模型配置节。"""
+        section_name = f"Model.{model_name}"
+        if not self.config.has_section(section_name):
+            raise ValueError(f"未找到模型配置节: '{section_name}'")
+        self.config.remove_section(section_name)
+
+    def get_raw_items(self, section: str) -> List[tuple[str, str]]:
+        """获取指定节下的所有原始键值对。"""
+        if self.config.has_section(section):
+            return self.config.items(section)
+        return []
+
     def get_llm_config(self) -> Dict[str, Any]:
         """获取LLM相关配置"""
         return {
             'max_workers': self.config.getint('LLM', 'max_workers'),
+            'max_model_pipelines': self.config.getint('LLM', 'max_model_pipelines'),
             'max_retries': self.config.getint('LLM', 'max_retries'),
             'retry_delay': self.config.getint('LLM', 'retry_delay')
         }
@@ -45,7 +101,7 @@ class ConfigManager:
 
     def list_model_configs(self) -> List[str]:
         """
-        列出所有已定义的模型配置别名
+        列出所有已定义的模型配置别名，顺序与配置文件中的顺序一致。
 
         Returns:
             一个包含所有模型别名的列表
@@ -55,7 +111,7 @@ class ConfigManager:
         for section in self.config.sections():
             if section.startswith(prefix):
                 configs.append(section[len(prefix):])
-        return sorted(configs)
+        return configs
         
     def get_database_config(self) -> Dict[str, str]:
         """获取数据库配置"""
@@ -169,4 +225,15 @@ class ConfigManager:
             return False
 
 # 全局配置实例
-config_manager = ConfigManager() 
+try:
+    # 假设config.ini在项目根目录下的config文件夹
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    # 如果src/config_manager.py，则根目录是 os.path.dirname(root_dir)
+    if os.path.basename(root_dir) == 'src':
+        root_dir = os.path.dirname(root_dir)
+    config_path = os.path.join(root_dir, 'config', 'config.ini')
+    config_manager = ConfigManager(config_path)
+except Exception as e:
+    # Fallback for unexpected structures
+    print(f"无法定位config.ini, 尝试默认路径 'config/config.ini'. Error: {e}")
+    config_manager = ConfigManager()

@@ -64,6 +64,37 @@ class BaseLLMService(ABC):
         else:
             raise ValueError("用户提示词模板路径未配置 ")
 
+    def _mask_api_key(self, text: str) -> str:
+        """对API密钥进行掩码处理"""
+        if not text or not isinstance(text, str):
+            return text
+            
+        # 如果是Bearer token格式
+        if text.startswith('Bearer '):
+            key = text[7:]  # 获取Bearer后面的部分
+            if len(key) > 8:
+                return f"Bearer {key[:4]}...{key[-4:]}"
+            return "Bearer ****"
+            
+        # 普通API密钥
+        if len(text) > 8:
+            return f"{text[:4]}...{text[-4:]}"
+        return "****"
+
+    def _mask_sensitive_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """递归处理字典中的敏感信息"""
+        masked_data = data.copy()
+        sensitive_keys = {'api_key', 'key', 'token', 'authorization', 'auth'}
+        
+        for key, value in masked_data.items():
+            if isinstance(value, dict):
+                masked_data[key] = self._mask_sensitive_data(value)
+            elif isinstance(value, str) and key.lower() in sensitive_keys:
+                masked_data[key] = self._mask_api_key(value)
+            elif isinstance(value, str) and 'api' in key.lower() and 'key' in key.lower():
+                masked_data[key] = self._mask_api_key(value)
+        return masked_data
+
     def _load_template_file(self, template_path: str) -> str:
         """
         加载模板文件内容
@@ -99,7 +130,7 @@ class BaseLLMService(ABC):
         """
         if self.system_prompt_template is None:
             raise RuntimeError("系统提示词模板未加载。 ")
-        return self.system_prompt_template.replace("{emotion_schema} ", emotion_schema)
+        return self.system_prompt_template.format(emotion_schema=emotion_schema)
 
     def _build_user_prompt(self, author: str, rhythmic: str, sentences_with_id_json: str) -> str:
         """
@@ -150,19 +181,17 @@ class BaseLLMService(ABC):
         """
         pass
 
-    def log_request_details(self, request_data: Dict[str, Any], prompt: str):
-        """记录完整的请求详情"""
-        log_data = request_data.copy()
-        if 'headers' in log_data and 'Authorization' in log_data['headers']:
-            auth_header = log_data['headers']['Authorization']
-            if auth_header.startswith('Bearer '):
-                log_data['headers']['Authorization'] = f"Bearer {'*' * 20}"
+    def log_request_details(self, request_body: Dict[str, Any], headers: Dict[str, Any], prompt: Optional[str] = None):
+        """记录完整的请求详情，分别记录请求体和请求头"""
+        masked_body = self._mask_sensitive_data(request_body)
+        masked_headers = self._mask_sensitive_data(headers)
+        
         self.logger.debug("=" * 80)
-        self.logger.debug(f"[{self.provider.upper()}] 完整请求详情:")
-        self.logger.debug(f"API端点: {self.base_url}")
-        self.logger.debug(f"模型: {self.model}")
-        self.logger.debug(f"完整提示词内容（变量替换后）: {prompt}")
-        self.logger.debug(f"请求数据: {json.dumps(log_data, ensure_ascii=False, indent=2)}")
+        self.logger.debug(f"[{self.provider.upper()}] 请求详情")
+        self.logger.debug(f"请求体 (Payload):\n{json.dumps(masked_body, ensure_ascii=False, indent=2)}")
+        self.logger.debug(f"请求头 (Headers):\n{json.dumps(masked_headers, ensure_ascii=False, indent=2)}")
+        if prompt:
+            self.logger.debug(f"用户提示词长度: {len(prompt)}")
         self.logger.debug("=" * 80)
 
     def log_response_details(self, response_data: Dict[str, Any], usage: Optional[Dict[str, Any]] = None):
@@ -177,20 +206,21 @@ class BaseLLMService(ABC):
 
     def log_error_details(self, error: Exception, request_data: Optional[Dict[str, Any]] = None, prompt: Optional[str] = None):
         """记录错误详情"""
-        self.logger.debug("=" * 80)
-        self.logger.debug(f"[{self.provider.upper()}] 错误详情:")
-        self.logger.debug(f"错误类型: {type(error).__name__}")
-        self.logger.debug(f"错误信息: {str(error)}")
-        if request_data:
-            log_data = request_data.copy()
-            if 'headers' in log_data and 'Authorization' in log_data['headers']:
-                auth_header = log_data['headers']['Authorization']
-                if auth_header.startswith('Bearer '):
-                    log_data['headers']['Authorization'] = f"Bearer {'*' * 20}"
-            self.logger.debug(f"请求数据: {json.dumps(log_data, ensure_ascii=False, indent=2)}")
-        if prompt:
-            self.logger.debug(f"用户提示词: {prompt}")
-        self.logger.debug("=" * 80)
+        try:
+            error_info = {
+                'error_type': type(error).__name__,
+                'error_message': str(error),
+                'request_data': self._mask_sensitive_data(request_data) if request_data else None,
+                'prompt_length': len(prompt) if prompt else None
+            }
+            self.logger.debug("=" * 80)
+            self.logger.debug(f"[{self.provider.upper()}] 错误详情:")
+            self.logger.debug(f"错误信息:\n{json.dumps(error_info, ensure_ascii=False, indent=2)}")
+            if prompt:
+                self.logger.debug(f"用户提示词: {prompt}")
+            self.logger.debug("=" * 80)
+        except Exception as e:
+            self.logger.warning(f"记录错误详情时发生错误: {e}")
 
     def validate_response(self, response_text: str) -> List[Dict[str, Any]]:
         """
@@ -245,8 +275,10 @@ class BaseLLMService(ABC):
 
     def get_service_info(self) -> Dict[str, Any]:
         """获取服务信息"""
-        return {
+        service_info = {
             "provider": self.provider,
             "model": self.model,
-            "base_url": self.base_url
+            "base_url": self.base_url,
+            "api_key": self.api_key  # 原始API密钥会被_mask_sensitive_data处理
         }
+        return self._mask_sensitive_data(service_info)

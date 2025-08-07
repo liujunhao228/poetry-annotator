@@ -30,6 +30,7 @@ class SiliconFlowService(BaseLLMService):
         self.client = httpx.AsyncClient(
             timeout=self.timeout,
             headers={
+                "Accept": "application/json",
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
@@ -45,28 +46,20 @@ class SiliconFlowService(BaseLLMService):
         self.max_tokens = int(self.config.get('max_tokens', 1000))
         self.timeout = int(self.config.get('timeout', 30))
         self.top_p = float(self.config.get('top_p', 1.0))
-        # 根据提示词，min_p、top_k、seed、thinking_budget 采用 if config.get('key') else None 的逻辑
-        # 这意味着如果配置中 'min_p' 键存在但值为 0，它也会被视为 False 导致 min_p 为 None。
-        # 如果需要区分 0 和 None，则要使用 'min_p' in self.config
-        self.min_p = float(self.config['min_p']) if self.config.get('min_p') else None
+        # 基础参数
         self.n = int(self.config.get('n', 1))
 
         if not (0 <= self.temperature <= 2): raise ValueError("temperature必须在0-2之间")
         if self.max_tokens <= 0: raise ValueError("max_tokens必须大于0")
         if self.timeout <= 0: raise ValueError("timeout必须大于0")
         if not (0 <= self.top_p <= 1): raise ValueError("top_p必须在0-1之间")
-        if self.min_p is not None and not (0 <= self.min_p <= 1): raise ValueError("min_p必须在0-1之间")
         if self.n <= 0: raise ValueError("n必须大于0")
 
         # 高级参数
         self.top_k = int(self.config['top_k']) if self.config.get('top_k') else None
-        self.frequency_penalty = float(self.config.get('frequency_penalty', 0.0))
-        self.presence_penalty = float(self.config.get('presence_penalty', 0.0))
         self.seed = int(self.config['seed']) if self.config.get('seed') else None
         
         if self.top_k is not None and self.top_k <= 0: raise ValueError("top_k必须大于0")
-        if not (-2 <= self.frequency_penalty <= 2): raise ValueError("frequency_penalty必须在-2到2之间")
-        if not (-2 <= self.presence_penalty <= 2): raise ValueError("presence_penalty必须在-2到2之间")
         if self.seed is not None and self.seed < 0: raise ValueError("seed必须大于等于0")
 
         # 停止序列
@@ -76,22 +69,26 @@ class SiliconFlowService(BaseLLMService):
 
         # 响应格式
         response_format_raw = self.config.get('response_format')
-        try:
-            self.response_format = eval(response_format_raw) if response_format_raw else None
-        except Exception:
-            self.logger.warning(f"无法解析response_format配置: '{response_format_raw}'。将忽略此配置。")
-            self.response_format = None
+        if response_format_raw:
+            try:
+                # 使用 json.loads 解析 JSON 字符串，更安全和规范
+                self.response_format = json.loads(response_format_raw)
+            except json.JSONDecodeError:
+                self.logger.warning(f"无法解析response_format配置为JSON: '{response_format_raw}'。将忽略此配置。请确保其是有效的JSON字符串 (例如 '{{\"type\": \"json_object\"}}')。")
+                self.response_format = None
+            except Exception as e:
+                self.logger.warning(f"解析response_format配置时发生未知错误: '{response_format_raw}', 错误: {e}。将忽略此配置。")
+                self.response_format = None
+        else:
+            self.response_format = None # 如果没有配置，则为 None
+            
         if self.response_format:
              if not isinstance(self.response_format, dict) or 'type' not in self.response_format or self.response_format['type'] not in ['json_object', 'text']:
-                raise ValueError("response_format 格式不正确")
+                # 提供更具体的错误信息，帮助调试
+                raise ValueError("response_format 格式不正确，必须是包含'type'键的字典，且'type'为'json_object'或'text'。")
 
         # 特殊参数
         self.stream = self.config.get('stream', 'false').lower() == 'true'
-        self.enable_thinking = self.config.get('enable_thinking', 'false').lower() == 'true'
-        self.thinking_budget = int(self.config['thinking_budget']) if self.config.get('thinking_budget') else None
-
-        if self.enable_thinking and self.thinking_budget is not None and self.thinking_budget <= 0:
-            raise ValueError("thinking_budget必须大于0")
 
     # [已移除] _validate_basic_params, _validate_advanced_params, _validate_stop_sequences, 
     #         _validate_special_params, _validate_response_format 方法，其逻辑已移至 _parse_and_validate_config。
@@ -118,12 +115,12 @@ class SiliconFlowService(BaseLLMService):
     def build_request_body(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
         """
         构建完整的请求体
-        (此方法内部逻辑保持不变，但其参数 system_prompt 和 user_prompt 现在由 prepare_prompts 提供)
+        请求格式参考：https://docs.siliconflow.cn/cn/api-reference/chat-completions/chat-completions
         """
         # 基础必需参数
         request_body = {
             "model": self.model,
-            "messages": self._build_messages(system_prompt, user_prompt), # 调用 _build_messages 时传入两个提示词
+            "messages": self._build_messages(system_prompt, user_prompt),
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
             "top_p": self.top_p,
@@ -133,16 +130,6 @@ class SiliconFlowService(BaseLLMService):
         # 可选采样参数
         if self.top_k is not None:
             request_body["top_k"] = self.top_k
-        
-        if self.min_p is not None:
-            request_body["min_p"] = self.min_p
-        
-        # 惩罚参数
-        if self.frequency_penalty != 0.0:
-            request_body["frequency_penalty"] = self.frequency_penalty
-        
-        if self.presence_penalty != 0.0:
-            request_body["presence_penalty"] = self.presence_penalty
         
         # 停止序列
         if self.stop is not None:
@@ -160,24 +147,15 @@ class SiliconFlowService(BaseLLMService):
         if self.stream:
             request_body["stream"] = self.stream
         
-        # 思考模式参数
-        if self.enable_thinking:
-            request_body["enable_thinking"] = self.enable_thinking
-            if self.thinking_budget is not None:
-                request_body["thinking_budget"] = self.thinking_budget
-        
         return request_body
     
     def _log_initialization(self):
         """记录初始化信息"""
         self.logger.info(f"SiliconFlow服务初始化完成 - 模型: {self.model}")
         self.logger.info(f"基础参数 - 温度: {self.temperature}, 最大token: {self.max_tokens}, 超时: {self.timeout}s")
-        self.logger.info(f"采样参数 - top_p: {self.top_p}, top_k: {self.top_k}, min_p: {self.min_p}")
-        self.logger.info(f"惩罚参数 - frequency_penalty: {self.frequency_penalty}, presence_penalty: {self.presence_penalty}")
+        self.logger.info(f"采样参数 - top_p: {self.top_p}, top_k: {self.top_k}")
         self.logger.info(f"生成参数 - n: {self.n}")
-        self.logger.info(f"特殊参数 - stream: {self.stream}, enable_thinking: {self.enable_thinking}")
-        if self.thinking_budget:
-            self.logger.info(f"思考预算: {self.thinking_budget}")
+        self.logger.info(f"特殊参数 - stream: {self.stream}")
         if self.response_format:
             self.logger.info(f"响应格式: {self.response_format}")
         if self.stop:
@@ -212,8 +190,12 @@ class SiliconFlowService(BaseLLMService):
             request_data = self.build_request_body(system_prompt, user_prompt)
             
             # 步骤 3: 记录和发送请求
-            # 使用 user_prompt_for_logging 记录提示词以保持与旧逻辑一致，虽然system_prompt也存在
-            self.log_request_details(request_data, user_prompt_for_logging)
+            # 记录完整请求信息
+            self.log_request_details(
+                request_body=request_data,
+                headers=dict(self.client.headers.items()),
+                prompt=user_prompt_for_logging
+            )
             
             response = await self.client.post(f"{self.base_url}", json=request_data)
             response.raise_for_status() # 检查HTTP响应状态码
@@ -368,15 +350,10 @@ class SiliconFlowService(BaseLLMService):
             "timeout": self.timeout,
             "top_p": self.top_p,
             "top_k": self.top_k,
-            "min_p": self.min_p,
-            "frequency_penalty": self.frequency_penalty,
-            "presence_penalty": self.presence_penalty,
             "stop": self.stop,
             "seed": self.seed,
             "response_format": self.response_format,
             "stream": self.stream,
-            "enable_thinking": self.enable_thinking,
-            "thinking_budget": self.thinking_budget,
             "n": self.n
         }
         

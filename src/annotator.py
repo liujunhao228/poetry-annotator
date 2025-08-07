@@ -43,17 +43,6 @@ class Annotator:
         """为句子生成ID并构建JSON格式"""
         return [{"id": f"S{i+1}", "sentence": sentence} for i, sentence in enumerate(paragraphs)]
     
-    def _build_prompt(self, poem: Dict[str, Any], sentences_with_id: List[Dict[str, str]]) -> str:
-        """构建完整的提示词"""
-        sentences_json = json.dumps(sentences_with_id, ensure_ascii=False, indent=2)
-        system_prompt = self.llm_service.build_system_prompt(self.emotion_schema)
-        user_prompt = self.llm_service.build_user_prompt(
-            poem['author'], 
-            poem['rhythmic'], 
-            sentences_json
-        )
-        return f"{system_prompt}\n\n{user_prompt}"
-    
     def _validate_and_transform_response(
         self, 
         original_sentences: List[Dict[str, str]], 
@@ -108,40 +97,27 @@ class Annotator:
     async def _annotate_single_poem(self, poem: Dict[str, Any]) -> Dict[str, Any]:
         """标注单首诗词，包含完整的处理流程和重试逻辑"""
         poem_id = poem['id']
-        
+
         @retry(
             stop=stop_after_attempt(self.max_retries),
             wait=wait_fixed(self.retry_delay)
         )
-        async def _do_annotation():
-            """实际执行标注的内部函数"""
-            sentences_with_id = self._generate_sentences_with_id(poem['paragraphs'])
-            sentences_json = json.dumps(sentences_with_id, ensure_ascii=False, indent=2)
-            
-            # 兼容不同服务调用方式（如果存在）
-            if hasattr(self.llm_service, 'annotate_poem_with_templates'):
-                llm_output_raw = await self.llm_service.annotate_poem_with_templates(
-                    emotion_schema=self.emotion_schema,
-                    author=poem['author'],
-                    rhythmic=poem['rhythmic'],
-                    sentences_with_id_json=sentences_json
-                )
-            else:
-                prompt = self._build_prompt(poem, sentences_with_id)
-                llm_output_raw = await self.llm_service.annotate_poem(prompt)
-            
-            if isinstance(llm_output_raw, dict) and 'error' in llm_output_raw:
-                raise ValueError(f"LLM服务返回错误: {llm_output_raw['error']}")
-            
-            # 在返回前，llm_output_raw 已经是经过解析和结构验证的 List[Dict]
-            return llm_output_raw
-        
+        async def _do_llm_call_with_retry():
+            # 此内部函数封装了对LLM服务的核心调用，以便tenacity可以重试
+            return await self.llm_service.annotate_poem(
+                poem=poem,
+                emotion_schema=self.emotion_schema
+            )
+
         try:
-            # 步骤1: 调用LLM并获取经过结构验证的响应
-            llm_output_validated = await _do_annotation()
+            # 步骤 1: 调用LLM（带重试逻辑）并获取经过结构验证的响应
+            llm_output_validated = await _do_llm_call_with_retry()
             
-            # 步骤2: 进行内容一致性验证并转换数据格式
+            # 步骤 2: 进行内容一致性验证并转换数据格式
             sentences_with_id = self._generate_sentences_with_id(poem['paragraphs'])
+            # 确保 llm_output_validated 是列表类型
+            if isinstance(llm_output_validated, dict):
+                llm_output_validated = [llm_output_validated]
             final_results = self._validate_and_transform_response(sentences_with_id, llm_output_validated)
             
             return {
