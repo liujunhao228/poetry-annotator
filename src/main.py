@@ -17,33 +17,46 @@ logger = get_logger(__name__)
 
 
 @click.group()
-@click.option('--log-level', 
+@click.option('--log-level', 'console_log_level',  # [修改] 将此选项映射到名为 console_log_level 的变量
               type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR']), 
-              default=None,  # 改为None，优先使用配置文件
-              help='设置日志级别（可选，将覆盖配置文件设置）')
-@click.option('--log-file', help='指定日志文件路径（可选，将覆盖配置文件设置）')
+              default=None,  # 保持None，优先使用配置文件
+              help='设置控制台的日志级别 (覆盖配置文件)') # [修改] 帮助文本更明确
+@click.option('--log-file', help='指定日志文件路径 (覆盖配置文件)')
 @click.option('--enable-file-log', is_flag=True, default=None, 
-              help='启用文件日志输出（可选，将覆盖配置文件设置）')
-def cli(log_level, log_file, enable_file_log):
+              help='启用文件日志输出 (覆盖配置文件)')
+def cli(console_log_level, log_file, enable_file_log):
     """LLM诗词情感标注工具"""
-    # 设置日志配置 - 优先使用配置文件，CLI参数可覆盖
+    # [修改] 设置日志配置 - 适配新的日志系统
+    # 新系统支持为控制台和文件设置不同级别
     try:
         config = config_manager.get_logging_config()
+        # [修改] 调用 setup_default_logging 时传递 console_level参数
         setup_default_logging(
-            log_level=log_level or config['log_level'],
-            enable_file_log=enable_file_log if enable_file_log is not None else config['enable_file_log'],
-            log_file=log_file or config['log_file']
+            console_level=console_log_level, # 使用命令行参数覆盖配置
+            enable_file_log=enable_file_log,
+            log_file=log_file
         )
     except Exception as e:
         # 如果配置文件有问题，使用CLI参数或默认值
-        setup_default_logging(log_level, enable_file_log, log_file)
+        # [修改] 即使在异常情况下，也使用新的参数名进行调用
+        setup_default_logging(
+            console_level=console_log_level, 
+            enable_file_log=enable_file_log, 
+            log_file=log_file
+        )
     
     # 记录启动信息
     logger.info("=" * 60)
     logger.info("LLM诗词情感标注工具启动")
     logger.info(f"Python版本: {sys.version}")
     logger.info(f"工作目录: {Path.cwd()}")
-    logger.info(f"日志级别: {logging.getLevelName(logger.level)}")
+    
+    # [说明] 以下日志消息现在会根据控制台和文件的级别分别显示
+    # INFO 级别默认会显示在控制台和文件中
+    # DEBUG 级别默认只会显示在文件中
+    log_level_name = logging.getLevelName(logging.getLogger().handlers[0].level)
+    logger.info(f"控制台日志级别: {log_level_name}") 
+    logger.debug("这是一个DEBUG级别的启动信息，应只出现在日志文件中。")
     logger.info("=" * 60)
 
 
@@ -262,4 +275,4 @@ def list_models():
 
 
 if __name__ == '__main__':
-    cli() 
+    cli()

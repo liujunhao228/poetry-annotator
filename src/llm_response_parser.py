@@ -3,10 +3,17 @@
 """
 
 import json
-import demjson3 as demjson
-import json5
 import re
 from typing import Any, List, Dict, Optional
+# 可选依赖：demjson3 和 json5
+try:
+    import demjson3 as demjson
+except ImportError:
+    demjson = None # 如果未安装，优雅地处理
+try:
+    import json5
+except ImportError:
+    json5 = None # 如果未安装，优雅地处理
 
 class LLMResponseParser:
     """
@@ -78,8 +85,6 @@ class LLMResponseParser:
         s = re.sub(r'\bTrue\b', 'true', s)
         s = re.sub(r'\bFalse\b', 'false', s)
         s = re.sub(r'\bNone\b', 'null', s)
-        # 7. 智能地将用单引号包裹的键转为双引号（风险较低的方式）
-        s = re.sub(r"(?<=[\{\,]\s*)'([^']+)':", r'"\1":', s)
         return s
 
     def _try_parse_with_multiple_libs(self, json_str: str) -> Any:

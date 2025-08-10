@@ -210,7 +210,6 @@ __marimo__/
 示例/
 
 # data
-*.db
 config/
 logs/
 ids/
@@ -237,8 +236,6 @@ poetry-annotator.py
 CLAUDE.md
 
 # scripts
-random_sample.py
-distribute_tasks.py
 distribute_tasks.md
 
 # 临时

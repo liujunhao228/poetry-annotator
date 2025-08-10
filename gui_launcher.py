@@ -8,6 +8,7 @@ import threading
 import queue
 import os
 import sys
+import json  # [新增] 导入json模块用于读写配置
 
 # 尝试导入原始项目的配置管理器以获取模型列表
 try:
@@ -148,7 +149,6 @@ class TaskExecutorTab(ttk.Frame):
         self.master.after(100, self.process_queue)
 
     def _on_task_finished(self):
-        # ... 此方法保持不变 ...
         return_code = self.process.returncode if self.process else -1
         # 准备最终的日志消息
         final_message = "\n" + "="*80 + "\n"
@@ -185,13 +185,102 @@ class TaskExecutorTab(ttk.Frame):
 class DistributionTab(TaskExecutorTab):
     """任务分发功能的UI选项卡。"""
     def __init__(self, master):
+        # [新增] 定义GUI配置文件的路径
+        self.config_file = os.path.join('config', 'gui_state.json')
+
         super().__init__(master, "distribute_tasks.py")
+        
+        # [修改] 调整调用顺序
         self._create_widgets()
-        super()._create_common_widgets()  # 先创建通用控件，包括 start_button
-        self._update_ui_state()  # 然后再更新 UI 状态
+        super()._create_common_widgets()
+        
+        # [新增] 在所有控件创建后，加载配置
+        self.load_config()
+        
+        self._update_ui_state()
         self.master.after(100, self.process_queue)
+    
+    # [新增] 保存配置的方法
+    def save_config(self):
+        """将当前UI配置保存到JSON文件。"""
+        config_data = {
+            'console_log_level': self.console_log_level_var.get(),
+            'file_log_level': self.file_log_level_var.get(),
+            'model_choice': self.model_choice_var.get(),
+            'selected_model': self.model_combobox_var.get(),
+            'id_source': self.id_source_var.get(),
+            'id_file_path': self.id_file_path_var.get(),
+            'id_dir_path': self.id_dir_path_var.get(),
+            'force_rerun': self.force_rerun_var.get(),
+            'fresh_start': self.fresh_start_var.get(),
+            'chunk_size': self.chunk_size_var.get(),
+            'enable_file_log': self.enable_file_log_var.get(),
+        }
+        
+        try:
+            # 确保'config'目录存在
+            config_dir = os.path.dirname(self.config_file)
+            if config_dir and not os.path.exists(config_dir):
+                os.makedirs(config_dir)
+            
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(config_data, f, indent=4, ensure_ascii=False)
+            print(f"GUI配置已成功保存到 {self.config_file}")
+            
+        except Exception as e:
+            # 在GUI中显示错误，而不是仅在控制台
+            error_message = f"错误: 保存GUI配置失败: {e}\n"
+            self.output_queue.put(error_message)
+    
+    # [新增] 加载配置的方法
+    def load_config(self):
+        """从JSON文件加载并应用UI配置。"""
+        if not os.path.exists(self.config_file):
+            print(f"未找到GUI配置文件 {self.config_file}，将使用默认值。")
+            return
+            
+        try:
+            with open(self.config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            # 使用.get()方法安全地获取值，如果键不存在则使用变量的默认值
+            self.console_log_level_var.set(config.get('console_log_level', self.console_log_level_var.get()))
+            self.file_log_level_var.set(config.get('file_log_level', self.file_log_level_var.get()))
+            self.model_choice_var.set(config.get('model_choice', self.model_choice_var.get()))
+            
+            # 检查模型是否仍然存在于列表中
+            selected_model = config.get('selected_model')
+            if selected_model and selected_model in self.model_combobox['values']:
+                self.model_combobox_var.set(selected_model)
+            
+            self.id_source_var.set(config.get('id_source', self.id_source_var.get()))
+            self.id_file_path_var.set(config.get('id_file_path', ''))
+            self.id_dir_path_var.set(config.get('id_dir_path', ''))
+            self.force_rerun_var.set(config.get('force_rerun', False))
+            self.fresh_start_var.set(config.get('fresh_start', False))
+            self.chunk_size_var.set(config.get('chunk_size', self.chunk_size_var.get()))
+            self.enable_file_log_var.set(config.get('enable_file_log', True))
+            
+            print(f"GUI配置已从 {self.config_file} 加载。")
+
+        except (json.JSONDecodeError, KeyError) as e:
+            error_message = f"警告: 加载GUI配置失败，文件可能已损坏。将使用默认值。\n错误: {e}\n"
+            self.output_queue.put(error_message)
 
     def _create_widgets(self):
+        options_frame = ttk.LabelFrame(self, text="日志级别控制")
+        options_frame.pack(fill="x", padx=5, pady=5)
+        
+        ttk.Label(options_frame, text="控制台日志级别:").pack(side="left", padx=(10, 5), pady=5)
+        self.console_log_level_var = tk.StringVar(value="INFO")
+        self.console_log_level_combo = ttk.Combobox(options_frame, textvariable=self.console_log_level_var, values=["DEBUG", "INFO", "WARNING", "ERROR"], width=10)
+        self.console_log_level_combo.pack(side="left", padx=5, pady=5)
+        
+        ttk.Label(options_frame, text="文件日志级别:").pack(side="left", padx=(20, 5), pady=5)
+        self.file_log_level_var = tk.StringVar(value="DEBUG")
+        self.file_log_level_combo = ttk.Combobox(options_frame, textvariable=self.file_log_level_var, values=["DEBUG", "INFO", "WARNING", "ERROR"], width=10)
+        self.file_log_level_combo.pack(side="left", padx=5, pady=5)
+        
         # --- 1. 模型选择区 ---
         model_frame = ttk.LabelFrame(self, text="模型选择")
         model_frame.pack(fill="x", padx=5, pady=5)
@@ -247,33 +336,38 @@ class DistributionTab(TaskExecutorTab):
         id_source_frame.columnconfigure(1, weight=1)
 
         # --- 3. 其他选项区 ---
-        options_frame = ttk.LabelFrame(self, text="其他选项")
-        options_frame.pack(fill="x", padx=5, pady=5)
+        other_options_frame = ttk.LabelFrame(self, text="其他选项")
+        other_options_frame.pack(fill="x", padx=5, pady=5)
 
-        self.force_rerun_var = tk.BooleanVar()
-        self.force_rerun_check = ttk.Checkbutton(options_frame, text="强制重跑", variable=self.force_rerun_var)
+        self.force_rerun_var = tk.BooleanVar(value=False)
+        self.force_rerun_check = ttk.Checkbutton(other_options_frame, text="强制重跑", variable=self.force_rerun_var)
         self.force_rerun_check.pack(side="left", padx=10, pady=5)
         
-        self.fresh_start_var = tk.BooleanVar()
-        self.fresh_start_check = ttk.Checkbutton(options_frame, text="全新开始", variable=self.fresh_start_var)
+        self.fresh_start_var = tk.BooleanVar(value=False)
+        self.fresh_start_check = ttk.Checkbutton(other_options_frame, text="全新开始", variable=self.fresh_start_var)
         self.fresh_start_check.pack(side="left", padx=10, pady=5)
         
-        ttk.Label(options_frame, text="批次大小:").pack(side="left", padx=(20, 5), pady=5)
+        ttk.Label(other_options_frame, text="批次大小:").pack(side="left", padx=(20, 5), pady=5)
         self.chunk_size_var = tk.StringVar(value="1000")
-        self.chunk_size_entry = ttk.Entry(options_frame, textvariable=self.chunk_size_var, width=10)
+        self.chunk_size_entry = ttk.Entry(other_options_frame, textvariable=self.chunk_size_var, width=10)
         self.chunk_size_entry.pack(side="left", padx=5, pady=5)
+        
+        self.enable_file_log_var = tk.BooleanVar(value=True)
+        self.enable_file_log_check = ttk.Checkbutton(other_options_frame, text="启用文件日志", variable=self.enable_file_log_var)
+        self.enable_file_log_check.pack(side="left", padx=10, pady=5)
 
     def _populate_models(self):
         try:
             models = config_manager.list_model_configs()
             if models:
                 self.model_combobox['values'] = models
-                self.model_combobox.set(models[0])
+                if not self.model_combobox_var.get(): # 仅在没有加载到值时设置默认值
+                    self.model_combobox.set(models[0])
             else:
                 self.model_combobox.set("无可用模型")
         except Exception as e:
             self.model_combobox.set("加载失败")
-            self.log_message(f"错误: 加载模型配置失败: {e}\n")
+            self.output_queue.put(f"错误: 加载模型配置失败: {e}\n")
 
     def _update_ui_state(self, is_running=False):
         state = "disabled" if is_running else "normal"
@@ -281,15 +375,24 @@ class DistributionTab(TaskExecutorTab):
         self.stop_button['state'] = 'normal' if is_running else 'disabled'
         self.status_bar['text'] = "状态: 运行中..." if is_running else "状态: 空闲"
 
-        self.model_combobox['state'] = state if self.model_choice_var.get() == "single" else "disabled"
-        self.id_file_entry['state'] = state if self.id_source_var.get() == "file" else "disabled"
-        self.id_file_browse_btn['state'] = state if self.id_source_var.get() == "file" else "disabled"
-        self.id_dir_entry['state'] = state if self.id_source_var.get() == "dir" else "disabled"
-        self.id_dir_browse_btn['state'] = state if self.id_source_var.get() == "dir" else "disabled"
+        # 日志级别控件的状态
+        self.console_log_level_combo['state'] = state
+        self.file_log_level_combo['state'] = state
+        
+        is_single_model = self.model_choice_var.get() == "single"
+        self.model_combobox['state'] = 'readonly' if state == 'normal' and is_single_model else 'disabled'
+
+        is_file_source = self.id_source_var.get() == "file"
+        self.id_file_entry['state'] = state if is_file_source else "disabled"
+        self.id_file_browse_btn['state'] = state if is_file_source else "disabled"
+
+        is_dir_source = self.id_source_var.get() == "dir"
+        self.id_dir_entry['state'] = state if is_dir_source else "disabled"
+        self.id_dir_browse_btn['state'] = state if is_dir_source else "disabled"
 
         for radio in [self.single_model_radio, self.all_models_radio, self.id_file_radio, self.id_dir_radio]:
             radio['state'] = state
-        for widget in [self.force_rerun_check, self.fresh_start_check, self.chunk_size_entry]:
+        for widget in [self.force_rerun_check, self.fresh_start_check, self.chunk_size_entry, self.enable_file_log_check]:
             widget['state'] = state
 
     def _browse_file(self):
@@ -299,28 +402,32 @@ class DistributionTab(TaskExecutorTab):
     def _browse_dir(self):
         path = filedialog.askdirectory(title="选择ID文件所在目录", initialdir=os.path.dirname(self.id_dir_path_var.get()) if self.id_dir_path_var.get() else None)
         if path: 
-            # 确保使用标准化的路径分隔符
             path = os.path.normpath(path)
             self.id_dir_path_var.set(path)
 
     def start_task(self):
         command = [sys.executable, self.script_path]
         
+        command.extend(["--console-log-level", self.console_log_level_var.get()])
+        command.extend(["--file-log-level", self.file_log_level_var.get()])
+        if self.enable_file_log_var.get():
+            command.append("--enable-file-log")
+        
         if self.model_choice_var.get() == "single":
             model_name = self.model_combobox_var.get()
-            if not model_name or "无" in model_name:
-                self.log_message("错误: 请选择一个有效的模型。\n"); return
+            if not model_name or "无" in model_name or "失败" in model_name:
+                self.output_queue.put("错误: 请选择一个有效的模型。\n"); return
             command.extend(["--model", model_name])
         else:
             command.append("--all-models")
 
         if self.id_source_var.get() == "file":
             id_file = self.id_file_path_var.get()
-            if not id_file: self.log_message("错误: 请指定一个ID文件路径。\n"); return
+            if not id_file: self.output_queue.put("错误: 请指定一个ID文件路径。\n"); return
             command.extend(["--id-file", id_file])
         else:
             id_dir = self.id_dir_path_var.get()
-            if not id_dir: self.log_message("错误: 请指定一个ID文件目录。\n"); return
+            if not id_dir: self.output_queue.put("错误: 请指定一个ID文件目录。\n"); return
             command.extend(["--id-dir", id_dir])
 
         if self.force_rerun_var.get(): command.append("--force-rerun")
@@ -330,10 +437,11 @@ class DistributionTab(TaskExecutorTab):
         if chunk_size.isdigit() and int(chunk_size) > 0:
             command.extend(["--chunk-size", chunk_size])
         else:
-            self.log_message(f"警告: 批次大小 '{chunk_size}' 无效，将使用脚本默认值。\n")
+            self.output_queue.put(f"警告: 批次大小 '{chunk_size}' 无效，将使用脚本默认值。\n")
 
         self.log_text.config(state="normal"); self.log_text.delete(1.0, tk.END); self.log_text.config(state="disabled")
-        self.log_message(f"执行命令: {' '.join(command)}\n" + "="*80 + "\n")
+        display_command = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in command)
+        self.output_queue.put(f"执行命令: {display_command}\n" + "="*80 + "\n")
         self._update_ui_state(is_running=True)
         self.task_thread = threading.Thread(target=self._run_task_thread, args=(command,), daemon=True)
         self.task_thread.start()
@@ -343,53 +451,40 @@ class SamplingTab(TaskExecutorTab):
     def __init__(self, master):
         super().__init__(master, "random_sample.py")
         self._create_widgets()
+        super()._create_common_widgets()
+        self.start_button.config(text="开始抽样")
+        self.stop_button.config(text="停止抽样")
+        self._update_ui_state()
         self.master.after(100, self.process_queue)
-
     def _create_widgets(self):
         # --- 1. 数据库和抽样数量 ---
         main_options_frame = ttk.LabelFrame(self, text="基本设置")
         main_options_frame.pack(fill="x", padx=5, pady=5)
-        
         ttk.Label(main_options_frame, text="数据库文件:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
         self.db_path_var = tk.StringVar(value="poetry.db")
         self.db_entry = ttk.Entry(main_options_frame, textvariable=self.db_path_var, width=50)
         self.db_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         self.db_browse_btn = ttk.Button(main_options_frame, text="浏览...", command=self._browse_db)
         self.db_browse_btn.grid(row=0, column=2, padx=5, pady=5)
-
         ttk.Label(main_options_frame, text="抽样数量:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
         self.count_var = tk.StringVar(value="100")
         self.count_entry = ttk.Entry(main_options_frame, textvariable=self.count_var, width=15)
         self.count_entry.grid(row=1, column=1, padx=5, pady=5, sticky="w")
-
-        # --- 新增：过滤选项复选框 ---
         self.filter_missing_var = tk.BooleanVar(value=False)
-        self.filter_missing_check = ttk.Checkbutton(
-            main_options_frame, 
-            text="过滤缺虚号 (排除任何含'□'的诗词)", 
-            variable=self.filter_missing_var
-        )
+        self.filter_missing_check = ttk.Checkbutton(main_options_frame, text="过滤缺虚号 (排除任何含'□'的诗词)", variable=self.filter_missing_var)
         self.filter_missing_check.grid(row=2, column=0, columnspan=3, padx=5, pady=5, sticky="w")
-        
         main_options_frame.columnconfigure(1, weight=1)
-
         # --- 2. 排序方式 ---
         self.sort_frame = ttk.LabelFrame(self, text="排序方式")
         self.sort_frame.pack(fill="x", padx=5, pady=5)
         self.sort_choice_var = tk.StringVar(value="shuffle")
-        # 将父控件也更新为 self.sort_frame (保持代码一致性)
         ttk.Radiobutton(self.sort_frame, text="随机排序 (默认)", variable=self.sort_choice_var, value="shuffle").pack(side="left", padx=10)
         ttk.Radiobutton(self.sort_frame, text="按ID升序", variable=self.sort_choice_var, value="sort").pack(side="left", padx=10)
         ttk.Radiobutton(self.sort_frame, text="不排序", variable=self.sort_choice_var, value="no-shuffle").pack(side="left", padx=10)
-
-
-
         # --- 3. 输出设置 ---
         output_frame = ttk.LabelFrame(self, text="输出设置")
         output_frame.pack(fill="x", padx=5, pady=5)
         self.output_mode_var = tk.StringVar(value="dir")
-        
-        # 目录输出模式
         self.dir_mode_radio = ttk.Radiobutton(output_frame, text="输出到目录", variable=self.output_mode_var, value="dir", command=self._update_ui_state)
         self.dir_mode_radio.grid(row=0, column=0, columnspan=3, sticky="w", padx=5, pady=5)
         ttk.Label(output_frame, text="目录路径:").grid(row=1, column=0, padx=(25, 5), pady=5, sticky="w")
@@ -402,8 +497,6 @@ class SamplingTab(TaskExecutorTab):
         self.num_files_var = tk.StringVar(value="1")
         self.num_files_entry = ttk.Entry(output_frame, textvariable=self.num_files_var, width=15)
         self.num_files_entry.grid(row=2, column=1, padx=5, pady=5, sticky="w")
-        
-        # 单文件输出模式
         self.file_mode_radio = ttk.Radiobutton(output_frame, text="输出到单个文件", variable=self.output_mode_var, value="file", command=self._update_ui_state)
         self.file_mode_radio.grid(row=3, column=0, columnspan=3, sticky="w", padx=5, pady=(10,5))
         ttk.Label(output_frame, text="文件路径:").grid(row=4, column=0, padx=(25, 5), pady=5, sticky="w")
@@ -414,81 +507,56 @@ class SamplingTab(TaskExecutorTab):
         self.output_file_browse_btn.grid(row=4, column=2, padx=5, pady=5)
         output_frame.columnconfigure(1, weight=1)
 
-        super()._create_common_widgets()
-        self.start_button.config(text="开始抽样")
-        self.stop_button.config(text="停止抽样")
-        self._update_ui_state()
-    
     def _update_ui_state(self, is_running=False):
         state = "disabled" if is_running else "normal"
         self.start_button['state'] = 'disabled' if is_running else 'normal'
         self.stop_button['state'] = 'normal' if is_running else 'disabled'
         self.status_bar['text'] = "状态: 运行中..." if is_running else "状态: 空闲"
-
-        # --- 修改：将新增的复选框加入UI状态管理 ---
-        for widget in [self.db_entry, self.db_browse_btn, self.count_entry, self.filter_missing_check, self.dir_mode_radio, self.file_mode_radio]:
-            widget['state'] = state
-        # 使用isinstance检查控件类型
+        for widget in [self.db_entry, self.db_browse_btn, self.count_entry, self.filter_missing_check, self.dir_mode_radio, self.file_mode_radio]: widget['state'] = state
         for child in self.sort_frame.winfo_children():
-            if isinstance(child, (ttk.Radiobutton, ttk.Button, ttk.Entry)):
-                child.configure(state=state)
-
+            if isinstance(child, (ttk.Radiobutton, ttk.Button, ttk.Entry)): child.configure(state=state)
         output_mode = self.output_mode_var.get()
         dir_state = state if output_mode == 'dir' else 'disabled'
-        for widget in [self.output_dir_entry, self.output_dir_browse_btn, self.num_files_entry]:
-            widget['state'] = dir_state
-
+        for widget in [self.output_dir_entry, self.output_dir_browse_btn, self.num_files_entry]: widget['state'] = dir_state
         file_state = state if output_mode == 'file' else 'disabled'
-        for widget in [self.output_file_entry, self.output_file_browse_btn]:
-            widget['state'] = file_state
-
+        for widget in [self.output_file_entry, self.output_file_browse_btn]: widget['state'] = file_state
+        
     def _browse_db(self):
         path = filedialog.askopenfilename(title="选择数据库文件", filetypes=[("SQLite数据库", "*.db"), ("所有文件", "*.*")])
         if path: self.db_path_var.set(path)
-
     def _browse_output_dir(self):
         path = filedialog.askdirectory(title="选择输出目录")
         if path: self.output_dir_var.set(path)
-
     def _browse_save_file(self):
         path = filedialog.asksaveasfilename(title="保存到文件", filetypes=[("文本文件", "*.txt"), ("所有文件", "*.*")], defaultextension=".txt")
         if path: self.output_file_var.set(path)
-
     def start_task(self):
         command = [sys.executable, self.script_path]
-
+        command.extend(["--console-log-level", self.console_log_level_var.get()])
+        if self.enable_file_log_var.get(): command.append("--enable-file-log")
         db_path = self.db_path_var.get()
-        if not db_path: self.log_message("错误: 请指定数据库文件路径。\n"); return
+        if not db_path: self.output_queue.put("错误: 请指定数据库文件路径。\n"); return
         command.extend(["--db", db_path])
-
         count = self.count_var.get()
-        if not (count.isdigit() and int(count) > 0):
-            self.log_message(f"错误: 抽样数量 '{count}' 必须为正整数。\n"); return
+        if not (count.isdigit() and int(count) > 0): self.output_queue.put(f"错误: 抽样数量 '{count}' 必须为正整数。\n"); return
         command.extend(["-n", count])
-
-        # --- 新增：读取复选框状态并添加到命令中 ---
-        if self.filter_missing_var.get():
-            command.append("--filter-missing")
-
+        if self.filter_missing_var.get(): command.append("--filter-missing")
         sort_mode = self.sort_choice_var.get()
         if sort_mode == 'sort': command.append("--sort")
         elif sort_mode == 'no-shuffle': command.append("--no-shuffle")
-
         if self.output_mode_var.get() == 'file':
             output_file = self.output_file_var.get()
-            if not output_file: self.log_message("错误: 请指定输出文件路径。\n"); return
+            if not output_file: self.output_queue.put("错误: 请指定输出文件路径。\n"); return
             command.extend(["--output-file", output_file])
-        else: # dir mode
+        else:
             output_dir = self.output_dir_var.get()
             if output_dir: command.extend(["--output-dir", output_dir])
-            
             num_files = self.num_files_var.get()
-            if not (num_files.isdigit() and int(num_files) > 0):
-                self.log_message(f"错误: 分段文件数 '{num_files}' 必须为正整数。\n"); return
+            if not (num_files.isdigit() and int(num_files) > 0): self.output_queue.put(f"错误: 分段文件数 '{num_files}' 必须为正整数。\n"); return
             command.extend(["--num-files", num_files])
-
         self.log_text.config(state="normal"); self.log_text.delete(1.0, tk.END); self.log_text.config(state="disabled")
-        self.log_message(f"执行命令: {' '.join(command)}\n" + "="*80 + "\n")
+        display_command = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in command)
+        self.output_queue.put(f"执行命令: {display_command}\n" + "="*80 + "\n")
         self._update_ui_state(is_running=True)
         self.task_thread = threading.Thread(target=self._run_task_thread, args=(command,), daemon=True)
         self.task_thread.start()
@@ -503,11 +571,37 @@ class PoetryToolGUI(tk.Tk):
         notebook = ttk.Notebook(self)
         notebook.pack(fill="both", expand=True, padx=10, pady=10)
 
-        dist_tab = DistributionTab(notebook)
-        sampling_tab = SamplingTab(notebook)
+        # [修改] 保存对 DistributionTab 实例的引用
+        self.dist_tab = None 
+        dist_tab_script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "distribute_tasks.py")
+        if os.path.exists(dist_tab_script_path):
+            self.dist_tab = DistributionTab(notebook)
+            notebook.add(self.dist_tab, text="  任务分发 (Distribution)  ")
+        else:
+            notebook.add(ttk.Frame(notebook), text="  任务分发 (脚本缺失)  ", state="disabled")
 
-        notebook.add(dist_tab, text="  任务分发 (Task Distribution)  ")
-        notebook.add(sampling_tab, text="  随机抽样 (Random Sampling)  ")
+        sampling_tab_script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "random_sample.py")
+        if os.path.exists(sampling_tab_script_path):
+            sampling_tab = SamplingTab(notebook)
+            notebook.add(sampling_tab, text="  随机抽样 (Sampling)  ")
+        else:
+            notebook.add(ttk.Frame(notebook), text="  随机抽样 (脚本缺失)  ", state="disabled")
+            
+        # [新增] 绑定窗口关闭事件
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    # [新增] 窗口关闭时调用的方法
+    def on_closing(self):
+        """在关闭窗口前，保存配置。"""
+        # 检查'任务分发'选项卡实例是否存在
+        if self.dist_tab:
+            try:
+                self.dist_tab.save_config()
+            except Exception as e:
+                print(f"关闭时保存配置失败: {e}") # 打印到控制台以进行调试
+        
+        # 销毁窗口，正常退出
+        self.destroy()
 
 if __name__ == "__main__":
     app = PoetryToolGUI()

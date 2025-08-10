@@ -19,7 +19,8 @@ class LoggingConfig:
         self.logger = logging.getLogger(__name__)
     
     def setup_logging(self, 
-                     log_level: str = 'INFO',
+                     console_level: str = 'INFO',
+                     file_level: str = 'DEBUG',
                      log_file: Optional[str] = None,
                      enable_file_log: bool = False,
                      enable_console_log: bool = True,
@@ -28,81 +29,62 @@ class LoggingConfig:
                      backup_count: int = 5,
                      quiet_third_party: bool = True) -> None:
         """
-        设置日志配置
-        
-        Args:
-            log_level: 日志级别 (DEBUG, INFO, WARNING, ERROR)
-            log_file: 日志文件路径
-            enable_file_log: 是否启用文件日志
-            enable_console_log: 是否启用控制台日志
-            log_format: 自定义日志格式
-            max_file_size: 日志文件最大大小（字节）
-            backup_count: 日志文件备份数量
-            quiet_third_party: 是否静音第三方库的日志
+        [重构] 设置日志配置，支持为控制台和文件设置不同级别
         """
-        # 确定日志级别
-        level = getattr(logging, log_level.upper(), logging.INFO)
+        # [修改] 根日志记录器的级别设为最低级别(DEBUG)，以捕获所有消息并交由handlers过滤
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.DEBUG)
+
+        # 清除现有处理器，防止重复记录
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
         
         # 默认日志格式
         if not log_format:
             log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         
-        # 创建格式化器
         formatter = logging.Formatter(
             log_format,
             datefmt='%Y-%m-%d %H:%M:%S'
         )
         
-        # 配置根日志记录器
-        root_logger = logging.getLogger()
-        root_logger.setLevel(level)
-        
-        # 清除现有的处理器
-        for handler in root_logger.handlers[:]:
-            root_logger.removeHandler(handler)
-        
-        # 添加控制台处理器
+        # [修改] 配置控制台处理器，并设置其独立的级别
         if enable_console_log:
             console_handler = logging.StreamHandler(sys.stdout)
-            console_handler.setLevel(level)
+            console_level_obj = getattr(logging, console_level.upper(), logging.INFO)
+            console_handler.setLevel(console_level_obj)
             console_handler.setFormatter(formatter)
             root_logger.addHandler(console_handler)
         
-        # 如果启用文件日志，添加文件处理器
+        # [修改] 配置日志文件处理器，并设置其独立的级别
         if enable_file_log:
             if not log_file:
-                # 创建logs目录
                 logs_dir = Path("logs")
                 logs_dir.mkdir(exist_ok=True)
-                
-                # 生成日志文件名
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 log_file = str(logs_dir / f"poetry_annotator_{timestamp}.log")
             
-            # 创建文件处理器，支持日志轮转
             file_handler = logging.handlers.RotatingFileHandler(
                 log_file,
                 maxBytes=max_file_size,
                 backupCount=backup_count,
                 encoding='utf-8'
             )
-            file_handler.setLevel(level)
+            file_level_obj = getattr(logging, file_level.upper(), logging.DEBUG)
+            file_handler.setLevel(file_level_obj)
             file_handler.setFormatter(formatter)
             root_logger.addHandler(file_handler)
             
             if enable_console_log:
-                print(f"日志文件: {log_file}")
+                print(f"日志文件: {os.path.abspath(log_file)}")
         
         # 静音第三方库的日志
         if quiet_third_party:
             self._quiet_third_party_loggers()
         
         # 记录配置信息
-        self.logger.info(f"日志系统初始化完成 - 级别: {logging.getLevelName(level)}")
-        if enable_file_log and log_file:
-            self.logger.info(f"日志文件: {log_file}")
-        if enable_console_log:
-            self.logger.info("控制台日志已启用")
+        self.logger.info("日志系统初始化完成。")
+        self.logger.info(f"控制台日志级别: {console_level.upper()}, 文件日志级别: {file_level.upper()}")
     
     def _quiet_third_party_loggers(self):
         """静音第三方库的日志"""
@@ -167,43 +149,45 @@ class LoggingConfig:
 logging_config = LoggingConfig()
 
 
-def setup_default_logging(log_level: Optional[str] = None, 
-                         enable_file_log: Optional[bool] = None,
-                         log_file: Optional[str] = None) -> None:
+def setup_default_logging(console_level: Optional[str] = None,
+                          file_level: Optional[str] = None,  # <<<<<< 这里添加 file_level 参数
+                          enable_file_log: Optional[bool] = None,
+                          log_file: Optional[str] = None) -> None:
     """
-    设置默认日志配置，支持从配置文件读取
-    
+    [重构] 设置默认日志配置，从配置文件读取并支持命令行覆盖。
     Args:
-        log_level: 日志级别（可选，优先使用配置文件）
-        enable_file_log: 是否启用文件日志（可选，优先使用配置文件）
-        log_file: 日志文件路径（可选，优先使用配置文件）
+        console_level: 控制台日志级别（可选，用于覆盖配置文件）
+        file_level: 文件日志级别（可选，用于覆盖配置文件） # <<<<<< 添加此说明
+        enable_file_log: 是否启用文件日志（可选，用于覆盖配置文件）
+        log_file: 日志文件路径（可选，用于覆盖配置文件）
     """
     try:
         from .config_manager import config_manager
         config = config_manager.get_logging_config()
-        
-        # 使用配置文件中的值，除非显式指定了参数
-        final_log_level = log_level or config['log_level']
+        # 使用配置文件中的值，除非显式通过参数覆盖
+        final_console_level = console_level or config['console_log_level']
+        # <<<<<< 关键修改：如果命令行传入了 file_level，则使用它，否则使用配置中的
+        final_file_level = file_level or config['file_log_level']
         final_enable_file_log = enable_file_log if enable_file_log is not None else config['enable_file_log']
-        final_log_file = log_file or config['log_file']
+        final_log_file = log_file or config.get('log_file')
         final_enable_console_log = config['enable_console_log']
         final_max_file_size = config['max_file_size'] * 1024 * 1024  # 转换为字节
         final_backup_count = config['backup_count']
         final_quiet_third_party = config['quiet_third_party']
-        
     except Exception as e:
-        # 如果配置文件读取失败，使用默认值
+        # 如果配置文件读取失败，使用安全的默认值
         print(f"警告: 读取日志配置失败，使用默认值: {e}")
-        final_log_level = log_level or 'INFO'
-        final_enable_file_log = enable_file_log or True
+        final_console_level = console_level or 'INFO'
+        final_file_level = file_level or 'DEBUG' # <<<<<< 也要处理默认值的情况
+        final_enable_file_log = enable_file_log if enable_file_log is not None else True
         final_log_file = log_file
         final_enable_console_log = True
         final_max_file_size = 10 * 1024 * 1024
         final_backup_count = 5
         final_quiet_third_party = True
-    
     logging_config.setup_logging(
-        log_level=final_log_level,
+        console_level=final_console_level,
+        file_level=final_file_level, # 确保这里传递的是新的 final_file_level
         enable_file_log=final_enable_file_log,
         log_file=final_log_file,
         enable_console_log=final_enable_console_log,

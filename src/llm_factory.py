@@ -1,66 +1,68 @@
 # src/llm_factory.py
-
 from typing import Dict, Any, Optional
 import logging
 from .config_manager import config_manager
-# 在文件顶部导入所有具体服务类
 from .llm_services.base_service import BaseLLMService
 from .llm_services.siliconflow_service import SiliconFlowService
 from .llm_services.gemini_service import GeminiService
 
+from pybreaker import CircuitBreaker
 
 class LLMFactory:
     """LLM服务工厂"""
     
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
-        # [修改] 将创建函数的映射改为类本身的映射，更符合工厂模式
+        # 将创建函数的映射改为类本身的映射，更符合工厂模式
         self.providers: Dict[str, type[BaseLLMService]] = {
             'siliconflow': SiliconFlowService,
             'gemini': GeminiService,
             # 未来可以添加更多提供商
         }
+        # --- 熔断器管理 ---
+        self.breakers: Dict[str, CircuitBreaker] = {}
+        try:
+            llm_config = config_manager.get_llm_config()
+            # 从配置中读取熔断器参数，并提供默认值
+            self.breaker_fail_max = llm_config.get('breaker_fail_max', 5)
+            self.breaker_reset_timeout = llm_config.get('breaker_reset_timeout', 60)
+            self.logger.info(f"熔断器配置加载: fail_max={self.breaker_fail_max}, reset_timeout={self.breaker_reset_timeout}")
+        except Exception as e:
+            self.logger.warning(f"加载LLM配置失败，将使用默认熔断器参数: {e}")
+            self.breaker_fail_max = 5
+            self.breaker_reset_timeout = 60
+
+    def get_breaker(self, config_name: str) -> CircuitBreaker:
+        """为指定的模型配置获取或创建熔断器实例"""
+        if config_name not in self.breakers:
+            # 使用从配置加载的参数创建熔断器
+            self.breakers[config_name] = CircuitBreaker(
+                fail_max=self.breaker_fail_max,
+                reset_timeout=self.breaker_reset_timeout,
+                # 为熔断器命名，方便在日志中识别
+                name=f"Breaker-{config_name}"
+            )
+            self.logger.info(f"为模型 '{config_name}' 创建了新的熔断器实例。")
+        return self.breakers[config_name]
     
     def get_llm_service(self, config_name: str) -> BaseLLMService:
         """
         根据模型配置别名创建LLM服务实例
-        
-        Args:
-            config_name: config.ini中定义的模型别名 (例如 'gpt-4o')
-            
-        Returns:
-            LLM服务实例
-            
-        Raises:
-            ValueError: 当配置别名无效或配置内容不完整时
         """
         try:
             if not config_name:
                 raise ValueError("必须提供模型配置名称")
-
-            # 获取模型特定的配置字典
-            try:
-                model_config = config_manager.get_model_config(config_name)
-            except ValueError as e:
-                raise ValueError(f"获取模型 '{config_name}' 配置失败: {e}")
-            
-            # 提取提供商
+            model_config = config_manager.get_model_config(config_name)
             provider = model_config.get('provider')
             if not provider:
                 raise ValueError(f"模型配置 '{config_name}' 必须包含 'provider' 字段")
-            
             provider = provider.lower()
             
-            # [修改] 使用类映射动态创建实例
             if provider not in self.providers:
                 supported_providers = list(self.providers.keys())
                 raise ValueError(f"不支持的提供商: {provider}。支持的提供商: {supported_providers}")
             
-            # 获取服务类
             service_class = self.providers[provider]
-            
-            # [修改] 将完整的配置字典直接传递给服务类的构造函数
-            # 服务类自己负责解析和验证配置
             service = service_class(
                 config=model_config,
                 model_config_name=config_name
@@ -71,14 +73,7 @@ class LLMFactory:
             
         except Exception as e:
             self.logger.error(f"创建LLM服务失败: {e}")
-            # 重新抛出更具体的异常
             raise ValueError(f"创建LLM服务实例 '{config_name}' 失败: {e}") from e
-
-    # [已移除] _create_siliconflow_service 和 _create_gemini_service 方法
-    # 它们的逻辑现在已经内聚到各自的服务类中。
-
-    # [已移除] _validate_model_config 方法
-    # 验证逻辑也已内聚到服务类中。
     
     def list_configured_models(self) -> Dict[str, Dict[str, str]]:
         """列出在config.ini中所有已配置的模型"""

@@ -128,15 +128,16 @@ class ConfigManager:
         }
 
     def get_logging_config(self) -> Dict[str, Any]:
-        """获取日志配置"""
+        """[重构] 获取日志配置，支持分离的日志级别"""
         return {
-            'log_level': self.config.get('Logging', 'log_level', fallback='INFO'),
+            'console_log_level': self.config.get('Logging', 'console_log_level', fallback='INFO'),
+            'file_log_level': self.config.get('Logging', 'file_log_level', fallback='DEBUG'),
             'enable_file_log': self.config.getboolean('Logging', 'enable_file_log', fallback=True),
-            'log_file': self.config.get('Logging', 'log_file', fallback=None),
+            'log_file': self.config.get('Logging', 'log_file', fallback='logs/poetry_annotator.log'),
             'enable_console_log': self.config.getboolean('Logging', 'enable_console_log', fallback=True),
             'max_file_size': self.config.getint('Logging', 'max_file_size', fallback=10),
             'backup_count': self.config.getint('Logging', 'backup_count', fallback=5),
-            'quiet_third_party': self.config.getboolean('Logging', 'quiet_third_party', fallback=True)
+            'quiet_third_party': self.config.getboolean('Logging', 'quiet_third_party', fallback=True),
         }
     
     
