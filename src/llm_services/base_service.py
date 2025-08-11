@@ -167,15 +167,15 @@ class BaseLLMService(ABC):
         
         return full_system_prompt
 
-    def _build_user_prompt(self, author: str, rhythmic: str, sentences_with_id_json: str) -> str:
+    def _build_user_prompt(self, author: str, title: str, sentences_with_id_json: str) -> str:
         """
-        构建用户提示词的内部方法
+        构建用户提示词的内部方法 - [修改] 使用 title 替代 rhythmic
         """
         if self.user_prompt_template is None:
             raise RuntimeError("用户提示词模板未加载。 ")
         return self.user_prompt_template.format(
             author=author,
-            rhythmic=rhythmic,
+            title=title,
             sentences_with_id_json=sentences_with_id_json
         )
 
@@ -189,6 +189,7 @@ class BaseLLMService(ABC):
         """
         集中化的提示词构建逻辑。
         这是服务类提供给外部的核心能力之一。
+        [修改] 使用 poem_data['title']
         """
         sentences_with_id = self._generate_sentences_with_id(poem_data['paragraphs'])
         sentences_json = json.dumps(sentences_with_id, ensure_ascii=False, indent=2)
@@ -196,7 +197,7 @@ class BaseLLMService(ABC):
         system_prompt = self._build_system_prompt(emotion_schema)
         user_prompt = self._build_user_prompt(
             author=poem_data['author'],
-            rhythmic=poem_data['rhythmic'],
+            title=poem_data['title'],
             sentences_with_id_json=sentences_json
         )
         return system_prompt, user_prompt

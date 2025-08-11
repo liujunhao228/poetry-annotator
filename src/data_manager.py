@@ -30,11 +30,11 @@ class DataManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # 创建诗词表
+        # 创建诗词表 - [修改] 将 rhythmic 列重命名为 title
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS poems (
                 id INTEGER PRIMARY KEY,
-                rhythmic TEXT,
+                title TEXT,
                 author TEXT,
                 paragraphs TEXT,
                 full_text TEXT,
@@ -94,15 +94,15 @@ class DataManager:
         return data
     
     def load_all_json_files(self) -> List[Dict[str, Any]]:
-        """加载所有JSON文件的数据"""
+        """加载所有JSON文件的数据 - [修改] 适配唐诗/宋诗文件格式"""
         source_path = Path(self.source_dir)
         if not source_path.exists():
             raise FileNotFoundError(f"数据源目录不存在: {source_path}")
         
         all_data = []
         
-        # 查找所有ci.song.*.json文件
-        json_files = list(source_path.glob('ci.song.*.json'))
+        # [修改] 查找所有 poet.*.*.json 文件
+        json_files = list(source_path.glob('poet.*.*.json'))
         json_files.sort()  # 确保按文件名排序
         
         self.logger.info(f"找到 {len(json_files)} 个JSON文件")
@@ -121,24 +121,35 @@ class DataManager:
         return all_data
     
     def load_author_data(self) -> List[Dict[str, Any]]:
-        """加载作者数据"""
-        author_file = Path(self.source_dir) / 'author.song.json'
-        
-        if not author_file.exists():
-            self.logger.warning(f"作者文件不存在: {author_file}")
+        """加载作者数据 - [修改] 适配唐诗/宋诗作者文件格式"""
+        source_path = Path(self.source_dir)
+        if not source_path.exists():
+            self.logger.warning(f"数据源目录不存在: {source_path}")
             return []
-        
-        try:
-            with open(author_file, 'r', encoding='utf-8') as f:
-                authors = json.load(f)
-            self.logger.info(f"加载了 {len(authors)} 位作者信息")
-            return authors
-        except Exception as e:
-            self.logger.error(f"加载作者数据时出错: {e}")
+
+        all_authors = []
+        author_files = sorted(list(source_path.glob('authors.*.json')))
+
+        if not author_files:
+            self.logger.warning("在数据源目录中未找到 'authors.*.json' 格式的作者文件。")
             return []
+
+        self.logger.info(f"找到 {len(author_files)} 个作者文件: {[f.name for f in author_files]}")
+
+        for author_file in author_files:
+            try:
+                with open(author_file, 'r', encoding='utf-8') as f:
+                    authors = json.load(f)
+                all_authors.extend(authors)
+                self.logger.info(f"从 {author_file.name} 加载了 {len(authors)} 位作者信息。")
+            except Exception as e:
+                self.logger.error(f"加载作者文件 {author_file.name} 时出错: {e}")
+        
+        self.logger.info(f"所有作者文件加载完成，总计加载了 {len(all_authors)} 位作者信息。")
+        return all_authors
     
     def batch_insert_authors(self, authors_data: List[Dict[str, Any]]) -> int:
-        """批量插入作者信息"""
+        """批量插入作者信息 - [修改] 适配新的 'desc' 字段"""
         from datetime import datetime, timezone, timedelta
         self.logger.info(f"开始批量插入 {len(authors_data)} 位作者信息...")
         conn = sqlite3.connect(self.db_path)
@@ -155,8 +166,8 @@ class DataManager:
                     VALUES (?, ?, ?, ?)
                 ''', (
                     author_data.get('name', ''),
-                    author_data.get('description', ''),
-                    author_data.get('short_description', ''),
+                    author_data.get('desc', ''),  # [修改] 使用 'desc' 字段
+                    author_data.get('short_description', ''), # 新格式无此字段，优雅降级
                     now
                 ))
                 inserted_count += 1
@@ -170,7 +181,7 @@ class DataManager:
         return inserted_count
     
     def batch_insert_poems(self, poems_data: List[Dict[str, Any]], start_id: Optional[int] = None) -> int:
-        """批量插入诗词到数据库"""
+        """批量插入诗词到数据库 - [修改] 适配 'title' 字段"""
         from datetime import datetime, timezone, timedelta
         self.logger.info(f"开始批量插入 {len(poems_data)} 首诗词...")
         conn = sqlite3.connect(self.db_path)
@@ -185,13 +196,14 @@ class DataManager:
             paragraphs = poem_data.get('paragraphs', [])
             full_text = '\n'.join(paragraphs)
 
+            # [修改] 使用 'title' 字段
             cursor.execute('''
                 INSERT OR REPLACE INTO poems 
-                (id, rhythmic, author, paragraphs, full_text, author_desc, created_at, updated_at)
+                (id, title, author, paragraphs, full_text, author_desc, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 current_id,
-                poem_data.get('rhythmic', ''),
+                poem_data.get('title', ''), # [修改] 从 'title' 获取
                 poem_data.get('author', ''),
                 json.dumps(paragraphs, ensure_ascii=False),
                 full_text,
@@ -213,16 +225,16 @@ class DataManager:
                                start_id: Optional[int] = None, 
                                end_id: Optional[int] = None,
                                force_rerun: bool = False) -> List[Dict[str, Any]]:
-        """获取指定模型待标注的诗词"""
+        """获取指定模型待标注的诗词 - [修改] 查询 'title'"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
         params = []
         
-        # 基本查询，连接诗词和作者信息
+        # [修改] 查询 'title' 而不是 'rhythmic'
         query = """
-            SELECT p.id, p.rhythmic, p.author, p.paragraphs, p.full_text, au.description as author_desc
+            SELECT p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc
             FROM poems p
             LEFT JOIN authors au ON p.author = au.name
         """
@@ -264,7 +276,7 @@ class DataManager:
         return poems
 
     def get_poems_by_ids(self, poem_ids: List[int]) -> List[Dict[str, Any]]:
-        """根据ID列表获取诗词信息"""
+        """根据ID列表获取诗词信息 - [修改] 查询 'title'"""
         if not poem_ids:
             return []
         
@@ -272,10 +284,10 @@ class DataManager:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        # 构建查询，使用IN子句
+        # [修改] 查询 'title'
         placeholders = ','.join('?' * len(poem_ids))
         query = f"""
-            SELECT p.id, p.rhythmic, p.author, p.paragraphs, p.full_text, au.description as author_desc
+            SELECT p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc
             FROM poems p
             LEFT JOIN authors au ON p.author = au.name
             WHERE p.id IN ({placeholders})
@@ -296,13 +308,14 @@ class DataManager:
 
     
     def get_poem_by_id(self, poem_id: int) -> Optional[Dict[str, Any]]:
-        """根据ID获取单首诗词信息"""
+        """根据ID获取单首诗词信息 - [修改] 查询 'title'"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
+        # [修改] 查询 'title'
         cursor.execute("""
-            SELECT p.id, p.rhythmic, p.author, p.paragraphs, p.full_text, au.description as author_desc
+            SELECT p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc
             FROM poems p
             LEFT JOIN authors au ON p.author = au.name
             WHERE p.id = ?
@@ -433,7 +446,7 @@ class DataManager:
     def export_results(self, output_format: str = 'jsonl', 
                        output_file: Optional[str] = None,
                        model_filter: Optional[str] = None) -> str:
-        """导出标注结果"""
+        """导出标注结果 - [修改] 导出 'title'"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -444,11 +457,11 @@ class DataManager:
             where_clause = "WHERE a.model_identifier = ?"
             params.append(model_filter)
         
-        # 查询标注结果
+        # [修改] 查询 'title'
         query = f"""
             SELECT 
                 p.id as poem_id,
-                p.rhythmic,
+                p.title,
                 p.author,
                 p.paragraphs,
                 p.full_text,
@@ -483,7 +496,7 @@ class DataManager:
                 for row in results:
                     result_dict = {
                         'poem_id': row[0],
-                        'rhythmic': row[1],
+                        'title': row[1], # [修改]
                         'author': row[2],
                         'paragraphs': row[3],
                         'full_text': row[4],
@@ -581,12 +594,13 @@ class DataManager:
         return [dict(row) for row in rows]
 
     def search_poems(self, author: Optional[str] = None, title: Optional[str] = None, page: int = 1, per_page: int = 10) -> Dict[str, Any]:
-        """根据作者和标题搜索诗词，并支持分页"""
+        """根据作者和标题搜索诗词，并支持分页 - [修改] 适配 'title'"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        query = "SELECT p.id, p.rhythmic, p.author, p.paragraphs, p.full_text, au.description as author_desc FROM poems p LEFT JOIN authors au ON p.author = au.name"
+        # [修改] 查询 'title'
+        query = "SELECT p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc FROM poems p LEFT JOIN authors au ON p.author = au.name"
         conditions = []
         params = []
 
@@ -595,14 +609,15 @@ class DataManager:
             params.append(f"%{author}%")
         
         if title:
-            conditions.append("p.rhythmic LIKE ?")
+            # [修改] 按 'title' 字段搜索
+            conditions.append("p.title LIKE ?")
             params.append(f"%{title}%")
 
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
         
         # Get total count for pagination
-        count_query = query.replace("p.id, p.rhythmic, p.author, p.paragraphs, p.full_text, au.description as author_desc", "COUNT(*)")
+        count_query = query.replace("p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc", "COUNT(*)")
         cursor.execute(count_query, params)
         total_count = cursor.fetchone()[0]
 
