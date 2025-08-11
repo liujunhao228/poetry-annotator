@@ -15,8 +15,7 @@ def get_random_poem_ids(db_path, sample_size=1, filter_enabled=False):
     if filter_enabled:
         # 使用 SQLite 的拼接操作符 || 将字段内容合并，然后一次性检查。
         # IFNULL 用于处理字段值为 NULL 的情况，避免整个表达式结果为 NULL。
-        filter_clause = " (IFNULL(rhythmic, '') || IFNULL(author, '') || IFNULL(full_text, '')) NOT LIKE '%□%' "
-    
+        filter_clause = " (IFNULL(title, '') || IFNULL(author, '') || IFNULL(full_text, '')) NOT LIKE '%□%' "
     conn = None 
     try:
         conn = sqlite3.connect(db_path)
