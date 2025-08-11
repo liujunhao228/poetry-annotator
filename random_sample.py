@@ -9,7 +9,7 @@ def get_random_poem_ids(db_path, sample_size=1, filter_enabled=False):
     高效随机抽取诗词ID。
     新增功能：可以通过 filter_enabled 参数控制是否过滤掉包含'□'（缺字标记）的诗词。
     """
-    # --- 【修改】根据实际数据结构调整过滤子句 ---
+    # --- 根据实际数据结构调整过滤子句 ---
     # 检测的字段为：rhythmic (词牌名), author (作者), full_text (完整文本)
     filter_clause = ""
     if filter_enabled:
@@ -22,7 +22,7 @@ def get_random_poem_ids(db_path, sample_size=1, filter_enabled=False):
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
-        # --- 根据是否存在 filter_clause 构建查询 --- (此部分逻辑无需修改)
+        # --- 根据是否存在 filter_clause 构建查询 --- 
         where_for_count = f"WHERE {filter_clause}" if filter_enabled else ""
         
         # 获取最大ID和符合条件的记录总数
@@ -67,7 +67,7 @@ def get_random_poem_ids(db_path, sample_size=1, filter_enabled=False):
 
                 placeholders = ','.join('?' * len(potential_candidate_ids))
                 
-                # --- 动态拼接查询语句 --- (此部分逻辑无需修改)
+                # --- 动态拼接查询语句 --- 
                 query = f"SELECT id FROM poems WHERE id IN ({placeholders})"
                 if filter_enabled:
                     query += f" AND {filter_clause}"
@@ -78,7 +78,7 @@ def get_random_poem_ids(db_path, sample_size=1, filter_enabled=False):
         return list(selected_ids)
     
     except sqlite3.Error as e:
-        # --- 【修改】更新错误提示信息 ---
+        # --- 更新错误提示信息 ---
         if "no such column" in str(e) and filter_enabled:
              print(f"数据库错误: {e}", file=sys.stderr)
              print("错误提示：筛选功能要求 poems 表中包含 rhythmic, author, 和 full_text 列。", file=sys.stderr)
@@ -132,7 +132,6 @@ if __name__ == "__main__":
     elif len(poem_ids) < args.count:
         print(f"警告: 数据库中可用ID数量 ({len(poem_ids)}) 少于请求数量 ({args.count})。将输出所有可用ID。", file=sys.stderr)
 
-    # --- 后续代码无需改动 ---
     if args.sort:
         poem_ids.sort()
     elif not args.no_shuffle:

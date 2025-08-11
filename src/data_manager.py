@@ -630,5 +630,48 @@ class DataManager:
             "pages": (total_count + per_page - 1) // per_page
         }
 
+    def get_completed_poem_ids(self, poem_ids: List[int], model_identifier: str) -> set[int]:
+        """
+        高效检查一组 poem_id 是否已被特定模型成功标注。
+        仅查询必要的 'completed' 状态的 poem_id，非常节省资源。
+
+        :param poem_ids: 需要检查的诗词ID列表。
+        :param model_identifier: 要检查的模型的标识符。
+        :return: 一个包含在这批ID中且已成功标注的 poem_id 的集合。
+        """
+        if not poem_ids:
+            return set()
+
+        completed_ids = set()
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # 使用参数化查询防止SQL注入
+            placeholders = ','.join('?' * len(poem_ids))
+            query = f"""
+                SELECT poem_id
+                FROM annotations
+                WHERE 
+                    poem_id IN ({placeholders})
+                    AND model_identifier = ?
+                    AND status = 'completed'
+            """
+            
+            params = poem_ids + [model_identifier]
+            cursor.execute(query, params)
+            
+            # 使用生成器表达式和 set.update 最高效地处理结果
+            completed_ids.update(row[0] for row in cursor.fetchall())
+            
+        except sqlite3.Error as e:
+            self.logger.error(f"检查标注状态时发生数据库错误: {e}")
+        finally:
+            if conn:
+                conn.close()
+        
+        return completed_ids
+
 # 全局数据管理器实例
 data_manager = DataManager()

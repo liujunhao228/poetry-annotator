@@ -215,6 +215,7 @@ logs/
 ids/
 data/
 .progress_cache/
+数据库备份/
 
 # test
 *test*
@@ -240,3 +241,4 @@ distribute_tasks.md
 
 # 临时
 README.md
+数据库备份.7z

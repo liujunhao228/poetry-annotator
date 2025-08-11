@@ -8,7 +8,7 @@ import threading
 import queue
 import os
 import sys
-import json  # [新增] 导入json模块用于读写配置
+import json
 
 # 尝试导入原始项目的配置管理器以获取模型列表
 try:
