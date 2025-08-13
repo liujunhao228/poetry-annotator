@@ -12,71 +12,113 @@ except ImportError:
     sys.path.append(str(Path(__file__).parent))
     from config_manager import config_manager
 from datetime import datetime
+try:
+    from .db_adapter import get_database_adapter, normalize_poem_data
+except ImportError:
+    # 当作为独立模块运行时
+    import sys
+    sys.path.append(str(Path(__file__).parent))
+    from db_adapter import get_database_adapter, normalize_poem_data
 
 
 class DataManager:
     """数据管理器，负责数据库操作和数据预处理"""
     
-    def __init__(self, db_path: Optional[str] = None):
-        self.db_path = db_path or config_manager.get_database_config()['db_path']
-        self.source_dir = config_manager.get_data_config()['source_dir']
+    def __init__(self, db_name: str = "default"):
+        db_config = config_manager.get_database_config()
+        
+        # 处理新的多数据库配置
+        if 'db_paths' in db_config:
+            db_paths = db_config['db_paths']
+            if db_name == "default":
+                # 默认使用第一个数据库
+                self.db_path = next(iter(db_paths.values()))
+                self.db_name = next(iter(db_paths.keys()))
+            else:
+                if db_name not in db_paths:
+                    raise ValueError(f"数据库 '{db_name}' 未在配置中定义。")
+                self.db_path = db_paths[db_name]
+                self.db_name = db_name
+        # 回退到旧的单数据库配置
+        elif 'db_path' in db_config:
+            self.db_path = db_config['db_path']
+            self.db_name = "default"
+        else:
+            raise ValueError("配置文件中未找到数据库路径配置。")
+            
+        # 如果source_dir还没有被设置（比如在initialize_all_databases_from_source_folders中），使用默认值
+        if not hasattr(self, 'source_dir'):
+            self.source_dir = config_manager.get_data_config()['source_dir']
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"数据管理器初始化 - 数据库: {self.db_path}, 数据源: {self.source_dir}")
+        
+        # 初始化数据库适配器
+        self.db_adapter = get_database_adapter('sqlite', self.db_path)
         self._init_database()
+        
+        # 为不同数据库设置ID前缀，确保全局唯一性
+        self._set_id_prefix()
+    
+    def _set_id_prefix(self):
+        """为不同数据库设置ID前缀，确保全局唯一性"""
+        # 定义数据库名称到前缀的映射
+        db_prefixes = {
+            "TangShi": 1000000,  # 唐诗ID前缀
+            "SongCi": 2000000,   # 宋词ID前缀
+            "YuanQu": 3000000,   # 元曲ID前缀
+            "default": 0         # 默认数据库前缀
+        }
+        
+        # 根据数据库名称设置前缀
+        self.id_prefix = db_prefixes.get(self.db_name, 0)
+        self.logger.info(f"数据库 {self.db_name} 的ID前缀设置为: {self.id_prefix}")
+    
+    @classmethod
+    def initialize_all_databases_from_source_folders(cls, clear_existing: bool = False) -> Dict[str, Dict[str, int]]:
+        """根据source_json下的子文件夹初始化所有数据库"""
+        data_config = config_manager.get_data_config()
+        source_json_dir = Path(data_config['source_dir'])
+        
+        # 获取数据库配置
+        db_config = config_manager.get_database_config()
+        db_paths = db_config.get('db_paths', {})
+        
+        # 获取所有子文件夹
+        subfolders = [f for f in source_json_dir.iterdir() if f.is_dir()]
+        
+        results = {}
+        
+        for folder in subfolders:
+            folder_name = folder.name
+            
+            # 如果该文件夹在数据库配置中，则使用配置的数据库路径
+            if folder_name in db_paths:
+                db_path = db_paths[folder_name]
+            else:
+                # 否则使用默认路径格式 data/{folder_name}.db
+                db_path = f"data/{folder_name}.db"
+            
+            # 创建DataManager实例，使用folder_name作为数据库名称
+            manager = cls(db_name=folder_name)
+            # 为该数据库实例设置正确的source_dir
+            manager.source_dir = str(folder)
+            
+            # 重新初始化db_adapter以确保使用正确的数据库路径
+            manager.db_adapter = get_database_adapter('sqlite', manager.db_path)
+            
+            # 初始化数据库
+            manager._init_database()
+            
+            # 初始化数据
+            result = manager.initialize_database_from_json(clear_existing=clear_existing)
+            results[folder_name] = result
+            
+        return results
     
     def _init_database(self):
         """初始化数据库 - 采用新表结构，时间戳字段不再用CURRENT_TIMESTAMP，需手动插入带时区的ISO时间字符串"""
         self.logger.info("开始初始化数据库...")
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        # 创建诗词表 - [修改] 将 rhythmic 列重命名为 title
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS poems (
-                id INTEGER PRIMARY KEY,
-                title TEXT,
-                author TEXT,
-                paragraphs TEXT,
-                full_text TEXT,
-                author_desc TEXT,
-                created_at TEXT,
-                updated_at TEXT
-            )
-        ''')
-
-        # 创建标注结果表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS annotations (
-                id INTEGER PRIMARY KEY,
-                poem_id INTEGER,
-                model_identifier TEXT NOT NULL,
-                status TEXT NOT NULL CHECK(status IN ('completed', 'failed')),
-                annotation_result TEXT,
-                error_message TEXT,
-                created_at TEXT,
-                updated_at TEXT,
-                FOREIGN KEY(poem_id) REFERENCES poems(id)
-            )
-        ''')
-
-        # 创建作者表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS authors (
-                name TEXT PRIMARY KEY,
-                description TEXT,
-                short_description TEXT,
-                created_at TEXT
-            )
-        ''')
-
-        # 创建索引
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_poem_author ON poems(author)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_annotation_poem_model ON annotations(poem_id, model_identifier)')
-        cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS uidx_poem_model ON annotations(poem_id, model_identifier)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_annotation_status ON annotations(status)')
-
-        conn.commit()
-        conn.close()
+        self.db_adapter.init_database()
         self.logger.info("数据库初始化完成")
 
     def load_data_from_json(self, json_file: str) -> List[Dict[str, Any]]:
@@ -101,11 +143,13 @@ class DataManager:
         
         all_data = []
         
-        # [修改] 查找所有 poet.*.*.json 文件
-        json_files = list(source_path.glob('poet.*.*.json'))
+        # [修改] 查找所有 poet.*.*.json 和 ci.*.*.json 文件
+        poet_files = list(source_path.glob('poet.*.*.json'))
+        ci_files = list(source_path.glob('ci.*.*.json'))
+        json_files = poet_files + ci_files
         json_files.sort()  # 确保按文件名排序
         
-        self.logger.info(f"找到 {len(json_files)} 个JSON文件")
+        self.logger.info(f"找到 {len(json_files)} 个JSON文件 ({len(poet_files)} 个poet文件, {len(ci_files)} 个ci文件)")
         
         for json_file in json_files:
             try:
@@ -128,10 +172,13 @@ class DataManager:
             return []
 
         all_authors = []
-        author_files = sorted(list(source_path.glob('authors.*.json')))
+        # 查找所有 authors.*.json 和 author.*.json 文件
+        authors_files = list(source_path.glob('authors.*.json'))
+        author_files = list(source_path.glob('author.*.json'))
+        author_files = sorted(authors_files + author_files)
 
         if not author_files:
-            self.logger.warning("在数据源目录中未找到 'authors.*.json' 格式的作者文件。")
+            self.logger.warning("在数据源目录中未找到作者文件。")
             return []
 
         self.logger.info(f"找到 {len(author_files)} 个作者文件: {[f.name for f in author_files]}")
@@ -193,21 +240,27 @@ class DataManager:
         now = datetime.now(tz).isoformat()
 
         for poem_data in poems_data:
-            paragraphs = poem_data.get('paragraphs', [])
+            # 标准化诗词数据，处理字段命名差异
+            normalized_data = normalize_poem_data(poem_data)
+            
+            paragraphs = normalized_data.get('paragraphs', [])
             full_text = '\n'.join(paragraphs)
 
-            # [修改] 使用 'title' 字段
+            # 使用全局唯一ID
+            global_id = self.id_prefix + current_id
+
+            # 使用 'title' 字段
             cursor.execute('''
                 INSERT OR REPLACE INTO poems 
                 (id, title, author, paragraphs, full_text, author_desc, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                current_id,
-                poem_data.get('title', ''), # [修改] 从 'title' 获取
-                poem_data.get('author', ''),
+                global_id,  # 使用全局唯一ID
+                normalized_data.get('title', ''), # 从 'title' 获取
+                normalized_data.get('author', ''),
                 json.dumps(paragraphs, ensure_ascii=False),
                 full_text,
-                poem_data.get('author_desc', ''),
+                normalized_data.get('author_desc', ''),
                 now,
                 now
             ))
@@ -226,10 +279,6 @@ class DataManager:
                                end_id: Optional[int] = None,
                                force_rerun: bool = False) -> List[Dict[str, Any]]:
         """获取指定模型待标注的诗词 - [修改] 查询 'title'"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-
         params = []
         
         # [修改] 查询 'title' 而不是 'rhythmic'
@@ -262,8 +311,7 @@ class DataManager:
             query += " LIMIT ?"
             params.append(limit)
         
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
+        rows = self.db_adapter.execute_query(query, tuple(params))
 
         poems = []
         for row in rows:
@@ -272,17 +320,12 @@ class DataManager:
                 poem['paragraphs'] = json.loads(poem['paragraphs'])
             poems.append(poem)
 
-        conn.close()
         return poems
 
     def get_poems_by_ids(self, poem_ids: List[int]) -> List[Dict[str, Any]]:
         """根据ID列表获取诗词信息 - [修改] 查询 'title'"""
         if not poem_ids:
             return []
-        
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
         
         # [修改] 查询 'title'
         placeholders = ','.join('?' * len(poem_ids))
@@ -293,9 +336,7 @@ class DataManager:
             WHERE p.id IN ({placeholders})
         """
         
-        cursor.execute(query, poem_ids)
-        rows = cursor.fetchall()
-        conn.close()
+        rows = self.db_adapter.execute_query(query, tuple(poem_ids))
         
         poems = []
         for row in rows:
@@ -309,22 +350,16 @@ class DataManager:
     
     def get_poem_by_id(self, poem_id: int) -> Optional[Dict[str, Any]]:
         """根据ID获取单首诗词信息 - [修改] 查询 'title'"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-
         # [修改] 查询 'title'
-        cursor.execute("""
+        rows = self.db_adapter.execute_query("""
             SELECT p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc
             FROM poems p
             LEFT JOIN authors au ON p.author = au.name
             WHERE p.id = ?
         """, (poem_id,))
         
-        row = cursor.fetchone()
-        conn.close()
-        
-        if row:
+        if rows:
+            row = rows[0]
             poem = dict(row)
             if poem.get('paragraphs'):
                 poem['paragraphs'] = json.loads(poem['paragraphs'])
@@ -339,13 +374,11 @@ class DataManager:
         from datetime import datetime, timezone, timedelta
         self.logger.debug(f"保存标注结果 - 诗词ID: {poem_id}, 模型: {model_identifier}, 状态: {status}")
 
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
         tz = timezone(timedelta(hours=8))
         now = datetime.now(tz).isoformat()
 
         try:
-            cursor.execute('''
+            rowcount = self.db_adapter.execute_update('''
                 INSERT INTO annotations (poem_id, model_identifier, status, annotation_result, error_message, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(poem_id, model_identifier) DO UPDATE SET
@@ -355,39 +388,33 @@ class DataManager:
                     updated_at = excluded.updated_at
             ''', (poem_id, model_identifier, status, annotation_result, error_message, now, now))
 
-            conn.commit()
-            success = cursor.rowcount > 0
+            success = rowcount > 0
             if success:
                 self.logger.debug(f"标注结果保存成功 - 诗词ID: {poem_id}, 模型: {model_identifier}")
             return success
         except Exception as e:
-            conn.rollback()
             self.logger.error(f"保存标注结果失败 - 诗词ID: {poem_id}, 模型: {model_identifier}, 错误: {e}")
             return False
-        finally:
-            conn.close()
 
     def get_statistics(self) -> Dict[str, Any]:
         """获取数据库统计信息 (增强版)"""
         self.logger.debug("开始获取数据库统计信息...")
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
         
         # 总诗词数量
-        cursor.execute("SELECT COUNT(*) FROM poems")
-        total_poems = cursor.fetchone()[0]
+        rows = self.db_adapter.execute_query("SELECT COUNT(*) FROM poems")
+        total_poems = rows[0][0]
         
         # 总作者数
-        cursor.execute("SELECT COUNT(*) FROM authors")
-        total_authors = cursor.fetchone()[0]
+        rows = self.db_adapter.execute_query("SELECT COUNT(*) FROM authors")
+        total_authors = rows[0][0]
         
         # 按模型和状态统计标注数量
-        cursor.execute("""
+        rows = self.db_adapter.execute_query("""
             SELECT model_identifier, status, COUNT(*) 
             FROM annotations 
             GROUP BY model_identifier, status
         """)
-        model_status_counts = cursor.fetchall()
+        model_status_counts = rows
         
         # 格式化模型统计
         stats_by_model = {}
@@ -396,8 +423,6 @@ class DataManager:
                 stats_by_model[model] = {'completed': 0, 'failed': 0, 'total_annotated': 0}
             stats_by_model[model][status] = count
             stats_by_model[model]['total_annotated'] += count
-            
-        conn.close()
         
         self.logger.debug(f"统计信息获取完成 - 诗词: {total_poems}, 作者: {total_authors}, 模型数: {len(stats_by_model)}")
         
@@ -413,13 +438,9 @@ class DataManager:
         
         if clear_existing:
             self.logger.info("清空现有数据...")
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM annotations")
-            cursor.execute("DELETE FROM poems")
-            cursor.execute("DELETE FROM authors")
-            conn.commit()
-            conn.close()
+            self.db_adapter.execute_update("DELETE FROM annotations")
+            self.db_adapter.execute_update("DELETE FROM poems")
+            self.db_adapter.execute_update("DELETE FROM authors")
             self.logger.info("现有数据已清空")
         
         # 加载作者数据
@@ -447,9 +468,6 @@ class DataManager:
                        output_file: Optional[str] = None,
                        model_filter: Optional[str] = None) -> str:
         """导出标注结果 - [修改] 导出 'title'"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
         # 构建查询条件
         where_clause = ""
         params = []
@@ -478,8 +496,7 @@ class DataManager:
             ORDER BY p.id, a.model_identifier
         """
         
-        cursor.execute(query, params)
-        results = cursor.fetchall()
+        results = self.db_adapter.execute_query(query, tuple(params))
         
         # 确定输出文件路径
         if not output_file:
@@ -510,16 +527,12 @@ class DataManager:
                     }
                     f.write(json.dumps(result_dict, ensure_ascii=False) + '\n')
         
-        conn.close()
         return str(output_file)
 
     def get_annotation_statistics(self) -> Dict[str, Any]:
         """获取标注统计信息"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
         # 获取总体统计
-        cursor.execute("""
+        rows = self.db_adapter.execute_query("""
             SELECT 
                 COUNT(DISTINCT p.id) as total_poems,
                 COUNT(a.id) as total_annotations,
@@ -529,10 +542,10 @@ class DataManager:
             LEFT JOIN annotations a ON p.id = a.poem_id
         """)
         
-        overall_stats = cursor.fetchone()
+        overall_stats = rows[0]
         
         # 按模型统计
-        cursor.execute("""
+        model_stats = self.db_adapter.execute_query("""
             SELECT 
                 model_identifier,
                 COUNT(*) as total,
@@ -543,20 +556,14 @@ class DataManager:
             ORDER BY model_identifier
         """)
         
-        model_stats = cursor.fetchall()
-        
         # 按状态统计
-        cursor.execute("""
+        status_stats = self.db_adapter.execute_query("""
             SELECT 
                 status,
                 COUNT(*) as count
             FROM annotations
             GROUP BY status
         """)
-        
-        status_stats = cursor.fetchall()
-        
-        conn.close()
         
         return {
             'overall': {
@@ -582,23 +589,12 @@ class DataManager:
 
     def get_all_authors(self) -> List[Dict[str, Any]]:
         """获取所有作者信息"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT name, description, short_description FROM authors ORDER BY name")
-        
-        rows = cursor.fetchall()
-        conn.close()
+        rows = self.db_adapter.execute_query("SELECT name, description, short_description FROM authors ORDER BY name")
         
         return [dict(row) for row in rows]
 
     def search_poems(self, author: Optional[str] = None, title: Optional[str] = None, page: int = 1, per_page: int = 10) -> Dict[str, Any]:
         """根据作者和标题搜索诗词，并支持分页 - [修改] 适配 'title'"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-
         # [修改] 查询 'title'
         query = "SELECT p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc FROM poems p LEFT JOIN authors au ON p.author = au.name"
         conditions = []
@@ -618,17 +614,15 @@ class DataManager:
         
         # Get total count for pagination
         count_query = query.replace("p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc", "COUNT(*)")
-        cursor.execute(count_query, params)
-        total_count = cursor.fetchone()[0]
+        count_rows = self.db_adapter.execute_query(count_query, tuple(params))
+        total_count = count_rows[0][0]
 
         # Add pagination to the main query
         offset = (page - 1) * per_page
         query += " ORDER BY p.id LIMIT ? OFFSET ?"
         params.extend([per_page, offset])
 
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
-        conn.close()
+        rows = self.db_adapter.execute_query(query, tuple(params))
 
         poems = []
         for row in rows:
@@ -658,11 +652,7 @@ class DataManager:
             return set()
 
         completed_ids = set()
-        conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
             # 使用参数化查询防止SQL注入
             placeholders = ','.join('?' * len(poem_ids))
             query = f"""
@@ -675,18 +665,23 @@ class DataManager:
             """
             
             params = poem_ids + [model_identifier]
-            cursor.execute(query, params)
+            rows = self.db_adapter.execute_query(query, tuple(params))
             
             # 使用生成器表达式和 set.update 最高效地处理结果
-            completed_ids.update(row[0] for row in cursor.fetchall())
+            completed_ids.update(row[0] for row in rows)
             
-        except sqlite3.Error as e:
+        except Exception as e:
             self.logger.error(f"检查标注状态时发生数据库错误: {e}")
-        finally:
-            if conn:
-                conn.close()
         
         return completed_ids
 
 # 全局数据管理器实例
-data_manager = DataManager()
+data_manager = None
+
+
+def get_data_manager(db_name: str = "default"):
+    """获取数据管理器实例，支持在运行时切换数据库"""
+    global data_manager
+    if data_manager is None or data_manager.db_name != db_name:
+        data_manager = DataManager(db_name=db_name)
+    return data_manager

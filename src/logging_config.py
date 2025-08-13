@@ -59,7 +59,10 @@ class LoggingConfig:
         # [修改] 配置日志文件处理器，并设置其独立的级别
         if enable_file_log:
             if not log_file:
-                logs_dir = Path("logs")
+                # 使用项目根目录下的logs目录
+                # 获取项目根目录
+                project_root = Path(__file__).parent.parent
+                logs_dir = project_root / "logs"
                 logs_dir.mkdir(exist_ok=True)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 log_file = str(logs_dir / f"poetry_annotator_{timestamp}.log")

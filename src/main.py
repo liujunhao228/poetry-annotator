@@ -4,12 +4,42 @@ import sys
 from pathlib import Path
 from typing import Optional, Tuple
 import logging
-from .config_manager import config_manager
-from .data_manager import data_manager
-from .label_parser import label_parser
-from .llm_factory import llm_factory
-from .annotator import Annotator
-from .logging_config import setup_default_logging, get_logger
+import os
+
+# 处理相对导入问题
+# 优先尝试相对导入（当作为包的一部分被导入时）
+relative_import_failed = False
+try:
+    # 当作为包运行时（推荐方式）
+    from .config_manager import config_manager
+    from .data_manager import get_data_manager
+    from .label_parser import label_parser
+    from .llm_factory import llm_factory
+    from .annotator import Annotator
+    from .logging_config import setup_default_logging, get_logger
+except ImportError as e:
+    relative_import_failed = True
+    print(f"相对导入失败: {e}")
+
+# 如果相对导入失败，则尝试绝对导入
+if relative_import_failed:
+    # 当直接运行时（兼容开发环境）
+    # 确保 src 目录在 sys.path 中，以便绝对导入可以找到 src 下的模块
+    src_dir = os.path.dirname(os.path.abspath(__file__))
+    if src_dir not in sys.path:
+        sys.path.insert(0, src_dir)
+        print(f"已将 {src_dir} 添加到 sys.path")
+        
+    try:
+        from config_manager import config_manager
+        from data_manager import get_data_manager
+        from label_parser import label_parser
+        from llm_factory import llm_factory
+        from annotator import Annotator
+        from logging_config import setup_default_logging, get_logger
+    except ImportError as e:
+        print(f"绝对导入也失败了: {e}")
+        raise # Re-raise the exception to stop execution
 
 
 # 获取主日志记录器
@@ -24,7 +54,8 @@ logger = get_logger(__name__)
 @click.option('--log-file', help='指定日志文件路径（可选，将覆盖配置文件设置）')
 @click.option('--enable-file-log', is_flag=True, default=None, 
               help='启用文件日志输出（可选，将覆盖配置文件设置）')
-def cli(log_level, log_file, enable_file_log):
+@click.option('--db-name', type=str, help='数据库名称（从配置文件中获取路径）')
+def cli(log_level, log_file, enable_file_log, db_name):
     """LLM诗词情感标注工具"""
     # 设置日志配置 - 优先使用配置文件，CLI参数可覆盖
     try:
@@ -37,6 +68,14 @@ def cli(log_level, log_file, enable_file_log):
     except Exception as e:
         # 如果配置文件有问题，使用CLI参数或默认值
         setup_default_logging(log_level, enable_file_log, log_file)
+    
+    # 设置数据库
+    if db_name:
+        try:
+            get_data_manager(db_name=db_name)
+        except ValueError as e:
+            logger.error(f"数据库设置错误: {e}")
+            return
     
     # 记录启动信息
     logger.info("=" * 60)
@@ -85,8 +124,11 @@ def setup(config, init_db, clear_existing):
         if init_db:
             logger.info("开始从JSON文件初始化数据库...")
             try:
-                result = data_manager.initialize_database_from_json(clear_existing=clear_existing)
-                logger.info(f"数据库初始化完成! 作者: {result['authors']}, 诗词: {result['poems']}")
+                # 使用新的多数据库初始化方法
+                results = data_manager.initialize_all_databases_from_source_folders(clear_existing=clear_existing)
+                logger.info("所有数据库初始化完成!")
+                for folder_name, result in results.items():
+                    logger.info(f"数据库 [{folder_name}]: 作者: {result['authors']}, 诗词: {result['poems']}")
             except Exception as e:
                 logger.error(f"数据库初始化失败: {e}")
                 return

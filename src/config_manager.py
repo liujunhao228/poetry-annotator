@@ -116,9 +116,24 @@ class ConfigManager:
         
     def get_database_config(self) -> Dict[str, str]:
         """获取数据库配置"""
-        return {
-            'db_path': self.config.get('Database', 'db_path')
-        }
+        # 尝试获取新的多数据库配置
+        db_paths_str = self.config.get('Database', 'db_paths', fallback=None)
+        if db_paths_str:
+            # 解析 "name1=path1,name2=path2" 格式
+            db_paths = {}
+            for item in db_paths_str.split(','):
+                if '=' in item:
+                    name, path = item.split('=', 1)
+                    db_paths[name.strip()] = path.strip()
+            return {'db_paths': db_paths}
+        
+        # 回退到旧的单数据库配置
+        db_path = self.config.get('Database', 'db_path', fallback=None)
+        if db_path:
+            return {'db_path': db_path}
+        
+        # 如果都没有配置，则返回空字典
+        return {}
     
     def get_data_config(self) -> Dict[str, str]:
         """获取数据路径配置"""
@@ -210,10 +225,10 @@ class ConfigManager:
             # 检查LLM配置
             llm_config = self.get_llm_config()
 
-            # 检查数据库配置
+            # 检查数据库配置 - 支持新旧两种模式
             db_config = self.get_database_config()
-            if not db_config['db_path']:
-                print("错误: 未设置数据库路径")
+            if not db_config:
+                print("错误: 未设置数据库路径 (db_path 或 db_paths)")
                 return False
             
             # 检查数据路径配置

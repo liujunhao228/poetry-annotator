@@ -241,34 +241,35 @@ class BaseLLMService(ABC):
 
     def log_request_details(self, request_body: Dict[str, Any], headers: Dict[str, Any], prompt: Optional[str] = None):
         """记录完整的请求详情，长文本使用DEBUG级别"""
-        masked_body = self._mask_sensitive_data(request_body)
-        masked_headers = self._mask_sensitive_data(headers)
+        # 注释掉记录发送的请求信息（请求体与请求头）的逻辑
+        # masked_body = self._mask_sensitive_data(request_body)
+        # masked_headers = self._mask_sensitive_data(headers)
         
         # 所有详细、冗长的日志都使用 DEBUG 级别
-        self.logger.debug("=" * 80)
-        self.logger.debug(f"[{self.provider.upper()}] 请求详情")
-        self.logger.debug(f"请求体 (Payload):\n{json.dumps(masked_body, ensure_ascii=False, indent=2)}")
-        self.logger.debug(f"请求头 (Headers):\n{json.dumps(masked_headers, ensure_ascii=False, indent=2)}")
-        if prompt:
-            # 提示词长度对于用户意义不大，属于调试信息
-            self.logger.debug(f"[{self.provider.upper()}] 系统提示词长度: {len(prompt)}")
-        self.logger.debug("=" * 80)
+        # self.logger.debug("=" * 80)
+        # self.logger.debug(f"[{self.provider.upper()}] 请求详情")
+        # self.logger.debug(f"请求体 (Payload):\n{json.dumps(masked_body, ensure_ascii=False, indent=2)}")
+        # self.logger.debug(f"请求头 (Headers):\n{json.dumps(masked_headers, ensure_ascii=False, indent=2)}")
+        # if prompt:
+        #     # 提示词长度对于用户意义不大，属于调试信息
+        #     self.logger.debug(f"[{self.provider.upper()}] 系统提示词长度: {len(prompt)}")
+        # self.logger.debug("=" * 80)
 
         # [新增] 添加一条简洁的 INFO 日志，让用户知道程序在做什么
         self.logger.info(f"向 [{self.provider.upper()}] 发送API请求...")
 
     def log_response_details(self, parsed_data: Any, usage: Optional[Dict[str, Any]] = None):
         """记录响应详情，长文本使用DEBUG级别"""
-        # 完整响应和Token使用情况也应使用 DEBUG 级别
-        self.logger.debug("=" * 80)
-        self.logger.debug(f"[{self.provider.upper()}] 完整响应详情:")
-        self.logger.debug(f"响应状态: 成功")
-        if usage:
-            self.logger.debug(f"Token使用情况: {usage}")
+        # 注释掉记录"完整响应详情"的逻辑
+        # self.logger.debug("=" * 80)
+        # self.logger.debug(f"[{self.provider.upper()}] 完整响应详情:")
+        # self.logger.debug(f"响应状态: 成功")
+        # if usage:
+        #     self.logger.debug(f"Token使用情况: {usage}")
         
         # 将详细的解析结果改为 DEBUG
-        self.logger.debug(f"[{self.provider.upper()}] 解析结果:\n{json.dumps(parsed_data, ensure_ascii=False, indent=2)}")
-        self.logger.debug("=" * 80)
+        # self.logger.debug(f"[{self.provider.upper()}] 解析结果:\n{json.dumps(parsed_data, ensure_ascii=False, indent=2)}")
+        # self.logger.debug("=" * 80)
 
         # [新增] 在此添加一条简洁的 INFO 日志
         self.logger.info(f"成功接收并解析了来自 [{self.provider.upper()}] 的响应。")
@@ -313,7 +314,8 @@ class BaseLLMService(ABC):
             
             # 将原有的 INFO 日志细化
             self.logger.info(f"响应解析及内容验证成功，共 {len(validated_list)} 条标注记录。") # 保留这条简洁的INFO
-            self.logger.debug(f"详细验证内容: {json.dumps(validated_list, ensure_ascii=False, indent=2)}") # 增加一条DEBUG用于追溯
+            # 注释掉记录"详细验证内容"的逻辑
+            # self.logger.debug(f"详细验证内容: {json.dumps(validated_list, ensure_ascii=False, indent=2)}") # 增加一条DEBUG用于追溯
             
             return validated_list
         except (ValueError, TypeError) as e:

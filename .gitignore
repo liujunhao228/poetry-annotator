@@ -203,42 +203,20 @@ __marimo__/
 .streamlit/secrets.toml
 
 # config
-*.ini
-*.xml
-
-# example
-示例/
+config.ini
 
 # data
 config/
 logs/
 ids/
-data/
+data/source_json
 .progress_cache/
-数据库备份/
+.recovery_cache
 
 # test
 *test*
-
-# markdown
-docs
 
 # log
 *.log
 *.txt
 
-# destroyed code
-web/
-api_service.py
-*2025*
-poetry-annotator.py
-
-# Claude Code
-CLAUDE.md
-
-# scripts
-distribute_tasks.md
-
-# 临时
-README.md
-数据库备份.7z

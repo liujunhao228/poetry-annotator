@@ -5,6 +5,8 @@
 import json
 import re
 from typing import Any, List, Dict, Optional
+from pathlib import Path
+
 # 可选依赖：demjson3 和 json5
 try:
     import demjson3 as demjson

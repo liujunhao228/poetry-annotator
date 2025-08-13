@@ -10,7 +10,7 @@ from tqdm import tqdm
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 import pybreaker
 
-from .data_manager import data_manager
+from .data_manager import get_data_manager
 from .llm_factory import llm_factory
 from .config_manager import config_manager
 from .label_parser import label_parser
@@ -92,7 +92,8 @@ class Annotator:
         
         # [调整] DEBUG级别：将详细的、结构化的调试信息记录在DEBUG级别，仅输出到文件。
         logger.debug(f"业务层验证与数据转换成功，已合并 {len(final_results)} 条标注。")
-        logger.debug(f"合并后的标注详情: {json.dumps(final_results, ensure_ascii=False, indent=2)}")
+        # 注释掉详细验证内容的记录，因为项目已投入正常运行
+        # logger.debug(f"合并后的标注详情: {json.dumps(final_results, ensure_ascii=False, indent=2)}")
         
         return final_results
 
@@ -167,8 +168,10 @@ class Annotator:
         logger.info(f"[{self.model_identifier}] 开始标注任务 - 限制: {limit or '无'}, 范围: {start_id or '开始'}-{end_id or '结束'}, 强制重跑: {force_rerun}, 指定ID: {poem_ids is not None}")
         
         if poem_ids is not None:
+            data_manager = get_data_manager()
             poems = data_manager.get_poems_by_ids(poem_ids)
         else:
+            data_manager = get_data_manager()
             poems = data_manager.get_poems_to_annotate(
                 model_identifier=self.model_identifier,
                 limit=limit, start_id=start_id, end_id=end_id, force_rerun=force_rerun
@@ -197,6 +200,7 @@ class Annotator:
         for future in asyncio.as_completed(tasks):
             result = await future
             
+            data_manager = get_data_manager()
             data_manager.save_annotation(
                 poem_id=result['poem_id'],
                 model_identifier=self.model_identifier,
