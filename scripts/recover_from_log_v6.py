@@ -1,9 +1,9 @@
-# recover_from_log_v5.py
+# recover_from_log_v6.py
 """
 从日志文件中恢复因意外中断而未保存的标注数据。
-V5更新：
-- 放弃了有缺陷的正则表达式方法。
-- 采用更稳健的逐行解析和括号计数法来提取完整的JSON块，解决了嵌套括号导致提取不全的问题。
+V6更新：
+- 适配新的单行JSON日志格式（由src/annotation_data_logger.py生成）
+- 每行是一个独立的JSON对象，包含poem_id和annotation_data
 """
 import json
 import re
@@ -13,22 +13,25 @@ from typing import List, Dict, Any, Optional
 from tqdm import tqdm
 import sqlite3
 import click
+import sys
+import os
 
 # --- 模块导入 ---
+# 确保可以从项目根目录正确导入src模块
+project_root = Path(__file__).resolve().parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+# 初始化全局变量
+config_manager = None
+DataManager = None
+
 try:
     from src.config_manager import config_manager
     from src.data_manager import DataManager
-except ImportError:
-    import sys
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    try:
-        from src.config_manager import config_manager
-        from src.data_manager import DataManager
-    except ImportError as e:
-        print(f"警告：无法导入 config_manager 或 DataManager: {e}")
-        print("请确保此脚本位于项目根目录，并且 `src` 目录在 python path 中。")
-        config_manager = None
-        DataManager = None
+except ImportError as e:
+    print(f"警告：无法导入 config_manager 或 DataManager: {e}")
+    print("请确保此脚本位于项目根目录，并且 `src` 目录在 python path 中。")
 
 # --- 配置区 ---
 DEFAULT_CACHE_DIR = '.recovery_cache'
@@ -36,8 +39,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def extract_and_validate_json_blocks(log_file_path: str, cache_file_path: str) -> List[List[Dict[str, Any]]]:
     """
-    从日志内容中提取并验证JSON块。
-    此版本使用括号计数法，以正确处理嵌套的JSON结构。
+    从新格式的日志文件中提取并验证JSON块。
+    新格式：每行一个独立的JSON对象，包含poem_id和annotation_data字段
     """
     cache_path = Path(cache_file_path)
     if cache_path.exists():
@@ -57,52 +60,50 @@ def extract_and_validate_json_blocks(log_file_path: str, cache_file_path: str) -
         logging.error(f"日志文件未找到: {log_file_path}")
         return []
         
-    with log_file.open('r', encoding='utf-8') as f:
-        log_lines = f.readlines()
-
     validated_json_blocks = []
-    in_block = False
-    current_block_str = ""
-    bracket_level = 0
-    start_marker = "合并后的标注详情:"
-
-    for line in log_lines:
-        if not in_block:
-            if start_marker in line:
-                # 找到了一个块的开始
-                in_block = True
-                # 从 '[' 开始截取
-                try:
-                    current_block_str = line[line.index('['):]
-                    bracket_level = current_block_str.count('[') - current_block_str.count(']')
-                except ValueError:
-                    # 如果'['不在第一行，则跳过
-                    in_block = False
-                    continue
-        else:
-            # 已经在一个块内部
-            current_block_str += line
-            bracket_level += line.count('[') - line.count(']')
-
-        # 检查块是否结束
-        if in_block and bracket_level == 0:
-            try:
-                # 去除可能尾随的无关字符
-                clean_block_str = current_block_str.strip()
-                data = json.loads(clean_block_str)
+    
+    with log_file.open('r', encoding='utf-8') as f:
+        for line_num, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
                 
-                if (isinstance(data, list) and data and isinstance(data[0], dict) and
-                        'sentence_id' in data[0] and 'sentence_text' in data[0]):
-                    validated_json_blocks.append(data)
-                else:
-                    logging.debug(f"跳过一个不符合内部结构的块: {str(clean_block_str)[:100]}...")
+            try:
+                # 解析单行JSON
+                log_entry = json.loads(line)
+                
+                # 验证必需字段
+                if not isinstance(log_entry, dict):
+                    logging.debug(f"第{line_num}行: 不是有效的JSON对象")
+                    continue
+                    
+                if 'poem_id' not in log_entry or 'annotation_data' not in log_entry:
+                    logging.debug(f"第{line_num}行: 缺少必需字段poem_id或annotation_data")
+                    continue
+                
+                # annotation_data应该是一个列表
+                annotation_data = log_entry['annotation_data']
+                if not isinstance(annotation_data, list) or not annotation_data:
+                    logging.debug(f"第{line_num}行: annotation_data不是有效的列表或为空")
+                    continue
+                
+                # 验证列表中的每个元素是否包含必需字段
+                valid_items = []
+                for item in annotation_data:
+                    if isinstance(item, dict) and 'sentence_id' in item and 'sentence_text' in item:
+                        valid_items.append(item)
+                
+                if not valid_items:
+                    logging.debug(f"第{line_num}行: annotation_data中没有有效的标注项")
+                    continue
+                
+                # 将验证后的数据添加到结果中
+                validated_json_blocks.append(valid_items)
+                
             except json.JSONDecodeError as e:
-                logging.warning(f"一个候选块JSON解析失败，已跳过。错误: {e}. 块内容: {current_block_str[:150]}...")
-            
-            # 重置状态，准备寻找下一个块
-            in_block = False
-            current_block_str = ""
-            bracket_level = 0
+                logging.warning(f"第{line_num}行: JSON解析失败 - {e}")
+            except Exception as e:
+                logging.warning(f"第{line_num}行: 处理时发生错误 - {e}")
 
     logging.info(f"扫描完成，成功解析了 {len(validated_json_blocks)} 个有效标注数据块。")
 
@@ -116,10 +117,6 @@ def extract_and_validate_json_blocks(log_file_path: str, cache_file_path: str) -
             logging.error(f"写入缓存文件失败: {e}")
 
     return validated_json_blocks
-
-# --- 后续函数 (find_poem_id_for_annotation, process_single_log, cli) 保持不变 ---
-# 为了简洁，此处省略了与v4版本中相同的函数代码。
-# 你只需将上面的 extract_and_validate_json_blocks 函数替换掉v4版本中的同名函数即可。
 
 def search_poems_by_sentence(cursor: sqlite3.Cursor, sentence_text: str, candidate_ids: Optional[List[int]] = None) -> List[int]:
     cleaned_text = re.sub(r'[，。？！\s]', '', sentence_text.strip())
@@ -279,4 +276,3 @@ def cli(log_file_path, log_dir_path, model_identifier, db_path_override, dry_run
 
 if __name__ == '__main__':
     cli()
-

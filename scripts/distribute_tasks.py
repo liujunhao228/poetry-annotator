@@ -175,14 +175,9 @@ def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_
     os.environ['ANNOTATION_MODEL_NAME'] = model
     os.environ['ANNOTATION_ID_FILE'] = Path(id_file).stem  # 使用文件名而不是完整路径
     
-    # 初始化批次日志记录器
-    try:
-        from src.batch_logger import batch_logger_manager
-        batch_logger = batch_logger_manager.create_batch_logger()
-        batch_logger.info(f"开始新的批次任务 - 模型: {model}, ID文件: {Path(id_file).name}")
-    except Exception as e:
-        logger.warning(f"批次日志初始化失败: {e}")
-        batch_logger = None
+    # 初始化批次日志记录器（已移除对不存在模块的依赖）
+    # 直接使用全局日志记录器记录批次任务信息
+    logger.info(f"开始新的批次任务 - 模型: {model}, ID文件: {Path(id_file).name}")
     
     logger.info("=" * 60)
     logger.info(f"启动任务流水线 -> 模型: [{model}], ID文件: [{Path(id_file).name}]")

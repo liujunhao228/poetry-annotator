@@ -204,19 +204,17 @@ __marimo__/
 
 # config
 config.ini
+*.xml
 
 # data
-logs/
 ids/
-data/source_json/TangShi
-data/source_json/SongCi
+data/source_json/TangShi/
+data/source_json/SongCi/
+data/validation
 .progress_cache/
-.recovery_cache
-
+.recovery_cache/
+logs/
+gui_state.json
 # test
 *test*
-
-# log
-*.log
-*.txt
 

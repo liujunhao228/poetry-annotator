@@ -175,13 +175,41 @@ class DBManager:
         query = "SELECT id, name_zh, name_en, parent_id, level FROM emotion_categories"
         return self._fetch_data(query)
 
-    def get_emotion_distribution(self) -> pd.DataFrame:
-        """统计每种情感（无论主次）的出现次数。"""
+    def get_emotion_distribution_frequency(self) -> pd.DataFrame:
+        """统计每种情感（无论主次）的出现次数（基于所有标注）。"""
         query = """
             SELECT ec.id, ec.name_zh, ec.parent_id, ec.level, COUNT(sel.emotion_id) AS count
             FROM sentence_emotion_links sel
             JOIN emotion_categories ec ON sel.emotion_id = ec.id
             GROUP BY ec.id ORDER BY count DESC
+        """
+        return self._fetch_data(query)
+
+    def get_emotion_distribution_actual(self) -> pd.DataFrame:
+        """统计每种情感在多少首不同的诗中出现（基于最新标注）。"""
+        query = """
+        WITH LatestCompletedAnnotation AS (
+            SELECT poem_id, MAX(id) as annotation_id 
+            FROM annotations 
+            WHERE status = 'completed' 
+            GROUP BY poem_id
+        ),
+        PoemDistinctEmotions AS (
+            SELECT DISTINCT sa.poem_id, sel.emotion_id
+            FROM sentence_emotion_links sel
+            JOIN sentence_annotations sa ON sel.sentence_annotation_id = sa.id
+            JOIN LatestCompletedAnnotation lca ON sa.annotation_id = lca.annotation_id
+        )
+        SELECT 
+            ec.id, 
+            ec.name_zh, 
+            ec.parent_id, 
+            ec.level, 
+            COUNT(DISTINCT pde.poem_id) AS count
+        FROM PoemDistinctEmotions pde
+        JOIN emotion_categories ec ON pde.emotion_id = ec.id
+        GROUP BY ec.id 
+        ORDER BY count DESC
         """
         return self._fetch_data(query)
 
@@ -208,32 +236,103 @@ class DBManager:
         """
         return self._fetch_data(query, params={'limit': limit})
 
-    def get_frequent_poem_emotion_sets(self, limit: int = 50) -> pd.DataFrame:
-        """查找最频繁的全诗情感集合。"""
+    def get_frequent_poem_emotion_sets_frequency(self, limit: int = 50) -> pd.DataFrame:
+        """查找最频繁的全诗情感集合（基于所有标注）。"""
         # 兼容 title (唐诗) 和 rhythmic (宋词) 字段
+        # 修改查询逻辑，不再使用 LatestCompletedAnnotation，而是直接关联所有completed的标注
         query = """
-            WITH LatestCompletedAnnotation AS (
-                SELECT poem_id, MAX(id) as annotation_id FROM annotations WHERE status = 'completed' GROUP BY poem_id
-            ), PoemDistinctEmotions AS (
-                SELECT DISTINCT sa.poem_id, sel.emotion_id
+            WITH PoemDistinctEmotions AS (
+                -- 对于每个 annotation_id (即每次标注)，找出其所有不重复的情感
+                SELECT DISTINCT 
+                    sa.poem_id, 
+                    sa.annotation_id, -- 包含 annotation_id 以便区分不同标注
+                    sel.emotion_id
                 FROM sentence_emotion_links sel
                 JOIN sentence_annotations sa ON sel.sentence_annotation_id = sa.id
-                JOIN LatestCompletedAnnotation lca ON sa.annotation_id = lca.annotation_id
-            ), PoemEmotionSets AS (
-                SELECT poem_id, GROUP_CONCAT(emotion_id, ';' ORDER BY emotion_id) as emotion_set_ids
-                FROM PoemDistinctEmotions GROUP BY poem_id HAVING COUNT(emotion_id) > 1
+                JOIN annotations a ON sa.annotation_id = a.id -- 关联 annotations 表以过滤 status
+                WHERE a.status = 'completed'
+            ), PoemEmotionSetsPerAnnotation AS (
+                -- 为每次标注 (annotation_id) 生成情感集合
+                SELECT 
+                    poem_id,
+                    annotation_id, -- 按 annotation_id 分组
+                    GROUP_CONCAT(emotion_id, ';' ORDER BY emotion_id) as emotion_set_ids
+                FROM PoemDistinctEmotions 
+                GROUP BY poem_id, annotation_id -- 按 poem_id 和 annotation_id 分组
+                HAVING COUNT(emotion_id) > 1
             ), SetCounts AS (
-                SELECT emotion_set_ids, COUNT(*) as set_count
-                FROM PoemEmotionSets GROUP BY emotion_set_ids
+                -- 统计每种情感集合出现的总次数（即被多少次标注过）
+                SELECT 
+                    emotion_set_ids, 
+                    COUNT(*) as set_count
+                FROM PoemEmotionSetsPerAnnotation
+                GROUP BY emotion_set_ids
             ), PoemExample AS (
-                SELECT pes.emotion_set_ids, 
-                       MIN(p.title || ' - ' || p.author) as poem_example
-                FROM PoemEmotionSets pes JOIN poems p ON pes.poem_id = p.id GROUP BY pes.emotion_set_ids
+                -- 为每种情感集合找一个示例诗词 (这里用 MIN 来确保一致性)
+                SELECT 
+                    pespa.emotion_set_ids, 
+                    MIN(p.title || ' - ' || p.author) as poem_example
+                FROM PoemEmotionSetsPerAnnotation pespa
+                JOIN poems p ON pespa.poem_id = p.id
+                GROUP BY pespa.emotion_set_ids
             )
-            SELECT sc.emotion_set_ids, sc.set_count, pe.poem_example
-            FROM SetCounts sc JOIN PoemExample pe ON sc.emotion_set_ids = pe.emotion_set_ids
+            SELECT 
+                sc.emotion_set_ids, 
+                sc.set_count, 
+                pe.poem_example
+            FROM SetCounts sc 
+            JOIN PoemExample pe ON sc.emotion_set_ids = pe.emotion_set_ids
             ORDER BY sc.set_count DESC
             LIMIT :limit
+        """
+        return self._fetch_data(query, params={'limit': limit})
+
+    def get_frequent_poem_emotion_sets_actual(self, limit: int = 50) -> pd.DataFrame:
+        """查找最频繁的全诗情感集合（基于最新标注）。"""
+        query = """
+        WITH LatestCompletedAnnotation AS (
+            SELECT poem_id, MAX(id) as annotation_id 
+            FROM annotations 
+            WHERE status = 'completed' 
+            GROUP BY poem_id
+        ),
+        PoemDistinctEmotions AS (
+            SELECT DISTINCT sa.poem_id, sel.emotion_id
+            FROM sentence_emotion_links sel
+            JOIN sentence_annotations sa ON sel.sentence_annotation_id = sa.id
+            JOIN LatestCompletedAnnotation lca ON sa.annotation_id = lca.annotation_id
+        ),
+        PoemEmotionSets AS (
+            SELECT 
+                poem_id, 
+                GROUP_CONCAT(emotion_id, ';' ORDER BY emotion_id) as emotion_set_ids
+            FROM PoemDistinctEmotions 
+            GROUP BY poem_id 
+            HAVING COUNT(emotion_id) > 1
+        ),
+        SetCounts AS (
+            SELECT 
+                emotion_set_ids, 
+                COUNT(*) as set_count
+            FROM PoemEmotionSets
+            GROUP BY emotion_set_ids
+        ),
+        PoemExample AS (
+            SELECT 
+                pes.emotion_set_ids, 
+                MIN(p.title || ' - ' || p.author) as poem_example
+            FROM PoemEmotionSets pes 
+            JOIN poems p ON pes.poem_id = p.id 
+            GROUP BY pes.emotion_set_ids
+        )
+        SELECT 
+            sc.emotion_set_ids, 
+            sc.set_count, 
+            pe.poem_example
+        FROM SetCounts sc 
+        JOIN PoemExample pe ON sc.emotion_set_ids = pe.emotion_set_ids
+        ORDER BY sc.set_count DESC
+        LIMIT :limit
         """
         return self._fetch_data(query, params={'limit': limit})
 

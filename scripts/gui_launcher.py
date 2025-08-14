@@ -438,6 +438,19 @@ class SamplingTab(TaskExecutorTab):
         self.filter_missing_var = tk.BooleanVar(value=False)
         self.filter_missing_check = ttk.Checkbutton(main_options_frame, text="过滤缺虚号 (排除任何含'□'的诗词)", variable=self.filter_missing_var)
         self.filter_missing_check.grid(row=1, column=0, columnspan=3, padx=5, pady=5, sticky="w")
+        
+        # 新增：排除已标注选项
+        self.exclude_annotated_frame = ttk.LabelFrame(main_options_frame, text="排除已标注")
+        self.exclude_annotated_frame.grid(row=2, column=0, columnspan=3, padx=5, pady=5, sticky="ew")
+        self.exclude_annotated_var = tk.BooleanVar(value=False)
+        self.exclude_annotated_check = ttk.Checkbutton(self.exclude_annotated_frame, text="排除已标注的诗词", variable=self.exclude_annotated_var, command=self._update_ui_state)
+        self.exclude_annotated_check.pack(side="left", padx=5, pady=5)
+        ttk.Label(self.exclude_annotated_frame, text="模型标识符:").pack(side="left", padx=(10, 5), pady=5)
+        self.model_var = tk.StringVar()
+        self.model_combobox = ttk.Combobox(self.exclude_annotated_frame, textvariable=self.model_var, state="readonly", width=20)
+        self.model_combobox.pack(side="left", padx=5, pady=5)
+        self._populate_models()
+        
         main_options_frame.columnconfigure(1, weight=1)
         self.sort_frame = ttk.LabelFrame(self, text="排序方式")
         self.sort_frame.pack(fill="x", padx=5, pady=5)
@@ -470,6 +483,22 @@ class SamplingTab(TaskExecutorTab):
         self.output_file_browse_btn.grid(row=4, column=2, padx=5, pady=5)
         output_frame.columnconfigure(1, weight=1)
 
+    def _populate_models(self):
+        """填充模型下拉框"""
+        try:
+            models = config_manager.list_model_configs()
+            if models:
+                # 在模型列表前添加"全部模型"选项
+                all_models = ["全部模型"] + models
+                self.model_combobox['values'] = all_models
+                if not self.model_var.get():
+                    self.model_combobox.set(all_models[0])  # 默认选择"全部模型"
+            else:
+                self.model_combobox.set("无可用模型")
+        except Exception as e:
+            self.model_combobox.set("加载失败")
+            self.output_queue.put(f"错误: 加载模型配置失败: {e}\n")
+            
     def _populate_databases(self):
         try:
             db_config = config_manager.get_database_config()
@@ -510,6 +539,11 @@ class SamplingTab(TaskExecutorTab):
         file_state = state if output_mode == 'file' else 'disabled'
         for widget in [self.output_file_entry, self.output_file_browse_btn]: widget['state'] = file_state
         
+        # 更新排除已标注相关控件
+        self.exclude_annotated_check['state'] = state
+        model_state = state if self.exclude_annotated_var.get() else 'disabled'
+        self.model_combobox['state'] = 'readonly' if model_state == 'normal' else 'disabled'
+        
         # 更新数据库选择的单选按钮
         for radio in [self.select_db_radio]:
             radio['state'] = state
@@ -523,22 +557,62 @@ class SamplingTab(TaskExecutorTab):
     def start_task(self):
         command = [sys.executable, self.script_path]
         
-        # 添加数据库选择 (复用通用逻辑)\n        db_name = self.db_combobox_var.get()\n        if not db_name or \"无\" in db_name or \"失败\" in db_name:\n            self.output_queue.put(\"错误: 请选择一个有效的数据库。\\n\"); return\n        command.extend([\"--db\", db_name])
+        # 添加数据库选择 (复用通用逻辑)
+        db_name = self.db_combobox_var.get()
+        if not db_name or "无" in db_name or "失败" in db_name:
+            self.output_queue.put("错误: 请选择一个有效的数据库。\n")
+            return
+            
+        # 获取完整的数据库路径并传递给脚本
+        try:
+            db_config = config_manager.get_database_config()
+            if 'db_paths' in db_config and db_name in db_config['db_paths']:
+                db_path = db_config['db_paths'][db_name]
+            elif 'db_path' in db_config and db_name == "default":
+                db_path = db_config['db_path']
+            else:
+                self.output_queue.put(f"错误: 无法找到数据库 '{db_name}' 的配置。\n")
+                return
+            # 确保使用绝对路径
+            db_path = os.path.abspath(db_path)
+            command.extend(["--db", db_path])
+        except Exception as e:
+            self.output_queue.put(f"错误: 获取数据库路径失败: {e}\n")
+            return
             
         count = self.count_var.get()
         if not (count.isdigit() and int(count) > 0): self.output_queue.put(f"错误: 抽样数量 '{count}' 必须为正整数。\n"); return
         command.extend(["-n", count])
         if self.filter_missing_var.get(): command.append("--filter-missing")
+        
+        # 添加排除已标注的选项
+        if self.exclude_annotated_var.get():
+            command.append("--exclude-annotated")
+            model_name = self.model_var.get()
+            # 如果选择了"全部模型"，则不指定具体的模型标识符
+            if model_name == "全部模型":
+                pass  # 不添加 --model 参数
+            elif not model_name or "无" in model_name or "失败" in model_name:
+                self.output_queue.put("错误: 请选择一个有效的模型。\n")
+                return
+            else:
+                command.extend(["--model", model_name])
+        
         sort_mode = self.sort_choice_var.get()
         if sort_mode == 'sort': command.append("--sort")
         elif sort_mode == 'no-shuffle': command.append("--no-shuffle")
         if self.output_mode_var.get() == 'file':
             output_file = self.output_file_var.get()
             if not output_file: self.output_queue.put("错误: 请指定输出文件路径。\n"); return
+            # 确保输出文件路径使用绝对路径
+            output_file = os.path.abspath(output_file)
             command.extend(["--output-file", output_file])
         else:
             output_dir = self.output_dir_var.get()
-            if output_dir: command.extend(["--output-dir", output_dir])
+            if output_dir: 
+                # 确保输出目录路径使用绝对路径
+                output_dir = os.path.abspath(output_dir)
+                command.extend(["--output-dir", output_dir])
             num_files = self.num_files_var.get()
             if not (num_files.isdigit() and int(num_files) > 0): self.output_queue.put(f"错误: 分段文件数 '{num_files}' 必须为正整数。\n"); return
             command.extend(["--num-files", num_files])
@@ -553,8 +627,8 @@ class SamplingTab(TaskExecutorTab):
 class RecoveryTab(TaskExecutorTab):
     """从日志恢复数据的UI选项卡。"""
     def __init__(self, master):
-        # 任务由 `main.py` 的子命令执行
-        super().__init__(master, "main.py")
+        # 直接调用 recover_from_log_v7.py 脚本
+        super().__init__(master, "recover_from_log_v7.py")
         self._create_widgets()
         super()._create_common_widgets()
         self.start_button.config(text="开始恢复")
@@ -591,6 +665,16 @@ class RecoveryTab(TaskExecutorTab):
         self.dry_run_check = ttk.Checkbutton(options_frame, text="试运行 (Dry Run) - 仅分析日志，不写入数据库", variable=self.dry_run_var)
         self.dry_run_check.grid(row=1, column=0, columnspan=3, padx=5, pady=5, sticky="w")
 
+        # 数据库路径输入
+        ttk.Label(options_frame, text="数据库路径 (可选):").grid(row=2, column=0, padx=5, pady=5, sticky="w")
+        
+        self.db_path_var = tk.StringVar()
+        self.db_path_entry = ttk.Entry(options_frame, textvariable=self.db_path_var, width=60)
+        self.db_path_entry.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+        
+        self.browse_db_btn = ttk.Button(options_frame, text="浏览数据库...", command=self._browse_db)
+        self.browse_db_btn.grid(row=2, column=2, padx=5, pady=5)
+
     def _browse_file(self):
         """打开文件选择对话框。"""
         path = filedialog.askopenfilename(title="选择日志文件", filetypes=[("日志文件", "*.log"), ("所有文件", "*.*")])
@@ -602,6 +686,12 @@ class RecoveryTab(TaskExecutorTab):
         path = filedialog.askdirectory(title="选择日志目录")
         if path:
             self.log_path_var.set(os.path.normpath(path))
+            
+    def _browse_db(self):
+        """打开数据库文件选择对话框。"""
+        path = filedialog.askopenfilename(title="选择数据库文件", filetypes=[("数据库文件", "*.db"), ("所有文件", "*.*")])
+        if path:
+            self.db_path_var.set(path)
 
     def _update_ui_state(self, is_running=False):
         """根据任务运行状态更新UI控件。"""
@@ -611,7 +701,8 @@ class RecoveryTab(TaskExecutorTab):
         self.status_bar['text'] = "状态: 运行中..." if is_running else "状态: 空闲"
 
         # 更新此选项卡的特定控件状态
-        for widget in [self.log_path_entry, self.browse_file_btn, self.browse_dir_btn, self.dry_run_check]:
+        for widget in [self.log_path_entry, self.browse_file_btn, self.browse_dir_btn, self.dry_run_check, 
+                       self.db_path_entry, self.browse_db_btn]:
             widget['state'] = state
             
     def start_task(self):
@@ -621,16 +712,29 @@ class RecoveryTab(TaskExecutorTab):
             self.output_queue.put("错误: 请指定日志文件或目录路径。\n")
             return
 
-        # 日志恢复是通过 main.py 的子命令调用的
+        # 直接调用 recover_from_log_v7.py 脚本
         command = [
             sys.executable, 
-            self.script_path,         # 指向 main.py
-            "recover-from-logs",      # 子命令
-            "--log-path", log_path    # 参数
+            self.script_path  # 指向 recover_from_log_v7.py
         ]
         
-        if self.dry_run_var.get():
-            command.append("--dry-run")
+        # 判断是文件还是目录
+        if os.path.isfile(log_path):
+            command.extend(["--file", log_path])
+        elif os.path.isdir(log_path):
+            command.extend(["--dir", log_path])
+        else:
+            self.output_queue.put("错误: 指定的路径既不是文件也不是目录。\n")
+            return
+            
+        # 添加数据库路径参数（如果提供了）
+        db_path = self.db_path_var.get()
+        if db_path:
+            command.extend(["--db-path", db_path])
+        
+        # Dry run 选项 - 注意脚本默认是 dry run，需要 --write 才会实际写入
+        if not self.dry_run_var.get():  # 如果用户取消了 dry run 选项
+            command.append("--write")   # 则添加 --write 标志
         
         # 清空日志区域并显示执行的命令
         self.log_text.config(state="normal"); self.log_text.delete(1.0, tk.END); self.log_text.config(state="disabled")

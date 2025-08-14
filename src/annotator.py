@@ -15,6 +15,7 @@ from .data_manager import get_data_manager
 from .llm_factory import llm_factory
 from .config_manager import config_manager
 from .label_parser import label_parser
+from .annotation_data_logger import AnnotationDataLogger
 # from .model_specific_logging import ModelSpecificLogging  # 已注释：不再使用模型特定日志记录器
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,9 @@ class Annotator:
         
         # 直接使用全局日志记录器，不再尝试导入可能出错的批次日志
         self.model_logger = logger
+        
+        # 初始化标注数据集合日志器
+        self.annotation_data_logger = AnnotationDataLogger(self.model_identifier)
     
     def _generate_sentences_with_id(self, paragraphs: List[str]) -> List[Dict[str, str]]:
         """为句子生成ID并构建JSON格式"""
@@ -151,8 +155,11 @@ class Annotator:
             # 记录最终结果到模型特定日志
             # self.model_logger.info(f"诗词ID {poem_id} 标注完成")  # 已注释：不再使用模型特定日志
             logger.info(f"诗词ID {poem_id} 标注完成")
-            # self.model_logger.debug(f"诗词ID {poem_id} 最终标注结果: {final_results}")  # 已注释：不再使用模型特定日志
-            logger.debug(f"诗词ID {poem_id} 最终标注结果: {final_results}")
+            # [已移除] 不再将详细的标注结果记录到主日志文件，因为 AnnotationDataLogger 已负责此项工作。
+            # logger.debug(f"诗词ID {poem_id} 最终标注结果: {final_results}")
+            
+            # 记录即将保存的标注数据到集合日志
+            self.annotation_data_logger.log_annotation_data(poem_id, final_results)
             
             return {
                 'poem_id': poem_id, 
@@ -176,6 +183,14 @@ class Annotator:
                 f"诗词ID {poem_id} 因熔断器开启而跳过请求。 "
                 f"错误: {e}"
             )
+            
+            # 记录失败的标注数据到集合日志
+            error_info = {
+                "status": "failed",
+                "error_message": f"Circuit breaker is open: {e}"
+            }
+            self.annotation_data_logger.log_annotation_data(poem_id, error_info)
+            
             return {
                 'poem_id': poem_id, 
                 'status': 'failed',
@@ -197,6 +212,14 @@ class Annotator:
                 f"诗词ID {poem_id} 标注流程在所有重试后最终失败: {str(e)}",
                 exc_info=True
             )
+            
+            # 记录失败的标注数据到集合日志
+            error_info = {
+                "status": "failed",
+                "error_message": str(e)
+            }
+            self.annotation_data_logger.log_annotation_data(poem_id, error_info)
+            
             return {
                 'poem_id': poem_id, 
                 'status': 'failed',

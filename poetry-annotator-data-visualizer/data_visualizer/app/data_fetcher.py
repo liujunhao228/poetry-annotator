@@ -26,7 +26,7 @@ def get_poem_length_distribution_data(db_key: str, method: str):
 @st.cache_data(show_spinner="正在加载情感分布数据...")
 def get_emotion_distribution_data(db_key: str):
     processor = get_data_processor(db_key)
-    sunburst_df = processor.compute_emotion_distribution()
+    sunburst_df = processor.compute_emotion_distribution_actual()
     return sunburst_df
 
 @st.cache_data(show_spinner="正在加载高频情感共现...")
@@ -34,10 +34,15 @@ def get_frequent_emotion_combinations_data(db_key: str, top_n: int):
     processor = get_data_processor(db_key)
     return processor.compute_frequent_emotion_combinations(limit=top_n)
 
-@st.cache_data(show_spinner="正在加载全诗情感集合...")
-def get_frequent_poem_emotion_sets_data(db_key: str, top_n: int):
+@st.cache_data(show_spinner="正在加载全诗情感集合(实际)...")
+def get_frequent_poem_emotion_sets_data_actual(db_key: str, top_n: int):
     processor = get_data_processor(db_key)
-    return processor.compute_frequent_poem_emotion_sets(limit=top_n)
+    return processor.compute_frequent_poem_emotion_sets_actual(limit=top_n)
+
+@st.cache_data(show_spinner="正在加载全诗情感集合(频率)...")
+def get_frequent_poem_emotion_sets_data_frequency(db_key: str, top_n: int):
+    processor = get_data_processor(db_key)
+    return processor.compute_frequent_poem_emotion_sets_frequency(limit=top_n)
 
 @st.cache_data(show_spinner="正在进行 Apriori 挖掘...")
 def get_apriori_results_data(db_key: str, level: str, min_support: float, min_length: int, max_transactions: int = None):

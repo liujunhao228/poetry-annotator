@@ -11,7 +11,8 @@ from data_visualizer.app.data_fetcher import (
     get_poem_count_by_author_data,
     get_emotion_distribution_data,
     get_frequent_emotion_combinations_data,
-    get_frequent_poem_emotion_sets_data,
+    get_frequent_poem_emotion_sets_data_actual,
+    get_frequent_poem_emotion_sets_data_frequency,
     get_apriori_results_data,
     get_model_annotation_trends_data,
     get_poem_length_distribution_data
@@ -136,17 +137,26 @@ def run_app():
 
 
                     st.subheader("情感共现与关联规则挖掘")
-                    tab_sql_sentence, tab_sql_poem, tab_apriori = st.tabs(["**单句内共现 (SQL 计数)**", "**全诗内共现 (SQL 计数)**", "**高级挖掘 (Apriori)**"])
+                    tab_sql_sentence, tab_sql_poem_actual, tab_sql_poem_frequency, tab_apriori = st.tabs(["**单句内共现 (SQL 计数)**", "**全诗内共现-实际 (SQL 计数)**", "**全诗内共现-频率 (SQL 计数)**", "**高级挖掘 (Apriori)**"])
 
                     with tab_sql_sentence:
                         st.markdown("⚡️ **快速概览**: 使用 SQL 直接统计**一句诗中**共同出现的多种情感。")
                         top_n_sentence = st.slider("选择显示组合数量", 5, 50, 15, key=f"combo_sentence_{selected_db_key}")
                         display_frequent_combinations(selected_db_key, top_n_sentence)
 
-                    with tab_sql_poem:
-                        st.markdown("⚡️ **快速概览**: 使用 SQL 直接统计**一首诗内**（不一定在同一句）共同出现的不同情感。")
-                        top_n_poem = st.slider("选择显示组合数量", 5, 50, 15, key=f"combo_poem_{selected_db_key}")
-                        sets_df = get_frequent_poem_emotion_sets_data(selected_db_key, top_n_poem)
+                    with tab_sql_poem_actual:
+                        st.markdown("⚡️ **实际普遍性**: 使用 SQL 直接统计**一首诗内**（基于最新完成标注）共同出现的不同情感。")
+                        top_n_poem = st.slider("选择显示组合数量", 5, 50, 15, key=f"combo_poem_actual_{selected_db_key}")
+                        sets_df = get_frequent_poem_emotion_sets_data_actual(selected_db_key, top_n_poem)
+                        if not sets_df.empty:
+                            st.dataframe(sets_df, column_config={"set_readable": st.column_config.TextColumn("情感集合", width="large"), "set_count": st.column_config.NumberColumn("出现次数", format="%d 首"), "poem_example": st.column_config.TextColumn("示例诗词")}, use_container_width=True, hide_index=True)
+                        else:
+                            st.info("暂无全诗内高频情感集合数据。")
+
+                    with tab_sql_poem_frequency:
+                        st.markdown("⚡️ **标注频率**: 使用 SQL 直接统计**一首诗内**（基于所有标注）共同出现的不同情感。")
+                        top_n_poem = st.slider("选择显示组合数量", 5, 50, 15, key=f"combo_poem_frequency_{selected_db_key}")
+                        sets_df = get_frequent_poem_emotion_sets_data_frequency(selected_db_key, top_n_poem)
                         if not sets_df.empty:
                             st.dataframe(sets_df, column_config={"set_readable": st.column_config.TextColumn("情感集合", width="large"), "set_count": st.column_config.NumberColumn("出现次数", format="%d 首"), "poem_example": st.column_config.TextColumn("示例诗词")}, use_container_width=True, hide_index=True)
                         else:

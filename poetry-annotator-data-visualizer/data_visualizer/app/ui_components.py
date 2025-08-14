@@ -5,7 +5,8 @@ from data_visualizer.app.data_fetcher import (
     get_poem_count_by_author_data,
     get_emotion_distribution_data,
     get_frequent_emotion_combinations_data,
-    get_frequent_poem_emotion_sets_data,
+    get_frequent_poem_emotion_sets_data_actual,
+    get_frequent_poem_emotion_sets_data_frequency,
     get_apriori_results_data,
     get_model_annotation_trends_data
 )

@@ -8,9 +8,3 @@ import sys
 src_dir = os.path.dirname(os.path.abspath(__file__))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
-
-# 导入核心模块
-from .batch_logger import batch_logger_manager, get_batch_logger
-
-# 导入核心模块
-from .batch_logger import batch_logger_manager, get_batch_logger 

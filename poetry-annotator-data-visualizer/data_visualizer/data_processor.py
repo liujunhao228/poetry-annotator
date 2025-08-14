@@ -126,9 +126,9 @@ class DataProcessor:
         return df.set_index('id')['name_zh'].to_dict()
 
     @lru_cache(maxsize=CACHE_MAX_SIZE_DATA_PROCESSING)
-    def compute_emotion_distribution(self) -> pd.DataFrame:
+    def compute_emotion_distribution_frequency(self) -> pd.DataFrame:
         """
-        【已修正】计算情感分布，为旭日图准备完整层级的数据。
+        【已修正】计算情感分布（基于所有标注），为旭日图准备完整层级的数据。
         此版本通过手动计算父节点的计数值，确保旭日图的稳健渲染，避免内外圈比例失衡。
         """
         all_categories_df = self.db_manager.get_all_emotion_categories()
@@ -144,8 +144,68 @@ class DataProcessor:
         all_categories_df.loc[all_categories_df['level'] == 1, 'parent_id'] = ''
 
         # --- 获取叶子节点（二级分类）的计数值 ---
-        # get_emotion_distribution 只返回有标注记录的叶子节点及其count
-        leaf_dist_df = self.db_manager.get_emotion_distribution()
+        # get_emotion_distribution_frequency 只返回有标注记录的叶子节点及其count
+        leaf_dist_df = self.db_manager.get_emotion_distribution_frequency()
+        if leaf_dist_df.empty:
+            logger.warning("无情感标注数据用于分布计算。将返回所有分类，但计数值均为0。")
+            all_categories_df['count'] = 0
+            all_categories_df['percentage'] = 0.0
+            return all_categories_df
+
+        # --- 合并数据并计算父节点计数值 ---
+        # 将叶子节点的计数值合并到完整的分类表中
+        merged_df = pd.merge(
+            all_categories_df,
+            leaf_dist_df[['id', 'count']],
+            on='id',
+            how='left'
+        )
+        # 未匹配到的计数值（包括所有父节点和未出现的叶子节点）填充为0
+        merged_df['count'] = merged_df['count'].fillna(0).astype(int)
+
+        # --- 核心修复：手动计算父节点的 count ---
+        # 1. 按 parent_id 分组，计算每个父节点下所有子节点的 count 总和
+        parent_sums = merged_df[merged_df['level'] == 2].groupby('parent_id')['count'].sum()
+        
+        # 2. 将计算出的总和更新（赋值）到父节点（一级分类）的 'count' 列中
+        #    使用 .map() 将 parent_sums 映射回 merged_df，确保数据对齐
+        #    这可以防止父节点计数值被重复计算或遗漏
+        parent_ids_series = merged_df.loc[merged_df['level'] == 1, 'id']
+        parent_counts = parent_ids_series.map(parent_sums).fillna(0).astype(int)
+        
+        # 使用 .loc 进行安全的赋值
+        merged_df.loc[merged_df['level'] == 1, 'count'] = parent_counts
+
+        # --- [新增] 添加百分比计算逻辑 ---
+        total_emotion_count = merged_df['count'].sum()
+        if total_emotion_count > 0:
+            merged_df['percentage'] = (merged_df['count'] / total_emotion_count * 100).round(2)
+        else:
+            merged_df['percentage'] = 0.0
+
+        return merged_df
+
+    @lru_cache(maxsize=CACHE_MAX_SIZE_DATA_PROCESSING)
+    def compute_emotion_distribution_actual(self) -> pd.DataFrame:
+        """
+        【已修正】计算情感分布（基于最新标注），为旭日图准备完整层级的数据。
+        此版本通过手动计算父节点的计数值，确保旭日图的稳健渲染，避免内外圈比例失衡。
+        """
+        all_categories_df = self.db_manager.get_all_emotion_categories()
+        if all_categories_df.empty:
+            logger.warning("情感分类表为空，无法计算分布。")
+            return pd.DataFrame()
+
+        # --- 数据预处理，提高健壮性 ---
+        all_categories_df['id'] = all_categories_df['id'].astype(str)
+        # 清理父ID，确保与子ID的ID格式一致
+        all_categories_df['parent_id'] = all_categories_df['parent_id'].fillna('').astype(str)
+        # 顶级分类的 parent_id 应为空字符串，以作为旭日图的根
+        all_categories_df.loc[all_categories_df['level'] == 1, 'parent_id'] = ''
+
+        # --- 获取叶子节点（二级分类）的计数值 ---
+        # get_emotion_distribution_actual 只返回有标注记录的叶子节点及其count
+        leaf_dist_df = self.db_manager.get_emotion_distribution_actual()
         if leaf_dist_df.empty:
             logger.warning("无情感标注数据用于分布计算。将返回所有分类，但计数值均为0。")
             all_categories_df['count'] = 0
@@ -215,9 +275,36 @@ class DataProcessor:
         return combos_df[['combination_readable', 'combo_count', 'sentence_text']]
 
     @lru_cache(maxsize=CACHE_MAX_SIZE_DATA_PROCESSING)
-    def compute_frequent_poem_emotion_sets(self, limit: int = 20) -> pd.DataFrame:
-        """处理高频全诗情感集合数据，将ID转换为可读文本。"""
-        sets_df = self.db_manager.get_frequent_poem_emotion_sets(limit=limit)
+    def compute_frequent_poem_emotion_sets_frequency(self, limit: int = 20) -> pd.DataFrame:
+        """处理高频全诗情感集合数据（基于所有标注），将ID转换为可读文本。"""
+        sets_df = self.db_manager.get_frequent_poem_emotion_sets_frequency(limit=limit)
+        if sets_df.empty:
+            logger.info("无高频全诗情感集合数据。")
+            return pd.DataFrame()
+        
+        id_to_name_map = self.get_emotion_categories_map()
+        if not id_to_name_map:
+            # 如果映射表为空，直接返回原始id，避免程序崩溃
+            sets_df['set_readable'] = sets_df['emotion_set_ids']
+            return sets_df
+
+        def format_set(id_string):
+            if not isinstance(id_string, str):
+                return "无效集合"
+            
+            ids = id_string.strip(';').split(';')
+            names = [id_to_name_map.get(id, f"未知ID({id})") for id in ids]
+            return ', '.join(names)
+
+        sets_df['set_readable'] = sets_df['emotion_set_ids'].apply(format_set)
+        logger.debug(f"高频全诗情感集合 (Top {limit}) 数据计算完成。")
+        # 返回对前端友好的列
+        return sets_df[['set_readable', 'set_count', 'poem_example']]
+
+    @lru_cache(maxsize=CACHE_MAX_SIZE_DATA_PROCESSING)
+    def compute_frequent_poem_emotion_sets_actual(self, limit: int = 20) -> pd.DataFrame:
+        """处理高频全诗情感集合数据（基于最新标注），将ID转换为可读文本。"""
+        sets_df = self.db_manager.get_frequent_poem_emotion_sets_actual(limit=limit)
         if sets_df.empty:
             logger.info("无高频全诗情感集合数据。")
             return pd.DataFrame()
@@ -338,8 +425,10 @@ class DataProcessor:
         self.compute_poem_length_distribution.cache_clear()
         self.compute_model_annotation_trends.cache_clear()
         self.get_emotion_categories_map.cache_clear()
-        self.compute_emotion_distribution.cache_clear()
+        self.compute_emotion_distribution_frequency.cache_clear()
+        self.compute_emotion_distribution_actual.cache_clear()
         self.compute_frequent_emotion_combinations.cache_clear()
-        self.compute_frequent_poem_emotion_sets.cache_clear()
+        self.compute_frequent_poem_emotion_sets_frequency.cache_clear()
+        self.compute_frequent_poem_emotion_sets_actual.cache_clear()
         self.mine_frequent_emotion_itemsets_apriori.cache_clear()
         logger.info("DataProcessor 缓存已清除。")

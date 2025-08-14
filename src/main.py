@@ -46,6 +46,10 @@ if relative_import_failed:
 logger = get_logger(__name__)
 
 
+# 获取主日志记录器
+logger = get_logger(__name__)
+
+
 @click.group()
 @click.option('--log-level', 
               type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR']), 
@@ -345,7 +349,54 @@ def list_models():
         
     except Exception as e:
         logger.error(f"获取已配置模型列表失败: {e}", exc_info=True)
+
+
+@cli.command(name="recover-from-logs")
+@click.option('--log-path', required=True, help='日志文件或目录路径')
+@click.option('--model', 'model_identifier', required=True, help='保存标注到数据库时使用的模型标识符, 例如 "gemini-2.5-flash"。')
+@click.option('--dry-run', is_flag=True, default=False, help='试运行模式，仅分析日志，不写入数据库')
+def recover_from_logs(log_path, model_identifier, dry_run):
+    """从日志文件中恢复因意外中断而未保存的标注数据"""
+    try:
+        logger.info("开始执行日志恢复任务...")
         
+        # 导入恢复功能模块
+        from scripts.recover_from_log_v6 import cli as recover_cli
+        
+        # 构造参数
+        import sys
+        original_argv = sys.argv[:]
+        
+        # 构造新的命令行参数
+        sys.argv = ['recover_from_log_v6.py']
+        
+        # 判断是文件还是目录
+        path_obj = Path(log_path)
+        if path_obj.is_file():
+            sys.argv.extend(['--file', str(path_obj)])
+        elif path_obj.is_dir():
+            sys.argv.extend(['--dir', str(path_obj)])
+        else:
+            logger.error(f"指定的路径既不是文件也不是目录: {log_path}")
+            return
+            
+        sys.argv.extend(['--model', model_identifier])
+        
+        # 如果不是dry-run，则添加--write标志
+        if not dry_run:
+            sys.argv.append('--write')
+            
+        # 调用恢复功能
+        recover_cli()
+        
+        # 恢复原始参数
+        sys.argv = original_argv
+        
+        logger.info("日志恢复任务执行完成")
+        
+    except Exception as e:
+        logger.error(f"日志恢复任务执行失败: {e}", exc_info=True)
+
 
 if __name__ == '__main__':
     cli()

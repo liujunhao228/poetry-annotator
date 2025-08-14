@@ -11,6 +11,7 @@
 - **容错机制**：具备重试、熔断等容错机制，保证任务稳定性
 - **灵活配置**：支持多模型配置、数据库配置、日志配置等
 - **数据可视化**：集成Streamlit数据可视化界面，便于分析标注结果
+- **辅助工具**：提供任务分发、随机抽样、日志恢复等实用工具
 
 ## 目录结构
 
@@ -21,9 +22,10 @@ poetry-annotator/
 ├── docs/                   # 文档目录
 ├── ids/                    # 诗词ID文件目录
 ├── logs/                   # 日志目录
+├── poetry-annotator-data-visualizer/  # 数据可视化模块
+├── poetry-label-editor/    # 标注编辑器模块
 ├── scripts/                # 脚本目录
 ├── src/                    # 核心源代码目录
-├── poetry-annotator-data-visualizer/  # 数据可视化模块
 ├── main.py                 # 程序入口
 ├── README.md               # 说明文档
 └── requirements.txt        # 依赖包列表
@@ -155,6 +157,16 @@ db_paths = TangShi=data/TangShi.db,SongCi=data/SongCi.db
 ### 可视化模块
 
 - **poetry-annotator-data-visualizer/** - 基于Streamlit的数据可视化应用
+
+### 辅助工具脚本
+
+在scripts目录下提供了多种实用工具：
+
+- `distribute_tasks.py` - 任务分发工具
+- `random_sample.py` - 随机抽样工具
+- `recover_from_log_v6.py` - 日志恢复工具
+- `find_duplicate_poems.py` - 查找重复诗词工具
+- `proofread_annotations.py` - 标注校对工具
 
 ## 贡献指南
 
