@@ -182,16 +182,28 @@ def run_app():
                             st.markdown("### ⚙️ 性能控制选项")
                             col3, col4 = st.columns(2)
                             with col3:
-                                # 根据最小支持度自动设置合理的事务上限
-                                recommended_max_transactions = max(1000, int(10000 * (1 - min_support)))  # 支持度越低，处理的数据应该越少
-                                max_transactions = st.slider(
-                                    "最大事务数 (控制计算规模)",
-                                    100,
-                                    50000,
-                                    min(recommended_max_transactions, 10000),
-                                    key=f"apriori_max_transactions_{selected_db_key}",
-                                    help="减少此值可加快计算速度但可能丢失罕见模式"
+                                # 添加复选框来启用/禁用事务数限制
+                                enable_max_transactions = st.checkbox(
+                                    "限制最大事务数",
+                                    value=True,
+                                    key=f"enable_max_transactions_{selected_db_key}",
+                                    help="取消勾选以处理所有事务（可能需要较长时间）"
                                 )
+                                
+                                if enable_max_transactions:
+                                    # 根据最小支持度自动设置合理的事务上限
+                                    recommended_max_transactions = max(1000, int(10000 * (1 - min_support)))  # 支持度越低，处理的数据应该越少
+                                    max_transactions = st.slider(
+                                        "最大事务数 (控制计算规模)",
+                                        100,
+                                        50000,
+                                        min(recommended_max_transactions, 10000),
+                                        key=f"apriori_max_transactions_{selected_db_key}",
+                                        help="减少此值可加快计算速度但可能丢失罕见模式"
+                                    )
+                                else:
+                                    max_transactions = None
+                                    st.info("当前设置将处理所有事务，可能需要较长时间。")
                             
                             with col4:
                                 # 动态提示用户当前设置可能导致的性能影响
@@ -306,17 +318,38 @@ def run_app():
                     st.session_state[session_key_comp] = False
                     st.rerun()
 
-                col_a, col_b = st.columns(2)
+                col_a, col_b, col_c = st.columns(3)
                 with col_a:
                     min_length_compare = st.slider("组合中最少情感数", 2, 5, 2, key="apriori_len_compare")
                 with col_b:
                     min_support_percent_compare = st.slider("最小支持度 (%)", 0.1, 5.0, 0.5, step=0.1, key="apriori_support_compare")
+                with col_c:
+                    # 添加复选框来启用/禁用事务数限制
+                    enable_max_transactions_compare = st.checkbox(
+                        "限制最大事务数",
+                        value=True,
+                        key="enable_max_transactions_compare",
+                        help="取消勾选以处理所有事务（可能需要较长时间）"
+                    )
+                    
+                    if enable_max_transactions_compare:
+                        max_transactions_compare = st.number_input(
+                            "最大事务数",
+                            min_value=100,
+                            max_value=50000,
+                            value=5000,
+                            key="apriori_max_transactions_compare",
+                            help="减少此值可加快计算速度但可能丢失罕见模式"
+                        )
+                    else:
+                        max_transactions_compare = None
+                        st.info("将处理所有事务，可能需要较长时间。")
                 
                 min_support_compare = min_support_percent_compare / 100.0
                 level_compare = 'poem'
 
-                apriori_df1 = get_apriori_results_data(db_keys_to_compare[0], level_compare, min_support_compare, min_length_compare)
-                apriori_df2 = get_apriori_results_data(db_keys_to_compare[1], level_compare, min_support_compare, min_length_compare)
+                apriori_df1 = get_apriori_results_data(db_keys_to_compare[0], level_compare, min_support_compare, min_length_compare, max_transactions_compare)
+                apriori_df2 = get_apriori_results_data(db_keys_to_compare[1], level_compare, min_support_compare, min_length_compare, max_transactions_compare)
 
                 if apriori_df1.empty and apriori_df2.empty:
                     st.warning(f"在当前设置下，两个数据库均未发现任何情感组合。请尝试降低参数。")

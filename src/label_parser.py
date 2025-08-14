@@ -4,6 +4,7 @@ from collections import OrderedDict
 import html
 from pathlib import Path
 from typing import Dict, List, Any, Optional
+import logging
 
 
 class LabelParser:
@@ -17,6 +18,9 @@ class LabelParser:
             xml_path: XML文件路径（可选，用于本地程序处理关系映射）
             md_path: Markdown文件路径（可选，用于LLM提示词）
         """
+        # 初始化日志记录器
+        self.logger = logging.getLogger(__name__)
+        
         # 从配置管理器获取路径，如果未提供的话
         if xml_path is None or md_path is None:
             # 延迟导入以避免循环导入
@@ -51,21 +55,22 @@ class LabelParser:
             with open(md_file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            print(f"成功读取 Markdown 文件: {self.md_path}")
-            print(f"原始文件大小: {len(content)} 字符")
+            self.logger.info(f"成功读取 Markdown 文件: {self.md_path}")
+            self.logger.debug(f"原始文件大小: {len(content)} 字符")
             
             # 移除"完整情感类别映射表"及其之后的内容
             mapping_table_start = content.find('### **完整情感类别映射表**')
             if mapping_table_start != -1:
                 content = content[:mapping_table_start].rstrip()
-                print(f"移除映射表后文件大小: {len(content)} 字符")
-                print("已移除'完整情感类别映射表'部分以节约token")
+                self.logger.debug(f"移除映射表后文件大小: {len(content)} 字符")
+                self.logger.info("已移除'完整情感类别映射表'部分以节约token")
             else:
-                print("未找到映射表，返回完整内容")
+                self.logger.info("未找到映射表，返回完整内容")
             
             return content
             
         except Exception as e:
+            self.logger.error(f"读取 Markdown 文件失败: {e}")
             raise Exception(f"读取 Markdown 文件失败: {e}")
     
     def _load_categories(self):
@@ -82,7 +87,7 @@ class LabelParser:
     
     def _parse_markdown_and_generate_xml(self):
         """从Markdown文件解析并生成XML"""
-        print(f"开始解析Markdown文件: {self.md_path}")
+        self.logger.info(f"开始解析Markdown文件: {self.md_path}")
         
         try:
             with open(self.md_path, 'r', encoding='utf-8') as f:
@@ -94,10 +99,10 @@ class LabelParser:
             # 生成XML文件
             self._generate_xml()
             
-            print(f"成功生成XML文件: {self.xml_path}")
+            self.logger.info(f"成功生成XML文件: {self.xml_path}")
             
         except Exception as e:
-            print(f"解析Markdown文件失败: {e}")
+            self.logger.error(f"解析Markdown文件失败: {e}")
             raise FileNotFoundError(f"无法解析Markdown文件 {self.md_path}，请检查文件格式是否正确")
     
     def _parse_markdown_content(self, md_content: str):
@@ -106,7 +111,7 @@ class LabelParser:
         primary_count = 0
         secondary_count = 0
 
-        print("开始解析 Markdown 内容...")
+        self.logger.info("开始解析 Markdown 内容...")
 
         # 1) 一级类别：兼容 #### 01. XXX 或 #### **01. XXX**
         primary_pattern = re.compile(
@@ -133,7 +138,7 @@ class LabelParser:
                 }
                 self.categories[primary_id] = current_primary
                 primary_count += 1
-                print(f"找到一级类别 [{line_num}]: ID={primary_id}, 名称={primary_name}")
+                self.logger.debug(f"找到一级类别 [{line_num}]: ID={primary_id}, 名称={primary_name}")
                 continue
 
             # 匹配二级类别
@@ -146,9 +151,9 @@ class LabelParser:
                     'name_zh': secondary_name
                 })
                 secondary_count += 1
-                print(f"  找到二级类别 [{line_num}]: ID={secondary_id}, 名称={secondary_name}")
+                self.logger.debug(f"  找到二级类别 [{line_num}]: ID={secondary_id}, 名称={secondary_name}")
 
-        print(f"\n解析完成: 共找到 {primary_count} 个一级类别, {secondary_count} 个二级类别")
+        self.logger.info(f"\n解析完成: 共找到 {primary_count} 个一级类别, {secondary_count} 个二级类别")
 
         # 解析映射表以获取英文名称
         self._parse_mapping_table(md_content)
@@ -159,12 +164,12 @@ class LabelParser:
         in_mapping_table = False
         mapping_count = 0
         
-        print("\n开始解析映射表...")
+        self.logger.info("\n开始解析映射表...")
         
         for line_num, line in enumerate(md_content.split('\n'), 1):
             if '### **完整情感类别映射表**' in line:
                 in_mapping_table = True
-                print(f"找到映射表起始位置 [{line_num}]")
+                self.logger.debug(f"找到映射表起始位置 [{line_num}]")
                 continue
             
             if in_mapping_table and line.startswith('|'):
@@ -181,9 +186,9 @@ class LabelParser:
                     # 添加到映射字典
                     mapping_dict[chinese_key] = english_value
                     mapping_count += 1
-                    print(f"  映射条目 [{line_num}]: '{chinese_key}' -> '{english_value}'")
+                    self.logger.debug(f"  映射条目 [{line_num}]: '{chinese_key}' -> '{english_value}'")
         
-        print(f"映射表解析完成: 共找到 {mapping_count} 个映射条目")
+        self.logger.info(f"映射表解析完成: 共找到 {mapping_count} 个映射条目")
         
         # 将映射信息添加到类别数据
         self._apply_mapping_to_categories(mapping_dict)
@@ -193,7 +198,7 @@ class LabelParser:
         unmatched_primary = 0
         unmatched_secondary = 0
         
-        print("\n开始匹配中英文名称...")
+        self.logger.info("\n开始匹配中英文名称...")
         
         for primary_id, primary in self.categories.items():
             # 查找一级类别的英文名称
@@ -202,7 +207,7 @@ class LabelParser:
             
             if primary_key_full in mapping_dict:
                 primary['name_en'] = mapping_dict[primary_key_full]
-                print(f"  一级匹配成功: {primary_key_full} -> {primary['name_en']}")
+                self.logger.debug(f"  一级匹配成功: {primary_key_full} -> {primary['name_en']}")
             else:
                 # 尝试匹配ID开头的键
                 matched = False
@@ -210,13 +215,13 @@ class LabelParser:
                     if key.startswith(primary_key_id):
                         primary['name_en'] = mapping_dict[key]
                         matched = True
-                        print(f"  一级ID匹配: {key} -> {primary['name_en']}")
+                        self.logger.debug(f"  一级ID匹配: {key} -> {primary['name_en']}")
                         break
                 
                 if not matched:
                     primary['name_en'] = ""
                     unmatched_primary += 1
-                    print(f"  ⚠️ 一级未匹配: {primary_key_full}")
+                    self.logger.warning(f"  ⚠️ 一级未匹配: {primary_key_full}")
             
             for secondary in primary['secondaries']:
                 # 查找二级类别的英文名称
@@ -225,7 +230,7 @@ class LabelParser:
                 
                 if secondary_key_full in mapping_dict:
                     secondary['name_en'] = mapping_dict[secondary_key_full]
-                    print(f"    二级匹配成功: {secondary_key_full} -> {secondary['name_en']}")
+                    self.logger.debug(f"    二级匹配成功: {secondary_key_full} -> {secondary['name_en']}")
                 else:
                     # 尝试匹配ID开头的键
                     matched = False
@@ -233,19 +238,19 @@ class LabelParser:
                         if key.startswith(secondary_key_id):
                             secondary['name_en'] = mapping_dict[key]
                             matched = True
-                            print(f"    二级ID匹配: {key} -> {secondary['name_en']}")
+                            self.logger.debug(f"    二级ID匹配: {key} -> {secondary['name_en']}")
                             break
                     
                     if not matched:
                         secondary['name_en'] = ""
                         unmatched_secondary += 1
-                        print(f"    ⚠️ 二级未匹配: {secondary_key_full}")
+                        self.logger.warning(f"    ⚠️ 二级未匹配: {secondary_key_full}")
         
-        print(f"\n匹配完成: 一级未匹配数={unmatched_primary}, 二级未匹配数={unmatched_secondary}")
+        self.logger.info(f"\n匹配完成: 一级未匹配数={unmatched_primary}, 二级未匹配数={unmatched_secondary}")
     
     def _generate_xml(self):
         """生成XML文件"""
-        print("\n开始构建XML结构...")
+        self.logger.info("\n开始构建XML结构...")
         root = ET.Element("EmotionCategories")
         
         # 添加一级和二级类别
@@ -261,7 +266,7 @@ class LabelParser:
                 name_zh=name_zh,
                 name_en=name_en
             )
-            print(f"添加一级类别: {primary_data['id']} - {name_zh}")
+            self.logger.debug(f"添加一级类别: {primary_data['id']} - {name_zh}")
             
             for secondary in primary_data['secondaries']:
                 # 转义XML特殊字符
@@ -275,9 +280,9 @@ class LabelParser:
                     name_zh=sec_name_zh,
                     name_en=sec_name_en
                 )
-                print(f"  添加二级类别: {secondary['id']} - {sec_name_zh}")
+                self.logger.debug(f"  添加二级类别: {secondary['id']} - {sec_name_zh}")
         
-        print("XML结构构建完成")
+        self.logger.info("XML结构构建完成")
         
         # 美化XML输出
         self._indent_xml(root)
@@ -337,10 +342,10 @@ class LabelParser:
                 
                 self.categories[primary_id] = primary_data
             
-            print(f"成功解析XML文件: 共找到 {len(self.categories)} 个一级类别")
+            self.logger.info(f"成功解析XML文件: 共找到 {len(self.categories)} 个一级类别")
             
         except Exception as e:
-            print(f"解析XML文件失败: {e}")
+            self.logger.error(f"解析XML文件失败: {e}")
             raise FileNotFoundError(f"无法解析XML文件 {self.xml_path}，请检查文件格式是否正确")
     
 
@@ -351,7 +356,7 @@ class LabelParser:
         try:
             return self.get_markdown_content()
         except Exception as e:
-            print(f"无法读取 Markdown 文件，回退到 XML 解析: {e}")
+            self.logger.warning(f"无法读取 Markdown 文件，回退到 XML 解析: {e}")
             # 回退到原有的 XML 解析方式
             return self._get_categories_text_from_xml()
     
@@ -399,4 +404,4 @@ class LabelParser:
 
 
 # 全局标签解析器实例
-label_parser = LabelParser()  # 使用默认配置，从 config_manager 获取路径 
+label_parser = LabelParser()  # 使用默认配置，从 config_manager 获取路径

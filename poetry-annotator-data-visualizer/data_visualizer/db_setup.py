@@ -37,8 +37,17 @@ from data_visualizer.db_manager import DBManager
 from data_visualizer.utils import db_connect
 from data_visualizer.config import DB_PATHS, project_root
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-XML_PATH = os.path.join(BASE_DIR, 'emotion_categories.xml')
+# 从主项目配置管理器获取情感分类XML文件路径
+try:
+    from src.config_manager import config_manager
+    categories_config = config_manager.get_categories_config()
+    XML_PATH = categories_config.get('xml_path', os.path.join(str(project_root), 'config', 'emotion_categories.xml'))
+    # 如果是相对路径，则相对于项目根目录解析
+    if not os.path.isabs(XML_PATH):
+        XML_PATH = os.path.join(str(project_root), XML_PATH)
+except Exception as e:
+    logger.warning(f"无法从主项目配置管理器获取情感分类XML路径: {e}。使用默认路径。")
+    XML_PATH = os.path.join(str(project_root), 'config', 'emotion_categories.xml')
 
 
 def parse_emotion_categories(xml_path: str) -> List[Tuple[str, str, str, str, int]]:
@@ -67,36 +76,55 @@ def parse_emotion_categories(xml_path: str) -> List[Tuple[str, str, str, str, in
 
 
 def populate_emotion_categories(conn: sqlite3.Connection, categories_data: List[Tuple[str, str, str, str, int]]):
-    """填充 emotion_categories 表。"""
+    """填充 emotion_categories 表，确保数据是最新的。"""
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM emotion_categories")
-    if cursor.fetchone()[0] > 0:
-        logger.info("emotion_categories 表已包含数据，跳过填充。")
-        return
     try:
+        # 清空现有数据并重新插入，确保数据是最新的
+        cursor.execute("DELETE FROM emotion_categories")
         cursor.executemany(
             "INSERT INTO emotion_categories (id, name_zh, name_en, parent_id, level) VALUES (?, ?, ?, ?, ?)",
             categories_data
         )
         conn.commit()
-        logger.info(f"成功将 {len(categories_data)} 条数据插入 emotion_categories 表。")
+        logger.info(f"成功更新 emotion_categories 表，共插入 {len(categories_data)} 条数据。")
     except sqlite3.Error as e:
-        logger.error(f"填充 emotion_categories 表失败: {e}")
+        logger.error(f"更新 emotion_categories 表失败: {e}")
         conn.rollback()
+        raise
 
 
 def migrate_annotations(conn: sqlite3.Connection):
-    """迁移旧的标注数据到新表结构。"""
+    """迁移旧的标注数据到新表结构，确保数据完整性。"""
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM sentence_annotations")
-    if cursor.fetchone()[0] > 0:
-        logger.info("sentence_annotations 表已包含数据，假定迁移已完成，跳过。")
+    
+    # 检查是否有需要迁移的数据
+    cursor.execute(
+        "SELECT COUNT(*) FROM annotations WHERE status = 'completed' AND annotation_result IS NOT NULL"
+    )
+    pending_migrations = cursor.fetchone()[0]
+    
+    if pending_migrations == 0:
+        logger.info("没有需要迁移的标注数据。")
         return
+    
+    # 检查是否已经迁移过数据
+    cursor.execute("SELECT COUNT(*) FROM sentence_annotations")
+    already_migrated = cursor.fetchone()[0]
+    
+    if already_migrated > 0:
+        logger.info("sentence_annotations 表已包含数据，为了确保数据一致性，将重新执行迁移。")
+        # 清空现有的迁移数据
+        cursor.execute("DELETE FROM sentence_emotion_links")
+        cursor.execute("DELETE FROM sentence_annotations")
+        conn.commit()
+    
     logger.info("开始迁移历史标注数据...")
     cursor.execute(
         "SELECT id, poem_id, annotation_result FROM annotations WHERE status = 'completed' AND annotation_result IS NOT NULL"
     )
     annotations_to_migrate = cursor.fetchall()
+    
+    migration_count = 0
     try:
         for ann_id, poem_id, ann_result_json in annotations_to_migrate:
             if not ann_result_json:
@@ -120,10 +148,11 @@ def migrate_annotations(conn: sqlite3.Connection):
                                 "INSERT INTO sentence_emotion_links (sentence_annotation_id, emotion_id, is_primary) VALUES (?, ?, ?)",
                                 (sentence_ann_id, sec_emotion, 0)
                             )
+                    migration_count += 1
             except json.JSONDecodeError:
                 logger.warning(f"无法解析 annotation_id={ann_id} 的JSON数据，跳过。")
         conn.commit()
-        logger.info(f"成功迁移 {len(annotations_to_migrate)} 条标注记录的详细情感数据。")
+        logger.info(f"成功迁移 {len(annotations_to_migrate)} 条标注记录，共处理 {migration_count} 条句子情感数据。")
     except sqlite3.Error as e:
         logger.error(f"迁移过程中发生数据库错误: {e}")
         conn.rollback()
@@ -143,7 +172,8 @@ def setup_for_db(db_key: str, db_path: str, categories_data: List[Tuple[str, str
     # 步骤 1: 确保数据库和所有表结构已创建
     logger.info(f"正在初始化/验证数据库架构: {abs_db_path}...")
     try:
-        DBManager(db_path=abs_db_path)  # 传递特定路径以初始化正确的数据库
+        # 直接初始化数据库表结构，确保每次都是最新的
+        initialize_database_schema(abs_db_path)
     except Exception as e:
         logger.error(f"初始化数据库 '{db_key}' 失败: {e}", exc_info=True)
         return False
@@ -163,6 +193,87 @@ def setup_for_db(db_key: str, db_path: str, categories_data: List[Tuple[str, str
     except Exception as e:
         logger.error(f"为 '{db_key}' 执行设置时发生未知错误: {e}", exc_info=True)
         return False
+    finally:
+        if conn:
+            conn.close()
+
+
+def initialize_database_schema(db_path: str):
+    """初始化数据库表和索引，确保表结构是最新的。"""
+    logger.info(f"检查/初始化数据库架构于 {db_path}...")
+    conn = None
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # poems 表兼容 title (唐诗) 和 rhythmic (宋词)
+        # 统一使用 title 字段名，宋词数据导入时将 rhythmic 映射到 title
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS poems (
+                id INTEGER PRIMARY KEY,
+                title TEXT,
+                author TEXT,
+                paragraphs TEXT,
+                full_text TEXT,
+                author_desc TEXT,
+                created_at TEXT,
+                updated_at TEXT
+            )
+        ''')
+
+        # --- 其他表结构保持不变 ---
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS annotations (
+                id INTEGER PRIMARY KEY, poem_id INTEGER, model_identifier TEXT NOT NULL,
+                status TEXT NOT NULL CHECK(status IN ('completed', 'failed')),
+                annotation_result TEXT, error_message TEXT, created_at TEXT, updated_at TEXT,
+                FOREIGN KEY(poem_id) REFERENCES poems(id)
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS authors (
+                name TEXT PRIMARY KEY, description TEXT, short_description TEXT, created_at TEXT
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS emotion_categories (
+                id TEXT PRIMARY KEY, name_zh TEXT NOT NULL, name_en TEXT,
+                parent_id TEXT, level INTEGER NOT NULL,
+                FOREIGN KEY(parent_id) REFERENCES emotion_categories(id)
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS sentence_annotations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, annotation_id INTEGER NOT NULL, poem_id INTEGER NOT NULL,
+                sentence_uid TEXT NOT NULL, sentence_text TEXT,
+                FOREIGN KEY(annotation_id) REFERENCES annotations(id) ON DELETE CASCADE
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS sentence_emotion_links (
+                sentence_annotation_id INTEGER NOT NULL, emotion_id TEXT NOT NULL, is_primary BOOLEAN NOT NULL,
+                PRIMARY KEY (sentence_annotation_id, emotion_id),
+                FOREIGN KEY(sentence_annotation_id) REFERENCES sentence_annotations(id) ON DELETE CASCADE,
+                FOREIGN KEY(emotion_id) REFERENCES emotion_categories(id)
+            )
+        ''')
+
+        # --- 索引保持不变 ---
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_poem_author ON poems(author)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_annotation_poem_model ON annotations(poem_id, model_identifier)')
+        cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS uidx_poem_model ON annotations(poem_id, model_identifier)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_annotation_status ON annotations(status)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_annotation_created_at ON annotations(created_at)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_poem_created_at ON poems(created_at)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_emotion_parent_id ON emotion_categories(parent_id)')
+        cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS uidx_sentence_ref ON sentence_annotations(annotation_id, sentence_uid)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_link_emotion_id ON sentence_emotion_links(emotion_id)')
+
+        conn.commit()
+        logger.info("数据库架构检查/初始化完成。")
+    except sqlite3.Error as e:
+        logger.error(f"数据库初始化错误: {e}")
+        raise
     finally:
         if conn:
             conn.close()

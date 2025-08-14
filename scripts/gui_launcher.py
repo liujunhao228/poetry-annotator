@@ -400,7 +400,7 @@ class DistributionTab(TaskExecutorTab):
         else:
             self.output_queue.put(f"警告: 批次大小 '{chunk_size}' 无效，将使用脚本默认值。\n")
         self.log_text.config(state="normal"); self.log_text.delete(1.0, tk.END); self.log_text.config(state="disabled")
-        display_command = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in command)
+        display_command = ' '.join(f'"{str(arg)}"' if ' ' in str(arg) else str(arg) for arg in command)
         self.output_queue.put(f"执行命令: {display_command}\n" + "="*80 + "\n")
         self._update_ui_state(is_running=True)
         self.task_thread = threading.Thread(target=self._run_task_thread, args=(command,), daemon=True)
@@ -543,7 +543,7 @@ class SamplingTab(TaskExecutorTab):
             if not (num_files.isdigit() and int(num_files) > 0): self.output_queue.put(f"错误: 分段文件数 '{num_files}' 必须为正整数。\n"); return
             command.extend(["--num-files", num_files])
         self.log_text.config(state="normal"); self.log_text.delete(1.0, tk.END); self.log_text.config(state="disabled")
-        display_command = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in command)
+        display_command = ' '.join(f'"{str(arg)}"' if ' ' in str(arg) else str(arg) for arg in command)
         self.output_queue.put(f"执行命令: {display_command}\n" + "="*80 + "\n")
         self._update_ui_state(is_running=True)
         self.task_thread = threading.Thread(target=self._run_task_thread, args=(command,), daemon=True)
@@ -634,7 +634,7 @@ class RecoveryTab(TaskExecutorTab):
         
         # 清空日志区域并显示执行的命令
         self.log_text.config(state="normal"); self.log_text.delete(1.0, tk.END); self.log_text.config(state="disabled")
-        display_command = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in command)
+        display_command = ' '.join(f'"{str(arg)}"' if ' ' in str(arg) else str(arg) for arg in command)
         self.output_queue.put(f"执行命令: {display_command}\n" + "="*80 + "\n")
         
         # 更新UI状态并启动线程

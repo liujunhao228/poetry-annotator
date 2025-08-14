@@ -1,0 +1,162 @@
+# Poetry Annotator 示例配置文件
+#
+# 这是 poetry-annotator 项目的示例配置文件 (`config.ini`)。
+# 请将此内容复制到 `config/config.ini`，并根据您的实际情况修改。
+#
+# - 使用 `#` 或 `;` 对配置项进行注释。
+# - 布尔值可以是 `True`, `False`, `yes`, `no`, `1`, `0`。
+# - 路径建议使用相对路径或绝对路径。
+
+[LLM]
+# --- 并发与容错控制 ---
+# 模型内最大并发工作线程数（控制单个Annotator实例的并发请求数）
+max_workers = 10
+# 模型间最大并发管道数（控制distribute_tasks.py同时运行多少个模型任务）
+max_model_pipelines = 2
+# 单次API调用失败后的最大重试次数
+max_retries = 3
+# 重试时的基础等待时间乘数（秒），将用于指数退避策略
+retry_delay = 1
+# 熔断器：在连续多少次失败后开启熔断
+breaker_fail_max = 5
+# 熔断器：熔断开启后，多少秒后进入半开状态尝试恢复
+breaker_reset_timeout = 60
+
+[Database]
+# --- 数据库配置 ---
+# 支持两种模式：
+# 1. 单数据库模式（向后兼容）:
+#    db_path = data/poetry.db
+# 2. 多数据库模式（推荐，与数据可视化子项目集成）:
+#    db_paths = TangShi=data/TangShi.db,SongCi=data/SongCi.db
+db_path = poetry.db
+
+[Data]
+# 存放原始JSON数据文件的目录
+source_dir = data/source_json
+# 存放导出结果的目录
+output_dir = data/output
+
+[Logging]
+# --- 日志系统配置 ---
+# 控制台显示的最低日志级别 (DEBUG, INFO, WARNING, ERROR)
+console_log_level = INFO
+# 文件记录的最低日志级别，建议设为DEBUG以捕获所有详细信息
+file_log_level = DEBUG
+# 是否启用文件日志
+enable_file_log = True
+# 日志文件路径，如果留空，将自动在 `logs/` 目录下创建带时间戳的文件
+log_file = logs/poetry_annotator.log
+# 是否启用控制台日志
+enable_console_log = True
+# 日志文件轮转前的最大大小（MB）
+max_file_size = 10
+# 保留的旧日志文件数量
+backup_count = 5
+# 是否静音第三方库（如httpx, urllib3）的冗余日志
+quiet_third_party = True
+
+[Categories]
+# --- 情感分类体系配置 ---
+# 情感分类体系的Markdown源文件路径
+md_path = config/中国古典诗词情感分类体系.md
+# （自动生成）情感体系的XML缓存文件路径
+xml_path = config/emotion_categories.xml
+
+[Prompt]
+# --- 全局默认提示词模板路径 ---
+# 这些路径可以被每个[Model.*]配置中的同名键覆盖
+# 系统提示-指令部分模板
+system_prompt_instruction_template = config/system_prompt_instruction.txt
+# 系统提示-示例部分模板
+system_prompt_example_template = config/system_prompt_example.txt
+# 用户提示模板
+user_prompt_template = config/user_prompt_template.txt
+
+
+# ==============================================================================
+# = 模型配置示例 (Model.*) =
+# ==============================================================================
+#
+# 您可以添加任意多个 [Model.*] 配置节，`*` 部分是您为该配置起的别名。
+# 这个别名将用于CLI和GUI中，例如：`python src/main.py annotate --model gemini-1.5-pro`
+
+[Model.gemini-1.5-pro]
+# 服务提供商 (目前支持: gemini, siliconflow)
+provider = gemini
+# 在API请求中使用的具体模型名称
+model_name = models/gemini-1.5-pro-latest
+# 您的API密钥
+api_key = your_gemini_api_key_here
+# API的基础URL (Gemini服务通常不需要配置此项，SDK会自动处理)
+base_url =
+# 每秒请求数 (QPS) 限制，留空或为0则不限制
+rate_limit_qps = 5
+# --- Gemini特定参数 ---
+temperature = 0.3
+max_tokens = 8192
+timeout = 120
+top_p = 1.0
+top_k = 40
+# 停止序列，用逗号分隔
+stop_sequences =
+# [可选] Gemini 2.5 Pro 特有参数，模型的思考时间预算（秒）
+thinking_budget =
+
+[Model.qwen-long]
+# 服务提供商 (SiliconFlow兼容OpenAI API)
+provider = siliconflow
+# 在API请求中使用的具体模型名称
+model_name = Qwen/Qwen2-7B-Instruct
+# 您的API密钥
+api_key = your_siliconflow_api_key_here
+# API服务的基础URL
+base_url = https://api.siliconflow.cn/v1/chat/completions
+# 每秒请求数 (QPS) 限制
+rate_limit_qps = 10
+# --- SiliconFlow/OpenAI特定参数 ---
+temperature = 0.1
+max_tokens = 4096
+timeout = 60
+top_p = 0.9
+# 停止序列，用逗号分隔
+stop = ]
+# 响应格式，对于需要JSON输出的模型，配置为 '{"type": "json_object"}'
+response_format = {"type": "json_object"}
+# [可选] 为模型指定一个随机种子以获得可复现的结果
+seed = 12345
+
+[Model.deepseek-v2]
+# 这是另一个SiliconFlow/OpenAI兼容模型的示例
+provider = siliconflow
+model_name = deepseek-ai/DeepSeek-V2-Chat
+api_key = your_deepseek_api_key_here
+base_url = https://api.deepseek.com/v1/chat/completions
+rate_limit_qps = 8
+temperature = 0.2
+max_tokens = 4096
+timeout = 90
+response_format = {"type": "json_object"}
+# --- 模型特定的提示词模板 ---
+# 假设这个模型需要不同的提示词，可以在这里覆盖全局配置
+system_prompt_instruction_template = config/prompts_for_deepseek/system_instruction.txt
+system_prompt_example_template = config/prompts_for_deepseek/system_example.txt
+user_prompt_template = config/prompts_for_deepseek/user_prompt.txt
+
+[Model.ollama-qwen]
+# 这是一个通过本地Ollama服务运行模型的示例
+# provider仍然是siliconflow，因为它兼容OpenAI的API格式
+provider = siliconflow
+model_name = qwen:7b-chat-v1.5-q4_K_M
+# Ollama本地服务通常不需要API密钥，但该字段不能为空，可以填任意值
+api_key = ollama
+# 指向你的本地Ollama服务地址
+base_url = http://localhost:11434/v1/chat/completions
+# 本地服务通常没有严格的QPS限制
+rate_limit_qps =
+temperature = 0.2
+max_tokens = 2048
+timeout = 180
+# [重要] Ollama的响应格式与标准OpenAI API略有不同，
+# 此适配器将帮助解析Ollama特有的响应结构（例如包含```json标签时）。
+response_adapter = ollama

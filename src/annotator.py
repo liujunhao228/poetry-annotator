@@ -4,6 +4,7 @@ import json
 import logging
 import asyncio
 import time
+import os
 from typing import List, Dict, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
@@ -14,6 +15,7 @@ from .data_manager import get_data_manager
 from .llm_factory import llm_factory
 from .config_manager import config_manager
 from .label_parser import label_parser
+# from .model_specific_logging import ModelSpecificLogging  # 已注释：不再使用模型特定日志记录器
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +46,12 @@ class Annotator:
             # ERROR级别：记录关键错误，应在控制台和文件都显示
             logger.error(f"加载情感分类体系失败: {e}")
             raise
-        
+            
         # INFO级别：初始化信息，简洁明了
         logger.info(f"初始化标注器: 模型配置='{self.model_identifier}', 并发数={self.max_workers}")
+        
+        # 直接使用全局日志记录器，不再尝试导入可能出错的批次日志
+        self.model_logger = logger
     
     def _generate_sentences_with_id(self, paragraphs: List[str]) -> List[Dict[str, str]]:
         """为句子生成ID并构建JSON格式"""
@@ -64,6 +69,9 @@ class Annotator:
         logger.debug(f"开始业务层验证与转换 - 输入句子数: {len(original_sentences)}")
         
         if not isinstance(llm_output, list) or not llm_output:
+            # 使用模型特定日志记录详细错误信息
+            # self.model_logger.error(f"LLM输出验证失败: 输出必须是一个非空列表，但实际是: {llm_output}")  # 已注释：不再使用模型特定日志
+            logger.error(f"LLM输出验证失败: 输出必须是一个非空列表，但实际是: {llm_output}")
             raise ValueError(f"LLM输出必须是一个非空列表，但实际是: {llm_output}")
         
         input_ids = {item['id'] for item in original_sentences}
@@ -77,6 +85,9 @@ class Annotator:
                 error_msg += f" 缺失ID: {missing}."
             if extra:
                 error_msg += f" 多余ID: {extra}."
+            # 使用模型特定日志记录详细错误信息
+            # self.model_logger.error(f"LLM输出ID验证失败: {error_msg}")  # 已注释：不再使用模型特定日志
+            logger.error(f"LLM输出ID验证失败: {error_msg}")
             raise ValueError(error_msg)
         
         annotations_by_id = {item['id']: item for item in llm_output}
@@ -92,14 +103,23 @@ class Annotator:
         
         # [调整] DEBUG级别：将详细的、结构化的调试信息记录在DEBUG级别，仅输出到文件。
         logger.debug(f"业务层验证与数据转换成功，已合并 {len(final_results)} 条标注。")
+        # 使用模型特定日志记录详细的验证结果，便于调试特定模型的问题
+        # self.model_logger.debug(f"业务层验证与数据转换成功，已合并 {len(final_results)} 条标注。")  # 已注释：不再使用模型特定日志
         # 注释掉详细验证内容的记录，因为项目已投入正常运行
-        # logger.debug(f"合并后的标注详情: {json.dumps(final_results, ensure_ascii=False, indent=2)}")
+        # self.model_logger.debug(f"合并后的标注详情: {json.dumps(final_results, ensure_ascii=False, indent=2)}")
         
         return final_results
 
     async def _annotate_single_poem(self, poem: Dict[str, Any]) -> Dict[str, Any]:
         """标注单首诗词，包含完整的处理流程和重试逻辑"""
         poem_id = poem['id']
+        # 记录开始处理某首诗的信息到模型特定日志
+        # self.model_logger.info(f"开始处理诗词ID: {poem_id}")  # 已注释：不再使用模型特定日志
+        logger.info(f"开始处理诗词ID: {poem_id}")
+        # 记录诗词内容到模型特定日志，便于调试
+        # self.model_logger.debug(f"诗词ID {poem_id} 内容: {poem}")  # 已注释：不再使用模型特定日志
+        logger.debug(f"诗词ID {poem_id} 内容: {poem}")
+        
         # --- Tenacity 重试策略保持不变 ---
         @retry(
             wait=wait_random_exponential(multiplier=self.retry_delay_multiplier, max=self.retry_max_wait),
@@ -121,8 +141,18 @@ class Annotator:
             # - 如果 breaker 已开启, call_async 会直接抛出 CircuitBreakerError。
             llm_output_validated = await self.breaker.call_async(_do_llm_call_with_retry)
             
+            # 记录LLM原始输出到模型特定日志
+            # self.model_logger.debug(f"诗词ID {poem_id} LLM原始输出: {llm_output_validated}")  # 已注释：不再使用模型特定日志
+            logger.debug(f"诗词ID {poem_id} LLM原始输出: {llm_output_validated}")
+            
             sentences_with_id = self._generate_sentences_with_id(poem['paragraphs'])
             final_results = self._validate_and_transform_response(sentences_with_id, llm_output_validated)
+            
+            # 记录最终结果到模型特定日志
+            # self.model_logger.info(f"诗词ID {poem_id} 标注完成")  # 已注释：不再使用模型特定日志
+            logger.info(f"诗词ID {poem_id} 标注完成")
+            # self.model_logger.debug(f"诗词ID {poem_id} 最终标注结果: {final_results}")  # 已注释：不再使用模型特定日志
+            logger.debug(f"诗词ID {poem_id} 最终标注结果: {final_results}")
             
             return {
                 'poem_id': poem_id, 
@@ -137,6 +167,15 @@ class Annotator:
                 f"诗词ID {poem_id} (模型: {self.model_identifier}) 因熔断器开启而跳过请求。 "
                 f"错误: {e}"
             )
+            # 记录熔断器错误到模型特定日志
+            # self.model_logger.warning(  # 已注释：不再使用模型特定日志
+            #     f"诗词ID {poem_id} 因熔断器开启而跳过请求。 "
+            #     f"错误: {e}"
+            # )
+            logger.warning(
+                f"诗词ID {poem_id} 因熔断器开启而跳过请求。 "
+                f"错误: {e}"
+            )
             return {
                 'poem_id': poem_id, 
                 'status': 'failed',
@@ -147,6 +186,15 @@ class Annotator:
             # 这个块会捕获从 _do_llm_call_with_retry (通过 tenacity 和 pybreaker) 抛出的最终异常
             logger.error(
                 f"诗词ID {poem_id} (模型: {self.model_identifier}) 标注流程在所有重试后最终失败: {str(e)}",
+                exc_info=True
+            )
+            # 记录详细错误到模型特定日志
+            # self.model_logger.error(  # 已注释：不再使用模型特定日志
+            #     f"诗词ID {poem_id} 标注流程在所有重试后最终失败: {str(e)}",
+            #     exc_info=True
+            # )
+            logger.error(
+                f"诗词ID {poem_id} 标注流程在所有重试后最终失败: {str(e)}",
                 exc_info=True
             )
             return {
@@ -166,6 +214,9 @@ class Annotator:
         
         # INFO级别：任务启动信息，对用户清晰展示任务参数。
         logger.info(f"[{self.model_identifier}] 开始标注任务 - 限制: {limit or '无'}, 范围: {start_id or '开始'}-{end_id or '结束'}, 强制重跑: {force_rerun}, 指定ID: {poem_ids is not None}")
+        # 在模型特定日志中也记录任务启动信息
+        # self.model_logger.info(f"开始标注任务 - 限制: {limit or '无'}, 范围: {start_id or '开始'}-{end_id or '结束'}, 强制重跑: {force_rerun}, 指定ID: {poem_ids is not None}")  # 已注释：不再使用模型特定日志
+        logger.info(f"开始标注任务 - 限制: {limit or '无'}, 范围: {start_id or '开始'}-{end_id or '结束'}, 强制重跑: {force_rerun}, 指定ID: {poem_ids is not None}")
         
         if poem_ids is not None:
             data_manager = get_data_manager()
@@ -180,11 +231,13 @@ class Annotator:
         if not poems:
             # INFO级别：告知用户没有待处理项，是重要的流程状态。
             logger.info(f"[{self.model_identifier}] 没有找到待标注的诗词。")
+            # self.model_logger.info("没有找到待标注的诗词。")  # 已注释：不再使用模型特定日志
             return {'total': 0, 'completed': 0, 'failed': 0, 'model': self.model_identifier}
         
         total_poems = len(poems)
         # INFO级别：告知用户待处理项总数，是重要的流程状态。
         logger.info(f"[{self.model_identifier}] 找到 {total_poems} 首待标注诗词，并发数: {self.max_workers}")
+        # self.model_logger.info(f"找到 {total_poems} 首待标注诗词，并发数: {self.max_workers}")  # 已注释：不再使用模型特定日志
         
         semaphore = asyncio.Semaphore(self.max_workers)
         
@@ -226,6 +279,17 @@ class Annotator:
         # INFO级别：最终的任务总结报告，是用户最关心的信息。
         logger.info(
             f"[{self.model_identifier}] 任务完成! "
+            f"耗时: {execution_time:.2f}秒 (平均 {avg_time_per_poem:.2f}秒/首), "
+            f"总计: {total_poems}, 成功: {completed_count} ({success_rate:.1f}%), 失败: {failed_count}"
+        )
+        # 在模型特定日志中也记录任务总结
+        # self.model_logger.info(  # 已注释：不再使用模型特定日志
+        #     f"任务完成! "
+        #     f"耗时: {execution_time:.2f}秒 (平均 {avg_time_per_poem:.2f}秒/首), "
+        #     f"总计: {total_poems}, 成功: {completed_count} ({success_rate:.1f}%), 失败: {failed_count}"
+        # )
+        logger.info(
+            f"任务完成! "
             f"耗时: {execution_time:.2f}秒 (平均 {avg_time_per_poem:.2f}秒/首), "
             f"总计: {total_poems}, 成功: {completed_count} ({success_rate:.1f}%), 失败: {failed_count}"
         )

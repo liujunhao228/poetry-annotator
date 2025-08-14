@@ -206,10 +206,10 @@ __marimo__/
 config.ini
 
 # data
-config/
 logs/
 ids/
-data/source_json
+data/source_json/TangShi
+data/source_json/SongCi
 .progress_cache/
 .recovery_cache
 

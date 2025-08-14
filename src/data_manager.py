@@ -58,6 +58,87 @@ class DataManager:
         
         # 为不同数据库设置ID前缀，确保全局唯一性
         self._set_id_prefix()
+        
+        # 初始化标注日志记录器
+        self._init_annotation_logger()
+    
+    def _init_annotation_logger(self):
+        """初始化标注结果专用日志记录器"""
+        import logging.handlers
+        from datetime import datetime
+        import os
+        
+        # 创建专用的日志记录器
+        logger_name = f"annotation.{self.db_name}"
+        self.annotation_logger = logging.getLogger(logger_name)
+        
+        # 清除可能已存在的处理器，防止重复记录
+        for handler in self.annotation_logger.handlers[:]:
+            self.annotation_logger.removeHandler(handler)
+        
+        # 确保日志目录存在
+        logs_dir = Path("logs")
+        logs_dir.mkdir(exist_ok=True)
+        
+        # 获取当前进程的信息（如果可用）
+        model_name = "unknown_model"
+        id_file = "no_id_file"
+        
+        # 尝试从环境变量获取模型名称和ID文件信息
+        # 这些信息会在任务分发时设置
+        model_name = os.environ.get('ANNOTATION_MODEL_NAME', model_name)
+        id_file = os.environ.get('ANNOTATION_ID_FILE', id_file)
+        
+        # 提取ID文件名（不含路径）
+        id_file_name = Path(id_file).stem if id_file != "no_id_file" else "no_id_file"
+        
+        # 生成时间戳，格式为 "yyyy-mm-dd-hh-mm-ss"
+        timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        
+        # 创建新的日志文件命名格式，包含所需的所有元数据
+        log_file = f"logs/annotation_{self.db_name}_{model_name}_{id_file_name}_{timestamp}.log"
+        handler = logging.handlers.RotatingFileHandler(
+            log_file,
+            maxBytes=10 * 1024 * 1024,  # 10MB
+            backupCount=5,
+            encoding='utf-8'
+        )
+        
+        # 设置格式化器，确保每条日志都是单行的JSON对象
+        formatter = logging.Formatter('%(message)s')
+        handler.setFormatter(formatter)
+        
+        # 添加处理器到日志记录器
+        self.annotation_logger.addHandler(handler)
+        self.annotation_logger.setLevel(logging.INFO)
+        
+        # 禁用传播到父级记录器，避免重复记录
+        self.annotation_logger.propagate = False
+        
+        # 确保日志记录器处于活动状态
+        self.annotation_logger.disabled = False
+    
+    def _log_annotation_result(self, poem_id: int, model_identifier: str, status: str, 
+                              annotation_result: Optional[str] = None, 
+                              error_message: Optional[str] = None):
+        """记录标注结果到专用日志文件（单行JSON格式）"""
+        from datetime import datetime, timezone, timedelta
+        # 构建完整的日志记录
+        log_entry = {
+            "timestamp": datetime.now(timezone(timedelta(hours=8))).isoformat(),
+            "poem_id": poem_id,
+            "model": model_identifier,
+            "status": status,
+            "data": annotation_result,
+            "error": error_message
+        }
+        
+        # 将日志记录为单行JSON格式
+        import json
+        self.annotation_logger.info(json.dumps(log_entry, ensure_ascii=False, separators=(',', ':')))
+        # 确保日志被写入文件
+        for handler in self.annotation_logger.handlers:
+            handler.flush()
     
     def _set_id_prefix(self):
         """为不同数据库设置ID前缀，确保全局唯一性"""
@@ -371,6 +452,13 @@ class DataManager:
                         annotation_result: Optional[str] = None, 
                         error_message: Optional[str] = None) -> bool:
         """保存标注结果到annotations表 (UPSERT)，时间戳带时区"""
+        # 首先记录到专用日志文件，确保即使数据库保存失败也有记录
+        try:
+            self._log_annotation_result(poem_id, model_identifier, status, annotation_result, error_message)
+        except Exception as e:
+            self.logger.error(f"记录标注日志失败 - 诗词ID: {poem_id}, 模型: {model_identifier}, 错误: {e}")
+        
+        # 然后保存到数据库
         from datetime import datetime, timezone, timedelta
         self.logger.debug(f"保存标注结果 - 诗词ID: {poem_id}, 模型: {model_identifier}, 状态: {status}")
 

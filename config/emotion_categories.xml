@@ -1,0 +1,165 @@
+<?xml version='1.0' encoding='utf-8'?>
+<EmotionCategories>
+  <PrimaryCategory id="01" name_zh="自然山水" name_en="NatureLandscape">
+    <SecondaryCategory id="01.01" name_zh="山水之乐" name_en="LandscapeJoy"></SecondaryCategory>
+    <SecondaryCategory id="01.02" name_zh="自然奇观" name_en="NaturalWonder"></SecondaryCategory>
+    <SecondaryCategory id="01.03" name_zh="物我交融" name_en="SubjectObjectUnity"></SecondaryCategory>
+    <SecondaryCategory id="01.04" name_zh="田园劳作" name_en="PastoralLabor"></SecondaryCategory>
+    <SecondaryCategory id="01.05" name_zh="季节观察" name_en="SeasonalObservation"></SecondaryCategory>
+    <SecondaryCategory id="01.06" name_zh="自然哲理" name_en="NaturalPhilosophy"></SecondaryCategory>
+    <SecondaryCategory id="01.07" name_zh="敬畏自然" name_en="AweOfNature"></SecondaryCategory>
+    <SecondaryCategory id="01.08" name_zh="生态警示" name_en="EcologicalWarning"></SecondaryCategory>
+    <SecondaryCategory id="01.09" name_zh="科学观察" name_en="ScientificObservation"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="02" name_zh="宴饮节庆" name_en="BanquetFestival">
+    <SecondaryCategory id="02.01" name_zh="宴饮欢庆" name_en="BanquetCelebration"></SecondaryCategory>
+    <SecondaryCategory id="02.02" name_zh="节庆活动" name_en="FestivalActivities"></SecondaryCategory>
+    <SecondaryCategory id="02.03" name_zh="市井欢聚" name_en="MarketGathering"></SecondaryCategory>
+    <SecondaryCategory id="02.04" name_zh="友人酬唱" name_en="FriendsGathering"></SecondaryCategory>
+    <SecondaryCategory id="02.05" name_zh="宴后寂寥" name_en="PostBanquetLoneliness"></SecondaryCategory>
+    <SecondaryCategory id="02.06" name_zh="节气习俗" name_en="SolarTermsCustoms"></SecondaryCategory>
+    <SecondaryCategory id="02.07" name_zh="商贾百业" name_en="CommerceIndustries"></SecondaryCategory>
+    <SecondaryCategory id="02.08" name_zh="市场交易" name_en="MarketTransactions"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="03" name_zh="童真成长" name_en="ChildhoodGrowth">
+    <SecondaryCategory id="03.01" name_zh="儿童玩耍" name_en="ChildrenPlay"></SecondaryCategory>
+    <SecondaryCategory id="03.02" name_zh="天真烂漫" name_en="ChildlikeInnocence"></SecondaryCategory>
+    <SecondaryCategory id="03.03" name_zh="儿童教育" name_en="ChildrenEducation"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="04" name_zh="功名仕途" name_en="CareerAmbition">
+    <SecondaryCategory id="04.01" name_zh="求取功名" name_en="PursuitFame"></SecondaryCategory>
+    <SecondaryCategory id="04.02" name_zh="金榜题名" name_en="SuccessExamination"></SecondaryCategory>
+    <SecondaryCategory id="04.03" name_zh="落第痛苦" name_en="FailureExamination"></SecondaryCategory>
+    <SecondaryCategory id="04.04" name_zh="仕途进取" name_en="OfficialCareerAdvancement"></SecondaryCategory>
+    <SecondaryCategory id="04.05" name_zh="建功立业" name_en="AchieveGreatness"></SecondaryCategory>
+    <SecondaryCategory id="04.06" name_zh="贬谪苦闷" name_en="ExileBitterness"></SecondaryCategory>
+    <SecondaryCategory id="04.07" name_zh="宦游旷达" name_en="ExileOptimism"></SecondaryCategory>
+    <SecondaryCategory id="04.08" name_zh="官场倦怠" name_en="OfficialBurnout"></SecondaryCategory>
+    <SecondaryCategory id="04.09" name_zh="归隐矛盾" name_en="ReclusionConflict"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="05" name_zh="家国天下" name_en="NationWorld">
+    <SecondaryCategory id="05.01" name_zh="忧国忧民" name_en="ConcernNationPeople"></SecondaryCategory>
+    <SecondaryCategory id="05.02" name_zh="边关战事" name_en="BorderWarfare"></SecondaryCategory>
+    <SecondaryCategory id="05.03" name_zh="政治讽喻" name_en="PoliticalSatire"></SecondaryCategory>
+    <SecondaryCategory id="05.04" name_zh="历史兴叹" name_en="HistoricalSigh"></SecondaryCategory>
+    <SecondaryCategory id="05.05" name_zh="亡国之痛" name_en="PainOfLostNation"></SecondaryCategory>
+    <SecondaryCategory id="05.06" name_zh="民生疾苦" name_en="PeopleSuffering"></SecondaryCategory>
+    <SecondaryCategory id="05.07" name_zh="宫廷生活" name_en="CourtLife"></SecondaryCategory>
+    <SecondaryCategory id="05.08" name_zh="战后废墟" name_en="PostWarRuins"></SecondaryCategory>
+    <SecondaryCategory id="05.09" name_zh="士兵心理" name_en="SoldierPsychology"></SecondaryCategory>
+    <SecondaryCategory id="05.10" name_zh="战争创伤" name_en="WarTrauma"></SecondaryCategory>
+    <SecondaryCategory id="05.11" name_zh="遗民之痛" name_en="LoyalistPain"></SecondaryCategory>
+    <SecondaryCategory id="05.12" name_zh="政治事件" name_en="PoliticalEvents"></SecondaryCategory>
+    <SecondaryCategory id="05.13" name_zh="文化认同" name_en="CulturalIdentity"></SecondaryCategory>
+    <SecondaryCategory id="05.14" name_zh="文化坚守" name_en="CulturalPersistence"></SecondaryCategory>
+    <SecondaryCategory id="05.15" name_zh="文化冲突" name_en="CulturalConflict"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="06" name_zh="羁旅漂泊" name_en="TravelingWander">
+    <SecondaryCategory id="06.01" name_zh="旅途孤寂" name_en="JourneyLoneliness"></SecondaryCategory>
+    <SecondaryCategory id="06.02" name_zh="行役艰辛" name_en="JourneyHardship"></SecondaryCategory>
+    <SecondaryCategory id="06.03" name_zh="游子思乡" name_en="TravelerHomesickness"></SecondaryCategory>
+    <SecondaryCategory id="06.04" name_zh="空间隔绝" name_en="SpatialIsolation"></SecondaryCategory>
+    <SecondaryCategory id="06.05" name_zh="流放心理" name_en="ExilePsychology"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="07" name_zh="贫病疾苦" name_en="PovertyIllness">
+    <SecondaryCategory id="07.01" name_zh="生计艰难" name_en="LivelihoodStruggle"></SecondaryCategory>
+    <SecondaryCategory id="07.02" name_zh="疾病缠身" name_en="IllnessSuffering"></SecondaryCategory>
+    <SecondaryCategory id="07.03" name_zh="寒门之困" name_en="PovertyStricken"></SecondaryCategory>
+    <SecondaryCategory id="07.04" name_zh="物质匮乏" name_en="MaterialScarcity"></SecondaryCategory>
+    <SecondaryCategory id="07.05" name_zh="孤寡无助" name_en="HelplessLoneliness"></SecondaryCategory>
+    <SecondaryCategory id="07.06" name_zh="底层苦难" name_en="UnderclassSuffering"></SecondaryCategory>
+    <SecondaryCategory id="07.07" name_zh="天灾人祸" name_en="NaturalManmadeDisasters"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="08" name_zh="离情别绪" name_en="PartingEmotion">
+    <SecondaryCategory id="08.01" name_zh="亲友离别" name_en="FarewellFriends"></SecondaryCategory>
+    <SecondaryCategory id="08.02" name_zh="情人分离" name_en="LoversParting"></SecondaryCategory>
+    <SecondaryCategory id="08.03" name_zh="死别之痛" name_en="GriefOfDeath"></SecondaryCategory>
+    <SecondaryCategory id="08.04" name_zh="壮行惜别" name_en="HeroicFarewell"></SecondaryCategory>
+    <SecondaryCategory id="08.05" name_zh="预别之悲" name_en="PrematureFarewellSorrow"></SecondaryCategory>
+    <SecondaryCategory id="08.06" name_zh="思乡" name_en="Homesickness"></SecondaryCategory>
+    <SecondaryCategory id="08.07" name_zh="思亲" name_en="MissingFamily"></SecondaryCategory>
+    <SecondaryCategory id="08.08" name_zh="怀友" name_en="MissingFriends"></SecondaryCategory>
+    <SecondaryCategory id="08.09" name_zh="悼亡" name_en="MourningDead"></SecondaryCategory>
+    <SecondaryCategory id="08.10" name_zh="忆旧游" name_en="NostalgicMemory"></SecondaryCategory>
+    <SecondaryCategory id="08.11" name_zh="思故国" name_en="MissingHomeland"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="09" name_zh="闲适隐逸" name_en="LeisureReclusion">
+    <SecondaryCategory id="09.01" name_zh="归隐生活" name_en="ReclusiveLife"></SecondaryCategory>
+    <SecondaryCategory id="09.02" name_zh="田园闲居" name_en="PastoralLeisure"></SecondaryCategory>
+    <SecondaryCategory id="09.03" name_zh="日常雅趣" name_en="DailyDelights"></SecondaryCategory>
+    <SecondaryCategory id="09.04" name_zh="悠然自得" name_en="Contentment"></SecondaryCategory>
+    <SecondaryCategory id="09.05" name_zh="禅意心境" name_en="ZenMind"></SecondaryCategory>
+    <SecondaryCategory id="09.06" name_zh="知足常乐" name_en="Satisfaction"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="10" name_zh="时空哲思" name_en="TimeSpacePhilosophy">
+    <SecondaryCategory id="10.01" name_zh="伤春悲秋" name_en="SeasonalGrief"></SecondaryCategory>
+    <SecondaryCategory id="10.02" name_zh="盛衰之感" name_en="RiseFallFeeling"></SecondaryCategory>
+    <SecondaryCategory id="10.03" name_zh="人生易老" name_en="LifeAging"></SecondaryCategory>
+    <SecondaryCategory id="10.04" name_zh="物是人非" name_en="ChangedWorld"></SecondaryCategory>
+    <SecondaryCategory id="10.05" name_zh="历史沧桑" name_en="HistoricalVicissitudes"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="11" name_zh="孤寂迷惘" name_en="LonelinessConfusion">
+    <SecondaryCategory id="11.01" name_zh="物理孤独" name_en="PhysicalLoneliness"></SecondaryCategory>
+    <SecondaryCategory id="11.02" name_zh="精神孤独" name_en="SpiritualLoneliness"></SecondaryCategory>
+    <SecondaryCategory id="11.03" name_zh="迟暮之感" name_en="AgingFeeling"></SecondaryCategory>
+    <SecondaryCategory id="11.04" name_zh="身份迷失" name_en="IdentityLoss"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="12" name_zh="壮志豪情" name_en="AmbitionHeroism">
+    <SecondaryCategory id="12.01" name_zh="怀才不遇" name_en="UnrecognizedTalent"></SecondaryCategory>
+    <SecondaryCategory id="12.02" name_zh="壮志难酬" name_en="UnfulfilledAmbition"></SecondaryCategory>
+    <SecondaryCategory id="12.03" name_zh="痛恨奸佞" name_en="HatredVillains"></SecondaryCategory>
+    <SecondaryCategory id="12.04" name_zh="鸣冤叫屈" name_en="InjusticeCry"></SecondaryCategory>
+    <SecondaryCategory id="12.05" name_zh="批判世态" name_en="SocialCriticism"></SecondaryCategory>
+    <SecondaryCategory id="12.06" name_zh="悲壮豪情" name_en="TragicHeroism"></SecondaryCategory>
+    <SecondaryCategory id="12.07" name_zh="英雄气概" name_en="HeroicSpirit"></SecondaryCategory>
+    <SecondaryCategory id="12.08" name_zh="报国壮志" name_en="Patriotism"></SecondaryCategory>
+    <SecondaryCategory id="12.09" name_zh="傲骨不屈" name_en="UnyieldingIntegrity"></SecondaryCategory>
+    <SecondaryCategory id="12.10" name_zh="狂放不羁" name_en="Unrestrained"></SecondaryCategory>
+    <SecondaryCategory id="12.11" name_zh="山河颂歌" name_en="OdeToLandscapes"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="13" name_zh="两性情思" name_en="RomanticLove">
+    <SecondaryCategory id="13.01" name_zh="爱情甜蜜" name_en="SweetLove"></SecondaryCategory>
+    <SecondaryCategory id="13.02" name_zh="闺怨情思" name_en="BoudoirComplaint"></SecondaryCategory>
+    <SecondaryCategory id="13.03" name_zh="离别相思" name_en="PartingLonging"></SecondaryCategory>
+    <SecondaryCategory id="13.04" name_zh="欢洽缠绵" name_en="IntimateBliss"></SecondaryCategory>
+    <SecondaryCategory id="13.05" name_zh="情欲暗涌" name_en="VeiledDesire"></SecondaryCategory>
+    <SecondaryCategory id="13.06" name_zh="娇嗔羞怯" name_en="CoyShyness"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="14" name_zh="礼教反思" name_en="RitualCriticism">
+    <SecondaryCategory id="14.01" name_zh="家庭伦理" name_en="FamilyEthics"></SecondaryCategory>
+    <SecondaryCategory id="14.02" name_zh="社会阶层" name_en="SocialHierarchy"></SecondaryCategory>
+    <SecondaryCategory id="14.03" name_zh="礼教规范" name_en="RitualNorms"></SecondaryCategory>
+    <SecondaryCategory id="14.04" name_zh="弃妇之怨" name_en="AbandonedWoman"></SecondaryCategory>
+    <SecondaryCategory id="14.05" name_zh="女性禁锢" name_en="FemaleConfinement"></SecondaryCategory>
+    <SecondaryCategory id="14.06" name_zh="守节之困" name_en="ChastityConfinement"></SecondaryCategory>
+    <SecondaryCategory id="14.07" name_zh="女性劳动" name_en="FemaleLabor"></SecondaryCategory>
+    <SecondaryCategory id="14.08" name_zh="闺阁禁锢" name_en="BoudoirConfinement"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="15" name_zh="宗教艺术" name_en="ReligionArt">
+    <SecondaryCategory id="15.01" name_zh="求仙问道" name_en="SeekingImmortality"></SecondaryCategory>
+    <SecondaryCategory id="15.02" name_zh="民间祭祀" name_en="FolkRituals"></SecondaryCategory>
+    <SecondaryCategory id="15.03" name_zh="佛教活动" name_en="BuddhistActivities"></SecondaryCategory>
+    <SecondaryCategory id="15.04" name_zh="祭祀祈愿" name_en="RitualPrayer"></SecondaryCategory>
+    <SecondaryCategory id="15.05" name_zh="天命敬畏" name_en="AweOfDestiny"></SecondaryCategory>
+    <SecondaryCategory id="15.06" name_zh="宗教寄托" name_en="ReligiousDevotion"></SecondaryCategory>
+    <SecondaryCategory id="15.07" name_zh="创作痴迷" name_en="CreativeObsession"></SecondaryCategory>
+    <SecondaryCategory id="15.08" name_zh="推敲之苦" name_en="CreativeAgony"></SecondaryCategory>
+    <SecondaryCategory id="15.09" name_zh="知音之渴" name_en="YearningAudience"></SecondaryCategory>
+    <SecondaryCategory id="15.10" name_zh="创作之悦" name_en="CreativeJoy"></SecondaryCategory>
+    <SecondaryCategory id="15.11" name_zh="鉴赏品评" name_en="ArtAppreciation"></SecondaryCategory>
+    <SecondaryCategory id="15.12" name_zh="艺术传承" name_en="ArtHeritage"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="16" name_zh="生死永恒" name_en="LifeDeathEternity">
+    <SecondaryCategory id="16.01" name_zh="死亡观照" name_en="DeathContemplation"></SecondaryCategory>
+    <SecondaryCategory id="16.02" name_zh="人生意义" name_en="MeaningOfLife"></SecondaryCategory>
+    <SecondaryCategory id="16.03" name_zh="宇宙永恒" name_en="CosmicEternity"></SecondaryCategory>
+    <SecondaryCategory id="16.04" name_zh="因果宿命" name_en="KarmicFate"></SecondaryCategory>
+    <SecondaryCategory id="16.05" name_zh="向死而生" name_en="LiveTowardsDeath"></SecondaryCategory>
+    </PrimaryCategory>
+  <PrimaryCategory id="17" name_zh="日常体悟" name_en="DailyInsights">
+    <SecondaryCategory id="17.01" name_zh="生活洞见" name_en="WorldlyObservations"></SecondaryCategory>
+    <SecondaryCategory id="17.02" name_zh="俗世超然" name_en="EtherealDetachment"></SecondaryCategory>
+    <SecondaryCategory id="17.03" name_zh="琐事哲思" name_en="PhilosophicalTrivia"></SecondaryCategory>
+    <SecondaryCategory id="17.04" name_zh="民间智慧" name_en="FolkWisdom"></SecondaryCategory>
+    </PrimaryCategory>
+  </EmotionCategories>

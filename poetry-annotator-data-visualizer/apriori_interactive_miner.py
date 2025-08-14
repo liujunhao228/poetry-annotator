@@ -26,6 +26,7 @@ Apriori 情感关联规则挖掘交互式终端
 然后根据提示输入参数即可。
 """
 import os
+import sys
 from datetime import datetime
 import pandas as pd
 from data_visualizer.db_manager import DBManager
@@ -41,11 +42,20 @@ def get_user_input(prompt, type_converter=str, validator=None, default=None):
             prompt_with_default = prompt
             if default is not None:
                 prompt_with_default = f"{prompt.strip(' :')} (默认: {default}): "
+            elif type_converter == int and default is None:
+                # 对于可选的整数输入，明确提示直接回车表示不限制
+                prompt_with_default = f"{prompt.strip(' :')} (直接回车表示不限制): "
             
             user_str = input(prompt_with_default)
             
-            if default is not None and user_str == "":
-                return default
+            # 处理空输入的情况
+            if user_str == "":
+                if default is not None:
+                    return default
+                elif type_converter == int and default is None:
+                    # 对于可选的整数输入，空输入返回 None
+                    return None
+                # 其他情况继续处理（会使用 type_converter 转换空字符串）
             
             value = type_converter(user_str)
             if validator is None or validator(value):
@@ -57,8 +67,8 @@ def get_user_input(prompt, type_converter=str, validator=None, default=None):
         except Exception as e:
             logger.error(f"发生错误: {e}")
 
-def get_common_parameters():
-    """获取通用的 Apriori 参数。"""
+def get_common_parameters(db_manager1, db_manager2=None):
+    """获取通用的 Apriori 参数，并添加合理性检查。"""
     level = get_user_input(
         "请输入分析粒度 ('sentence' 或 'poem')",
         validator=lambda l: l in ['sentence', 'poem'],
@@ -79,12 +89,59 @@ def get_common_parameters():
         default=2
     )
 
+    # 获取事务总数，用于后续的合理性检查
+    total_transactions1 = len(db_manager1.get_emotion_transactions(level=level))
+    
+    if db_manager2 is not None:
+        # 双库对比模式，使用两个数据库事务数的总和
+        total_transactions2 = len(db_manager2.get_emotion_transactions(level=level))
+        total_transactions = total_transactions1 + total_transactions2
+        print(f"[提示] 当前 '{level}' 级别下，'{db_manager1.db_path}' 有 {total_transactions1} 条事务数据，"
+              f"'{db_manager2.db_path}' 有 {total_transactions2} 条事务数据，总计 {total_transactions} 条。")
+    else:
+        # 单库模式
+        total_transactions = total_transactions1
+        print(f"[提示] 当前 '{level}' 级别下共有 {total_transactions} 条事务数据。")
+    
+    # 设置合理的默认值和警告阈值
+    recommended_max = min(5000, total_transactions)  # 推荐最大值不超过5000或总事务数
+    warning_threshold = 10000  # 超过此值会给出警告
+    
     max_transactions = get_user_input(
-        "请输入最大处理事务数以控制性能 (直接回车表示不限制)",
+        f"请输入最大处理事务数以控制性能 (推荐值: {recommended_max}, 直接回车表示不限制)",
         type_converter=int,
         validator=lambda m: m > 0,
         default=None
     )
+    
+    # 添加合理性检查和警告
+    if max_transactions is not None:
+        if max_transactions > warning_threshold:
+            print(f"[警告] 设置的最大事务数 ({max_transactions}) 较大，可能导致程序运行缓慢或卡死。")
+            confirm = get_user_input(
+                "是否确认继续使用该设置? (y/n)",
+                validator=lambda x: x.lower() in ['y', 'n'],
+                default='n'
+            )
+            if confirm.lower() != 'y':
+                print("[提示] 已将最大事务数调整为推荐值。")
+                max_transactions = recommended_max
+        elif max_transactions > total_transactions:
+            print(f"[提示] 设置的最大事务数 ({max_transactions}) 超过了实际事务总数 ({total_transactions})，将使用全部事务数据。")
+            max_transactions = None  # 不限制
+    else:
+        # 如果用户选择不限制，但事务数超过警告阈值，则给出确认提示
+        if total_transactions > warning_threshold:
+            print(f"[警告] 当前事务总数 ({total_transactions}) 较大，可能导致程序运行缓慢或卡死。")
+            confirm = get_user_input(
+                "是否确认处理全部事务数据? (y/n)",
+                validator=lambda x: x.lower() in ['y', 'n'],
+                default='n'
+            )
+            if confirm.lower() != 'y':
+                print("[提示] 已将最大事务数设置为推荐值。")
+                max_transactions = recommended_max
+
     return level, min_support, min_length, max_transactions
 
 def execute_mining(db_key, level, min_support, min_length, max_transactions):
@@ -94,6 +151,7 @@ def execute_mining(db_key, level, min_support, min_length, max_transactions):
         processor = DataProcessor(db_manager)
 
         logger.info(f"[{db_key}] 正在从数据库提取事务数据并执行 Apriori 算法...")
+        print(f"[{db_key}] 正在从数据库提取事务数据并执行 Apriori 算法...")
         results_df = processor.mine_frequent_emotion_itemsets_apriori(
             level=level,
             min_support=min_support,
@@ -165,7 +223,8 @@ def run_single_db_session():
 
     # 2. 设置参数
     print("\n--- 步骤 2: 设置挖掘参数 ---")
-    level, min_support, min_length, max_transactions = get_common_parameters()
+    db_manager = DBManager(db_path=DB_PATHS[db_key])
+    level, min_support, min_length, max_transactions = get_common_parameters(db_manager)
 
     # 3. 执行挖掘
     print("\n--- 步骤 3: 开始执行挖掘 ---")
@@ -216,7 +275,10 @@ def run_comparison_session():
 
     # 2. 设置统一参数
     print("\n--- 步骤 2: 设置统一的挖掘参数 ---")
-    level, min_support, min_length, max_transactions = get_common_parameters()
+    # 使用两个数据库来获取参数
+    db_manager1 = DBManager(db_path=DB_PATHS[db_key1])
+    db_manager2 = DBManager(db_path=DB_PATHS[db_key2])
+    level, min_support, min_length, max_transactions = get_common_parameters(db_manager1, db_manager2)
 
     # 3. 执行挖掘
     print("\n--- 步骤 3: 开始对两个数据库执行挖掘 ---")
@@ -232,15 +294,40 @@ def run_comparison_session():
 
     # 4. 合并并展示结果
     print("\n--- 步骤 4: 显示对比结果 ---")
+    # 检查结果是否为空
     if results_df1.empty and results_df2.empty:
         logger.warning("在当前参数设置下，两个数据库均未发现任何高频情感组合。")
         return
+    
+    # 检查每个结果是否包含所需的列
+    required_columns = ['itemsets_readable', 'support']
+    if not results_df1.empty and not all(col in results_df1.columns for col in required_columns):
+        logger.error(f"'{db_key1}' 的挖掘结果缺少必要的列: {required_columns}")
+        logger.error(f"'{db_key1}' 的列: {list(results_df1.columns)}")
+        return
+    if not results_df2.empty and not all(col in results_df2.columns for col in required_columns):
+        logger.error(f"'{db_key2}' 的挖掘结果缺少必要的列: {required_columns}")
+        logger.error(f"'{db_key2}' 的列: {list(results_df2.columns)}")
+        return
 
-    df1_comp = results_df1[['itemsets_readable', 'support']].rename(columns={'support': f'support_{db_key1}'})
-    df2_comp = results_df2[['itemsets_readable', 'support']].rename(columns={'support': f'support_{db_key2}'})
+    # 如果其中一个结果为空，创建一个空的用于合并
+    if results_df1.empty:
+        df1_comp = pd.DataFrame(columns=['itemsets_readable', 'support']).rename(columns={'support': f'support_{db_key1}'})
+    else:
+        df1_comp = results_df1[['itemsets_readable', 'support']].rename(columns={'support': f'support_{db_key1}'})
+        
+    if results_df2.empty:
+        df2_comp = pd.DataFrame(columns=['itemsets_readable', 'support']).rename(columns={'support': f'support_{db_key2}'})
+    else:
+        df2_comp = results_df2[['itemsets_readable', 'support']].rename(columns={'support': f'support_{db_key2}'})
 
     # 使用外连接合并，并填充0
     merged_df = pd.merge(df1_comp, df2_comp, on='itemsets_readable', how='outer').fillna(0)
+    
+    # 检查合并后的结果是否为空
+    if merged_df.empty:
+        logger.warning("合并后的对比结果为空。")
+        return
     
     # 计算支持度差异
     merged_df['support_diff'] = merged_df[f'support_{db_key2}'] - merged_df[f'support_{db_key1}']

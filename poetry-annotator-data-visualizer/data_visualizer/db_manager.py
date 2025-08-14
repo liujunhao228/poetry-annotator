@@ -5,6 +5,13 @@ from data_visualizer.config import DB_PATHS, CACHE_MAX_SIZE_DB_QUERIES
 from data_visualizer.utils import logger, db_connect
 from typing import Any
 
+# 尝试导入 tqdm 用于进度显示
+try:
+    from tqdm import tqdm
+    TQDM_AVAILABLE = True
+except ImportError:
+    TQDM_AVAILABLE = False
+
 class DBManager:
     def __init__(self, db_path=DB_PATHS['SongCi']):
         self.db_path = db_path
@@ -278,8 +285,17 @@ class DBManager:
         if df.empty:
             return []
         
+        # 显示进度信息
+        total_rows = len(df)
+        if TQDM_AVAILABLE and total_rows > 1000:
+            print(f"正在处理 {total_rows} 条 {level} 级别的事务数据...")
+        
         # 将 "id1;id2;id3" 这样的字符串转换为 ['id1', 'id2', 'id3']
-        transactions = [row.split(';') for row in df.iloc[:, 0]]
+        # 使用 tqdm 显示进度（如果可用且数据量较大）
+        if TQDM_AVAILABLE and total_rows > 1000:
+            transactions = [row.split(';') for row in tqdm(df.iloc[:, 0], desc="处理事务数据", unit="事务")]
+        else:
+            transactions = [row.split(';') for row in df.iloc[:, 0]]
         
         logger.info(f"成功提取 {len(transactions)} 条 {level} 级别的事务数据。")
         return transactions

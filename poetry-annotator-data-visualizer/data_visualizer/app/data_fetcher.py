@@ -41,6 +41,16 @@ def get_frequent_poem_emotion_sets_data(db_key: str, top_n: int):
 
 @st.cache_data(show_spinner="正在进行 Apriori 挖掘...")
 def get_apriori_results_data(db_key: str, level: str, min_support: float, min_length: int, max_transactions: int = None):
+    """
+    获取 Apriori 挖掘结果数据。
+    
+    :param db_key: 数据库键
+    :param level: 分析层级 ('sentence' 或 'poem')
+    :param min_support: 最小支持度阈值 (0 到 1 之间)
+    :param min_length: 项集的最短长度
+    :param max_transactions: 最大事务数，用于限制计算规模。如果为 None，则不限制。
+    :return: 包含高频项集、支持度和可读名称的 DataFrame
+    """
     processor = get_data_processor(db_key)
     return processor.mine_frequent_emotion_itemsets_apriori(
         level=level, min_support=min_support, min_length=min_length, max_transactions=max_transactions

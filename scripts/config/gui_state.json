@@ -1,0 +1,15 @@
+{
+    "console_log_level": "INFO",
+    "file_log_level": "DEBUG",
+    "model_choice": "single",
+    "selected_model": "DeepSeek-R1-0528-Qwen3-8B",
+    "id_source": "file",
+    "id_file_path": "",
+    "id_dir_path": "",
+    "force_rerun": false,
+    "fresh_start": false,
+    "chunk_size": "1000",
+    "enable_file_log": true,
+    "db_choice": "default",
+    "selected_db": "TangShi"
+}

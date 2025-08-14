@@ -121,6 +121,33 @@ def setup(config, init_db, clear_existing):
         except Exception as e:
             logger.warning(f"配置信息记录失败: {e}")
         
+        # 确保情感分类体系是最新的（从Markdown文件生成XML文件）
+        try:
+            logger.info("检查情感分类体系文件...")
+            categories_config = config_manager.get_categories_config()
+            xml_path = categories_config.get('xml_path')
+            md_path = categories_config.get('md_path')
+            
+            if xml_path and md_path:
+                xml_file = Path(xml_path)
+                md_file = Path(md_path)
+                
+                # 如果Markdown文件存在且比XML文件新，或者XML文件不存在，则重新生成XML
+                if md_file.exists() and (not xml_file.exists() or md_file.stat().st_mtime > xml_file.stat().st_mtime):
+                    logger.info(f"检测到Markdown文件更新，正在重新生成XML文件...")
+                    # 重新创建label_parser实例以触发解析和生成
+                    from .label_parser import LabelParser
+                    LabelParser()  # 初始化时会自动处理Markdown到XML的转换
+                    logger.info("情感分类体系XML文件已更新")
+                elif xml_file.exists():
+                    logger.info("情感分类体系XML文件已是最新")
+                else:
+                    logger.warning("未找到情感分类体系文件（Markdown或XML）")
+            else:
+                logger.warning("未配置情感分类体系文件路径")
+        except Exception as e:
+            logger.warning(f"情感分类体系文件检查失败: {e}")
+        
         if init_db:
             logger.info("开始从JSON文件初始化数据库...")
             try:
@@ -157,11 +184,16 @@ async def run_multi_model_annotation(models: Tuple[str], limit: Optional[int], i
     target_models = list(models)
     logger.info(f"将要执行标注任务的模型配置: {target_models}")
 
+    # 不再创建批次日志记录器，直接使用全局日志记录器
+    batch_logger = logger
+    batch_logger.info(f"开始新的标注批次任务 - 模型: {target_models}, 范围: {id_range or '全部'}")
+
     # 为每个模型创建并运行一个标注任务
     tasks = []
     for model_alias in target_models:
         try:
             logger.info(f"创建模型配置 '{model_alias}' 的标注器...")
+            # 不再设置环境变量用于批次日志
             annotator = Annotator(config_name=model_alias)
             task = annotator.run(
                 limit=limit,
@@ -171,30 +203,42 @@ async def run_multi_model_annotation(models: Tuple[str], limit: Optional[int], i
             )
             tasks.append(task)
             logger.info(f"模型配置 '{model_alias}' 的标注任务已创建")
+            batch_logger.info(f"模型配置 '{model_alias}' 的标注任务已创建")
         except Exception as e:
             logger.error(f"创建模型配置 '{model_alias}' 的标注器失败: {e}")
+            batch_logger.error(f"创建模型配置 '{model_alias}' 的标注器失败: {e}")
     
     if not tasks:
         logger.warning("没有可执行的标注任务。")
+        batch_logger.warning("没有可执行的标注任务。")
         return
 
     # 并发执行所有模型任务
     logger.info(f"开始并发执行 {len(tasks)} 个标注任务...")
+    batch_logger.info(f"开始并发执行 {len(tasks)} 个标注任务...")
     results = await asyncio.gather(*tasks)
 
     # 汇总并打印最终报告
     total_completed, total_failed = 0, 0
     logger.info("\n=== 多模型标注任务最终报告 ===")
+    batch_logger.info("\n=== 多模型标注任务最终报告 ===")
     for res in results:
         logger.info(
+            f"模型配置 [{res['model']}]: "
+            f"总计={res['total']}, 成功={res['completed']}, 失败={res['failed']}"
+        )
+        batch_logger.info(
             f"模型配置 [{res['model']}]: "
             f"总计={res['total']}, 成功={res['completed']}, 失败={res['failed']}"
         )
         total_completed += res.get('completed', 0)
         total_failed += res.get('failed', 0)
     logger.info("---------------------------------")
+    batch_logger.info("---------------------------------")
     logger.info(f"所有模型总计: 成功={total_completed}, 失败={total_failed}")
+    batch_logger.info(f"所有模型总计: 成功={total_completed}, 失败={total_failed}")
     logger.info("=================================")
+    batch_logger.info("=================================")
 
 
 @cli.command()

@@ -13,14 +13,24 @@
   - `logger.debug()` 用于详细的内部状态和调试信息，仅记录于文件。
 """
 
+import sys
+import os
+from pathlib import Path
+
+# 获取当前脚本的绝对路径
+script_dir = Path(__file__).resolve().parent
+# 获取项目根目录
+project_root = script_dir.parent
+# 将项目根目录添加到 sys.path
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 import click
 import asyncio
 import time
-import os
 import json
 import hashlib
 from typing import List, Tuple, Dict, Any, Optional
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
@@ -160,6 +170,20 @@ def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_
     """
     【外层并发单元】为单个指定模型和单个ID文件运行完整的并行标注流程。
     """
+    # 设置环境变量，供日志系统使用
+    import os
+    os.environ['ANNOTATION_MODEL_NAME'] = model
+    os.environ['ANNOTATION_ID_FILE'] = Path(id_file).stem  # 使用文件名而不是完整路径
+    
+    # 初始化批次日志记录器
+    try:
+        from src.batch_logger import batch_logger_manager
+        batch_logger = batch_logger_manager.create_batch_logger()
+        batch_logger.info(f"开始新的批次任务 - 模型: {model}, ID文件: {Path(id_file).name}")
+    except Exception as e:
+        logger.warning(f"批次日志初始化失败: {e}")
+        batch_logger = None
+    
     logger.info("=" * 60)
     logger.info(f"启动任务流水线 -> 模型: [{model}], ID文件: [{Path(id_file).name}]")
     logger.info(f"任务将使用 {max_workers} 个内部工作线程处理数据块。")

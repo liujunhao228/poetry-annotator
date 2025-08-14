@@ -153,14 +153,14 @@ logging_config = LoggingConfig()
 
 
 def setup_default_logging(console_level: Optional[str] = None,
-                          file_level: Optional[str] = None,  # <<<<<< 这里添加 file_level 参数
+                          file_level: Optional[str] = None,
                           enable_file_log: Optional[bool] = None,
                           log_file: Optional[str] = None) -> None:
     """
     [重构] 设置默认日志配置，从配置文件读取并支持命令行覆盖。
     Args:
         console_level: 控制台日志级别（可选，用于覆盖配置文件）
-        file_level: 文件日志级别（可选，用于覆盖配置文件） # <<<<<< 添加此说明
+        file_level: 文件日志级别（可选，用于覆盖配置文件）
         enable_file_log: 是否启用文件日志（可选，用于覆盖配置文件）
         log_file: 日志文件路径（可选，用于覆盖配置文件）
     """
@@ -169,7 +169,7 @@ def setup_default_logging(console_level: Optional[str] = None,
         config = config_manager.get_logging_config()
         # 使用配置文件中的值，除非显式通过参数覆盖
         final_console_level = console_level or config['console_log_level']
-        # <<<<<< 关键修改：如果命令行传入了 file_level，则使用它，否则使用配置中的
+        # 关键修改：如果命令行传入了 file_level，则使用它，否则使用配置中的
         final_file_level = file_level or config['file_log_level']
         final_enable_file_log = enable_file_log if enable_file_log is not None else config['enable_file_log']
         final_log_file = log_file or config.get('log_file')
@@ -181,7 +181,7 @@ def setup_default_logging(console_level: Optional[str] = None,
         # 如果配置文件读取失败，使用安全的默认值
         print(f"警告: 读取日志配置失败，使用默认值: {e}")
         final_console_level = console_level or 'INFO'
-        final_file_level = file_level or 'DEBUG' # <<<<<< 也要处理默认值的情况
+        final_file_level = file_level or 'DEBUG'  # 也要处理默认值的情况
         final_enable_file_log = enable_file_log if enable_file_log is not None else True
         final_log_file = log_file
         final_enable_console_log = True
@@ -190,7 +190,7 @@ def setup_default_logging(console_level: Optional[str] = None,
         final_quiet_third_party = True
     logging_config.setup_logging(
         console_level=final_console_level,
-        file_level=final_file_level, # 确保这里传递的是新的 final_file_level
+        file_level=final_file_level,  # 确保这里传递的是新的 final_file_level
         enable_file_log=final_enable_file_log,
         log_file=final_log_file,
         enable_console_log=final_enable_console_log,
