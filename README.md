@@ -4,14 +4,14 @@
 
 ## 功能特性
 
-- **多模型支持**：支持多种大语言模型，包括Gemini、Qwen、DeepSeek等
+- **多模型支持**：支持多种大语言模型以及多种API格式
 - **情感分类体系**：采用17大类、200+细项的中国古典诗词情感分类体系
 - **多种运行模式**：提供命令行、图形界面和数据可视化三种交互方式
 - **并发处理**：支持多线程并发请求，提高处理效率
 - **容错机制**：具备重试、熔断等容错机制，保证任务稳定性
 - **灵活配置**：支持多模型配置、数据库配置、日志配置等
 - **数据可视化**：集成Streamlit数据可视化界面，便于分析标注结果
-- **辅助工具**：提供任务分发、随机抽样、日志恢复等实用工具
+- **辅助工具**：提供任务分发、随机抽样、日志恢复等实用工具，以及对应的GUI界面
 
 ## 目录结构
 
@@ -23,7 +23,7 @@ poetry-annotator/
 ├── ids/                    # 诗词ID文件目录
 ├── logs/                   # 日志目录
 ├── poetry-annotator-data-visualizer/  # 数据可视化模块
-├── poetry-label-editor/    # 标注编辑器模块
+├── poetry-label-editor/    # 分类定义编辑器模块
 ├── scripts/                # 脚本目录
 ├── src/                    # 核心源代码目录
 ├── main.py                 # 程序入口
@@ -38,17 +38,32 @@ poetry-annotator/
 - Python 3.8+
 - pip包管理工具
 
-### 安装依赖
+### 安装步骤
 
-```bash
-pip install -r requirements.txt
-```
+1. 克隆项目代码：
+   ```bash
+   git clone https://github.com/liujunhao228/poetry-annotator.git
+   cd poetry-annotator
+   ```
+
+2. 创建虚拟环境（更推荐`conda`）：
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # Linux/Mac
+   # 或
+   venv\Scripts\activate     # Windows
+   ```
+
+3. 安装依赖包：
+   ```bash
+   pip install -r requirements.txt
+   ```
 
 ### 配置文件设置
 
 1. 复制配置模板：
    ```bash
-   cp config/config.ini.template config/config.ini
+   cp config/config - 副本.ini config/config.ini
    ```
 
 2. 编辑 `config/config.ini` 文件，根据需要修改以下配置：
@@ -57,9 +72,39 @@ pip install -r requirements.txt
    - 日志设置
    - 情感分类体系文件路径
 
+3. 配置模型提供商：
+   目前支持多种模型提供商，需要在配置文件中设置相应的API密钥和模型名称：
+   
+   ```ini
+   [Model.gemini-1.5-pro]
+   provider = gemini
+   model_name = models/gemini-2.5-flash
+   api_key = your_gemini_api_key_here
+   
+   [Model.qwen-long]
+   provider = siliconflow
+   model_name = Qwen/Qwen3-235B-A22B-Instruct-2507
+   api_key = your_api_key_here
+   base_url = https://api-inference.modelscope.cn/v1/chat/completions # OpenAI 格式的 API 均可
+   ```
+4. 数据库配置：
+   ```ini
+   # 单数据库模式
+   db_path = data/poetry.db
+
+   # 多数据库模式
+   db_paths = TangShi=data/TangShi.db,SongCi=data/SongCi.db
+   ```
+
 ## 使用方法
 
-### 命令行模式
+### 准备数据
+
+在开始标注之前，需要准备诗词数据（[chinese-poetry](https://github.com/chinese-poetry/chinese-poetry)）并复制至对应目录：
+例如`data\source_json\TangShi`、`data\source_json\SongCi`
+之后程序会自行初始化数据库并导入数据
+
+### 命令行模式（不推荐）
 
 ```bash
 # 查看帮助信息
@@ -72,7 +117,7 @@ python main.py
 python main.py --mode cli
 ```
 
-### 图形界面模式
+### 图形界面模式（推荐使用）
 
 ```bash
 # 启动图形界面
@@ -83,6 +128,7 @@ python main.py --mode gui
 - 任务分发管理
 - 随机抽样工具
 - 日志恢复功能
+- 实时监控标注进度
 
 ### 数据可视化模式
 
@@ -90,6 +136,12 @@ python main.py --mode gui
 # 启动数据可视化界面
 python main.py --mode visualizer
 ```
+
+数据可视化界面提供以下功能：
+- 标注结果统计分析
+- 情感分类分布图表
+- 标注质量评估
+- 导出分析报告
 
 ## 情感分类体系
 
@@ -114,36 +166,9 @@ python main.py --mode visualizer
 17. 日常体悟 (DailyInsights)
 
 每个一级类别下包含若干二级类别，总计200多个具体的情感分类标签。
-
-## 配置说明
-
-### 模型配置示例
-
-支持多种模型提供商的配置：
-
-```ini
-[Model.gemini-1.5-pro]
-provider = gemini
-model_name = models/gemini-1.5-pro-latest
-api_key = your_gemini_api_key_here
-
-[Model.qwen-long]
-provider = siliconflow
-model_name = Qwen/Qwen2-7B-Instruct
-api_key = your_siliconflow_api_key_here
-base_url = https://api.siliconflow.cn/v1/chat/completions
-```
-
-### 数据库配置
-
-支持单数据库和多数据库模式：
-
-```ini
-# 单数据库模式
-db_path = data/poetry.db
-
-# 多数据库模式
-db_paths = TangShi=data/TangShi.db,SongCi=data/SongCi.db
+您可以使用`poetry-label-editor`模块来快速编辑：
+```bash
+python poetry-label-editor/editor_app_refactored.py
 ```
 
 ## 项目模块
@@ -160,7 +185,7 @@ db_paths = TangShi=data/TangShi.db,SongCi=data/SongCi.db
 
 ### 辅助工具脚本
 
-在scripts目录下提供了多种实用工具：
+在scripts目录下提供了多种实用工具（推荐通过GUI模式使用）：
 
 - `distribute_tasks.py` - 任务分发工具
 - `random_sample.py` - 随机抽样工具
@@ -174,7 +199,7 @@ db_paths = TangShi=data/TangShi.db,SongCi=data/SongCi.db
 
 ## 许可证
 
-[待添加具体许可证信息]
+[MIT]
 
 ## 联系方式
 

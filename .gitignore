@@ -215,6 +215,7 @@ data/validation
 .recovery_cache/
 logs/
 gui_state.json
+
 # test
 *test*
 
