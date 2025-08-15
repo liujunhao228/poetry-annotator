@@ -44,6 +44,7 @@ def get_frequent_poem_emotion_sets_data_frequency(db_key: str, top_n: int):
     processor = get_data_processor(db_key)
     return processor.compute_frequent_poem_emotion_sets_frequency(limit=top_n)
 
+# [OPTIMIZATION 3.4] 添加 max_transactions 参数
 @st.cache_data(show_spinner="正在进行 Apriori 挖掘...")
 def get_apriori_results_data(db_key: str, level: str, min_support: float, min_length: int, max_transactions: int = None):
     """

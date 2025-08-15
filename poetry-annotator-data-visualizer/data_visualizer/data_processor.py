@@ -328,6 +328,7 @@ class DataProcessor:
         # 返回对前端友好的列
         return sets_df[['set_readable', 'set_count', 'poem_example']]
 
+    # [OPTIMIZATION 3.4] 添加 max_transactions 参数
     @lru_cache(maxsize=CACHE_MAX_SIZE_DATA_PROCESSING)
     def mine_frequent_emotion_itemsets_apriori(self, level: str, min_support: float, min_length: int = 2, max_transactions: int = None) -> pd.DataFrame:
         """
@@ -346,10 +347,9 @@ class DataProcessor:
             logger.info(f"在 {level} 级别未找到用于 Apriori 挖掘的事务数据。")
             return pd.DataFrame()
         
-        # 限制事务数量以提高性能（如果指定了最大事务数）
-        original_count = len(transactions)
+        # [OPTIMIZATION] 限制事务数量以提高性能
         if max_transactions is not None and len(transactions) > max_transactions:
-            logger.info(f"事务数从 {original_count} 限制到 {max_transactions}")
+            logger.info(f"事务数从 {len(transactions)} 限制到 {max_transactions}")
             transactions = transactions[:max_transactions]
         
         # 提前过滤不满足最小长度的事务
@@ -358,62 +358,36 @@ class DataProcessor:
             logger.info("过滤后没有满足最小长度要求的事务。")
             return pd.DataFrame()
             
-        # 检查事务数量是否过大，给出警告
-        warning_threshold = 5000  # 超过此值会记录警告
+        warning_threshold = 5000
         if len(transactions) > warning_threshold:
             logger.warning(f"当前处理的事务数量 ({len(transactions)}) 较大，Apriori 算法可能需要较长时间运行。")
             
-        # 1. 将事务数据转换为 one-hot 编码的 DataFrame
         te = TransactionEncoder()
-        
-        # 显示进度条（如果可用）
-        if TQDM_AVAILABLE:
-            print("正在转换事务数据...")
-            te_ary = te.fit(transactions).transform(tqdm(transactions, desc="转换事务数据", unit="事务"))
-        else:
-            te_ary = te.fit(transactions).transform(transactions)
-            
+        te_ary = te.fit(transactions).transform(transactions)
         df_encoded = pd.DataFrame(te_ary, columns=te.columns_)
         
-        # 如果数据框为空，直接返回空结果
         if df_encoded.empty:
             logger.info("编码后的事务数据为空。")
             return pd.DataFrame(columns=['itemsets_readable', 'support', 'length'])
             
-        # 检查编码后的数据维度，给出警告
-        if len(df_encoded.columns) > 100:  # 如果情感类别过多
-            logger.warning(f"情感类别数量较多 ({len(df_encoded.columns)})，Apriori 算法可能需要较长时间运行。")
-            
-        # 2. 运行 Apriori 算法
-        print(f"正在执行 Apriori 算法 (最小支持度: {min_support})...")
-        # 使用 tqdm 显示进度（如果可用）
-        if TQDM_AVAILABLE:
-            frequent_itemsets = apriori(df_encoded, min_support=min_support, use_colnames=True, verbose=1)
-        else:
-            frequent_itemsets = apriori(df_encoded, min_support=min_support, use_colnames=True)
+        frequent_itemsets = apriori(df_encoded, min_support=min_support, use_colnames=True)
             
         if frequent_itemsets.empty:
             logger.info(f"在最小支持度 {min_support} 下未发现任何高频项集。")
             return pd.DataFrame()
             
-        # 3. 结果格式化和转换
-        # 计算项集长度用于筛选
         frequent_itemsets['length'] = frequent_itemsets['itemsets'].apply(lambda x: len(x))
         
-        # 筛选出长度符合要求的项集
         filtered_itemsets = frequent_itemsets[frequent_itemsets['length'] >= min_length].copy()
         if filtered_itemsets.empty:
             return pd.DataFrame()
             
-        # 获取情感ID到名称的映射
         id_to_name_map = self.get_emotion_categories_map()
         def format_itemset(itemset):
-            # itemset 是一个 frozenset，例如 frozenset({'E1', 'E2'})
             names = [id_to_name_map.get(id, f"未知ID({id})") for id in itemset]
             return ', '.join(sorted(names))
         filtered_itemsets['itemsets_readable'] = filtered_itemsets['itemsets'].apply(format_itemset)
         
-        # 重新排序列，并按支持度降序排序
         result_df = filtered_itemsets[['itemsets_readable', 'support', 'length']].sort_values(by='support', ascending=False)
         
         logger.debug(f"Apriori 挖掘完成，发现 {len(result_df)} 个高频项集 (min_support={min_support}, min_length={min_length})。")

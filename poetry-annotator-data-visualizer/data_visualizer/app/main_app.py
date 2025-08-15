@@ -74,6 +74,7 @@ def run_app():
                 st.subheader("模型性能总览")
                 display_model_performance(selected_db_key)
                 
+                # [OPTIMIZATION] 添加局部刷新按钮
                 header_col, button_col = st.columns([0.85, 0.15])
                 with header_col:
                     st.subheader("标注趋势")
@@ -93,6 +94,7 @@ def run_app():
             with tab2:
                 st.header(f"诗词数据概览: {selected_db_key}")
                 
+                # [OPTIMIZATION] 添加局部刷新按钮
                 header_col, button_col = st.columns([0.85, 0.15])
                 with header_col:
                     st.subheader("诗人作品数量分布")
@@ -118,6 +120,7 @@ def run_app():
                 if emotion_dist_df.empty:
                     st.warning("未找到情感分布数据。请确保已运行数据迁移脚本，或该库中有已完成的标注。")
                 else:
+                    # [OPTIMIZATION] 添加局部刷新按钮
                     header_col, button_col = st.columns([0.85, 0.15])
                     with header_col:
                         st.subheader("情感类型层级分布")
@@ -163,74 +166,66 @@ def run_app():
                             st.info("暂无全诗内高频情感集合数据。")
 
                     with tab_apriori:
+                        # [OPTIMIZATION 3.1] Apriori 懒加载
                         st.markdown("🔬 **深度挖掘**: 使用 Apriori 算法发现频繁项集，探索不同稀有度的情感组合。")
-                        st.info("此功能计算密集。为提升体验，挖掘将在您点击按钮后启动。")
+                        st.info("此功能计算密集。为提升体验，参数调整后点击按钮才会启动挖掘。")
+                        
+                        # 参数设置始终可见，提升用户体验
+                        st.markdown("---")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            level_map = {"句子级别": "sentence", "诗词级别": "poem"}
+                            selected_level_display = st.radio("分析粒度", level_map.keys(), key=f"apriori_level_{selected_db_key}", horizontal=True)
+                            level = level_map[selected_level_display]
+                        with col2:
+                            min_length = st.slider("组合中最少情感数", 2, 5, 2, key=f"apriori_len_{selected_db_key}")
+                        
+                        min_support_percent = st.slider("最小支持度 (%)", 0.1, 10.0, 1.0, step=0.1, key=f"apriori_support_{selected_db_key}", help="一个情感组合出现的频率。值越低，发现的组合越稀有、越多。")
+                        min_support = min_support_percent / 100.0
+                        
+                        # [OPTIMIZATION 3.4] 性能控制选项
+                        st.markdown("### ⚙️ 性能控制选项")
+                        enable_max_transactions = st.checkbox(
+                            "限制最大事务数",
+                            value=True,
+                            key=f"enable_max_transactions_{selected_db_key}",
+                            help="取消勾选以处理所有事务（可能需要较长时间）"
+                        )
+                        
+                        if enable_max_transactions:
+                            max_transactions = st.slider(
+                                "最大事务数 (控制计算规模)",
+                                100, 50000, 5000,
+                                key=f"apriori_max_transactions_{selected_db_key}",
+                                help="减少此值可加快计算速度但可能丢失罕见模式"
+                            )
+                        else:
+                            max_transactions = None
+                            st.info("当前设置将处理所有事务，可能需要较长时间。")
                         
                         session_key = f"apriori_started_{selected_db_key}"
                         if session_key not in st.session_state:
                             st.session_state[session_key] = False
                         
-                        if st.button("🚀 开始 Apriori 挖掘", key=f"start_apriori_{selected_db_key}"):
-                            st.session_state[session_key] = True
-                        if st.session_state.get(session_key):
-                            if st.button("隐藏结果", key=f"reset_apriori_{selected_db_key}"):
+                        # 添加重新挖掘按钮，用户修改参数后可重新执行
+                        button_col1, button_col2 = st.columns(2)
+                        with button_col1:
+                            if st.button("🚀 开始/重新 Apriori 挖掘", key=f"start_apriori_{selected_db_key}"):
+                                st.session_state[session_key] = True
+                        with button_col2:
+                            if st.session_state.get(session_key) and st.button("隐藏结果", key=f"reset_apriori_{selected_db_key}"):
                                 st.session_state[session_key] = False
                                 st.rerun()
-                            st.markdown("---")
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                level_map = {"句子级别": "sentence", "诗词级别": "poem"}
-                                selected_level_display = st.radio("分析粒度", level_map.keys(), key=f"apriori_level_{selected_db_key}", horizontal=True)
-                                level = level_map[selected_level_display]
-                            with col2:
-                                min_length = st.slider("组合中最少情感数", 2, 5, 2, key=f"apriori_len_{selected_db_key}")
-                            
-                            min_support_percent = st.slider("最小支持度 (%)", 0.1, 10.0, 1.0, step=0.1, key=f"apriori_support_{selected_db_key}", help="一个情感组合出现的频率。值越低，发现的组合越稀有、越多。")
-                            min_support = min_support_percent / 100.0
-                            
-                            # 新增性能控制选项
-                            st.markdown("### ⚙️ 性能控制选项")
-                            col3, col4 = st.columns(2)
-                            with col3:
-                                # 添加复选框来启用/禁用事务数限制
-                                enable_max_transactions = st.checkbox(
-                                    "限制最大事务数",
-                                    value=True,
-                                    key=f"enable_max_transactions_{selected_db_key}",
-                                    help="取消勾选以处理所有事务（可能需要较长时间）"
-                                )
-                                
-                                if enable_max_transactions:
-                                    # 根据最小支持度自动设置合理的事务上限
-                                    recommended_max_transactions = max(1000, int(10000 * (1 - min_support)))  # 支持度越低，处理的数据应该越少
-                                    max_transactions = st.slider(
-                                        "最大事务数 (控制计算规模)",
-                                        100,
-                                        50000,
-                                        min(recommended_max_transactions, 10000),
-                                        key=f"apriori_max_transactions_{selected_db_key}",
-                                        help="减少此值可加快计算速度但可能丢失罕见模式"
-                                    )
-                                else:
-                                    max_transactions = None
-                                    st.info("当前设置将处理所有事务，可能需要较长时间。")
-                            
-                            with col4:
-                                # 动态提示用户当前设置可能导致的性能影响
-                                estimated_time = "几秒到几分钟"
-                                if min_support < 0.5:
-                                    estimated_time = "几分钟到数十分钟"
-                                if max_transactions > 10000:
-                                    estimated_time += " (可能会更长)"
-                                st.info(f"预计计算时间: {estimated_time}")
-                            # 显示正在执行的状态
+                        
+                        if st.session_state.get(session_key):
+                            # 执行挖掘并显示结果
                             with st.spinner("正在进行 Apriori 挖掘，请稍候..."):
                                 apriori_results_df = get_apriori_results_data(selected_db_key, level, min_support, min_length, max_transactions)
                             
                             st.markdown("---")
                             st.subheader(f"挖掘结果 (支持度 > {min_support_percent:.1f}%)")
                             if not apriori_results_df.empty:
-                                # 检查数据框长度，避免滑块错误
+                                # [OPTIMIZATION 3.3] 完善滑块以避免错误
                                 result_count = len(apriori_results_df)
                                 if result_count > 1:
                                     top_n_apriori = st.slider("显示前 N 条结果", 1, result_count, min(25, result_count), key=f"apriori_rows_{selected_db_key}")
@@ -252,11 +247,10 @@ def run_app():
                             else:
                                 st.warning(f"在当前设置下未发现任何情感组合。请尝试降低最小支持度或最小长度。")
     else:
-        # --- Comparison View Mode (Code remains largely the same, but lazy loading can be applied to Apriori here too) ---
+        # --- Comparison View Mode ---
         db_keys_to_compare = db_keys_options[:2] # Default to first two
         
         with tab1:
-            # ... (Existing comparison code) ...
             st.header("标注结果分析 (对比)")
             st.subheader("模型性能总览")
             col1, col2 = st.columns(2)
@@ -271,7 +265,6 @@ def run_app():
 
 
         with tab2:
-            # ... (Existing comparison code) ...
             st.header("诗词数据概览 (对比)")
             st.subheader("创作者作品数量 (并排对比)")
             col1, col2 = st.columns(2)
@@ -289,7 +282,6 @@ def run_app():
             st.header("情感分析 (对比)")
             st.subheader("情感层级分布 (并排对比)")
             col1, col2 = st.columns(2)
-            # ... (Existing comparison sunburst code) ...
             with col1:
                 st.subheader(db_keys_to_compare[0])
                 display_emotion_sunburst(db_keys_to_compare[0])
@@ -297,7 +289,6 @@ def run_app():
                 st.subheader(db_keys_to_compare[1])
                 display_emotion_sunburst(db_keys_to_compare[1])
             st.markdown("---")
-            # ... (Existing comparison diff table code) ...
             st.subheader(f"聚合对比：情感分类引用百分比差异 ({db_keys_to_compare[1]} vs {db_keys_to_compare[0]})")
             sunburst_df1 = get_emotion_distribution_data(db_keys_to_compare[0])
             sunburst_df2 = get_emotion_distribution_data(db_keys_to_compare[1])
@@ -314,65 +305,71 @@ def run_app():
             st.markdown("---")
             
             st.subheader(f"聚合对比：高频情感组合支持度差异 ({db_keys_to_compare[1]} vs {db_keys_to_compare[0]})")
-            st.info("使用 Apriori 算法在 **诗词级别** 进行对比挖掘。为减少计算开销，挖掘将在点击按钮后启动。")
+            st.info("使用 Apriori 算法在 **诗词级别** 进行对比挖掘。参数调整后点击按钮才会启动挖掘。")
             
+            # 参数设置始终可见，提升用户体验
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                min_length_compare = st.slider("组合中最少情感数", 2, 5, 2, key="apriori_len_compare")
+            with col_b:
+                min_support_percent_compare = st.slider("最小支持度 (%)", 0.1, 5.0, 0.5, step=0.1, key="apriori_support_compare")
+            with col_c:
+                # [OPTIMIZATION 3.4] 性能控制
+                enable_max_transactions_compare = st.checkbox(
+                    "限制最大事务数", value=True, key="enable_max_transactions_compare"
+                )
+                if enable_max_transactions_compare:
+                    max_transactions_compare = st.number_input(
+                        "最大事务数", min_value=100, max_value=50000, value=5000, key="apriori_max_transactions_compare"
+                    )
+                else:
+                    max_transactions_compare = None
+            
+            min_support_compare = min_support_percent_compare / 100.0
+            level_compare = 'poem'
+            
+            # [OPTIMIZATION 3.1] 懒加载
             session_key_comp = "apriori_started_compare"
             if session_key_comp not in st.session_state:
                 st.session_state[session_key_comp] = False
 
-            if st.button("🚀 开始对比挖掘", key="start_apriori_compare"):
-                st.session_state[session_key_comp] = True
-
-            if st.session_state.get(session_key_comp):
-                if st.button("隐藏对比结果", key="reset_apriori_compare"):
+            # 添加重新挖掘按钮，用户修改参数后可重新执行
+            button_col1, button_col2 = st.columns(2)
+            with button_col1:
+                if st.button("🚀 开始/重新对比挖掘", key="start_apriori_compare"):
+                    st.session_state[session_key_comp] = True
+            with button_col2:
+                if st.session_state.get(session_key_comp) and st.button("隐藏对比结果", key="reset_apriori_compare"):
                     st.session_state[session_key_comp] = False
                     st.rerun()
 
-                col_a, col_b, col_c = st.columns(3)
-                with col_a:
-                    min_length_compare = st.slider("组合中最少情感数", 2, 5, 2, key="apriori_len_compare")
-                with col_b:
-                    min_support_percent_compare = st.slider("最小支持度 (%)", 0.1, 5.0, 0.5, step=0.1, key="apriori_support_compare")
-                with col_c:
-                    # 添加复选框来启用/禁用事务数限制
-                    enable_max_transactions_compare = st.checkbox(
-                        "限制最大事务数",
-                        value=True,
-                        key="enable_max_transactions_compare",
-                        help="取消勾选以处理所有事务（可能需要较长时间）"
-                    )
-                    
-                    if enable_max_transactions_compare:
-                        max_transactions_compare = st.number_input(
-                            "最大事务数",
-                            min_value=100,
-                            max_value=50000,
-                            value=5000,
-                            key="apriori_max_transactions_compare",
-                            help="减少此值可加快计算速度但可能丢失罕见模式"
-                        )
-                    else:
-                        max_transactions_compare = None
-                        st.info("将处理所有事务，可能需要较长时间。")
-                
-                min_support_compare = min_support_percent_compare / 100.0
-                level_compare = 'poem'
-
-                apriori_df1 = get_apriori_results_data(db_keys_to_compare[0], level_compare, min_support_compare, min_length_compare, max_transactions_compare)
-                apriori_df2 = get_apriori_results_data(db_keys_to_compare[1], level_compare, min_support_compare, min_length_compare, max_transactions_compare)
+            if st.session_state.get(session_key_comp):
+                with st.spinner("正在为两个数据库执行 Apriori 对比挖掘..."):
+                    apriori_df1 = get_apriori_results_data(db_keys_to_compare[0], level_compare, min_support_compare, min_length_compare, max_transactions_compare)
+                    apriori_df2 = get_apriori_results_data(db_keys_to_compare[1], level_compare, min_support_compare, min_length_compare, max_transactions_compare)
 
                 if apriori_df1.empty and apriori_df2.empty:
                     st.warning(f"在当前设置下，两个数据库均未发现任何情感组合。请尝试降低参数。")
                 else:
-                    df1_ap_comp = apriori_df1[['itemsets_readable', 'support']].rename(columns={'support': f'support_{db_keys_to_compare[0]}'}),
-                    df2_ap_comp = apriori_df2[['itemsets_readable', 'support']].rename(columns={'support': f'support_{db_keys_to_compare[1]}'}),
+                    df1_ap_comp = apriori_df1[['itemsets_readable', 'support']].rename(columns={'support': f'support_{db_keys_to_compare[0]}'})
+                    df2_ap_comp = apriori_df2[['itemsets_readable', 'support']].rename(columns={'support': f'support_{db_keys_to_compare[1]}'})
                     merged_ap_df = pd.merge(df1_ap_comp, df2_ap_comp, on='itemsets_readable', how='outer').fillna(0)
-                    merged_ap_df['support_diff'] = merged_ap_df[f'support_{db_keys_to_compare[1]}'] - merged_ap_df[f'support_{db_keys_to_compare[0]}']
-                    merged_ap_df = merged_ap_df[(merged_ap_df[f'support_{db_keys_to_compare[0]}'] > 0) | (merged_ap_df[f'support_{db_keys_to_compare[1]}'] > 0)]
-                    merged_ap_df = merged_ap_df.sort_values(by='support_diff', ascending=False, key=abs)
-                    
-                    top_n_apriori_comp = st.slider("显示前 N 条对比结果", 5, len(merged_ap_df), min(25, len(merged_ap_df)), key="apriori_rows_compare")
-                    st.dataframe(merged_ap_df.head(top_n_apriori_comp), column_config={'itemsets_readable': "高频情感组合", f'support_{db_keys_to_compare[0]}': st.column_config.NumberColumn(f"{db_keys_to_compare[0]} 支持度", format="%.4f"), f'support_{db_keys_to_compare[1]}': st.column_config.NumberColumn(f"{db_keys_to_compare[1]} 支持度", format="%.4f"), 'support_diff': st.column_config.NumberColumn(f"支持度差异 ({db_keys_to_compare[1]}-{db_keys_to_compare[0]})", format="%+.4f")}, column_order=['itemsets_readable', f'support_{db_keys_to_compare[0]}', f'support_{db_keys_to_compare[1]}', 'support_diff'], use_container_width=True, hide_index=True)
+                    if not merged_ap_df.empty:
+                        merged_ap_df['support_diff'] = merged_ap_df[f'support_{db_keys_to_compare[1]}'] - merged_ap_df[f'support_{db_keys_to_compare[0]}']
+                        merged_ap_df = merged_ap_df[(merged_ap_df[f'support_{db_keys_to_compare[0]}'] > 0) | (merged_ap_df[f'support_{db_keys_to_compare[1]}'] > 0)]
+                        merged_ap_df = merged_ap_df.reindex(merged_ap_df['support_diff'].abs().sort_values(ascending=False).index)
+                        
+                        # [OPTIMIZATION 3.3] 完善滑块
+                        result_count_comp = len(merged_ap_df)
+                        if result_count_comp > 1:
+                            top_n_apriori_comp = st.slider("显示前 N 条对比结果", 1, result_count_comp, min(25, result_count_comp), key="apriori_rows_compare")
+                            display_df_comp = merged_ap_df.head(top_n_apriori_comp)
+                        else:
+                            display_df_comp = merged_ap_df
+
+                        st.dataframe(display_df_comp, column_config={'itemsets_readable': "高频情感组合", f'support_{db_keys_to_compare[0]}': st.column_config.NumberColumn(f"{db_keys_to_compare[0]} 支持度", format="%.4f"), f'support_{db_keys_to_compare[1]}': st.column_config.NumberColumn(f"{db_keys_to_compare[1]} 支持度", format="%.4f"), 'support_diff': st.column_config.NumberColumn(f"支持度差异 ({db_keys_to_compare[1]}-{db_keys_to_compare[0]})", format="%+.4f")}, column_order=['itemsets_readable', f'support_{db_keys_to_compare[0]}', f'support_{db_keys_to_compare[1]}', 'support_diff'], use_container_width=True, hide_index=True)
+                    else:
+                        st.info("合并后的对比结果为空。")
 
     with tab4:
         st.header("关于与性能")
