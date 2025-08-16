@@ -49,6 +49,10 @@ try:
             "TangShi": os.path.join(str(project_root), 'data', 'TangShi.db'),
             "SongCi": os.path.join(str(project_root), 'data', 'SongCi.db'),
         }
+        
+    # 获取可视化相关配置
+    visualizer_config = config_manager.get_visualizer_config()
+    ENABLE_CUSTOM_DOWNLOAD = visualizer_config.get('enable_custom_download', False)
 except Exception as e:
     print(f"无法从主项目配置管理器获取数据库配置: {e}")
     # Fallback to default configuration
@@ -56,6 +60,8 @@ except Exception as e:
         "TangShi": os.path.join(str(project_root), 'data', 'TangShi.db'),
         "SongCi": os.path.join(str(project_root), 'data', 'SongCi.db'),
     }
+    # 默认不启用自定义下载功能
+    ENABLE_CUSTOM_DOWNLOAD = False
 
 # 缓存配置
 # 数据库查询结果最大缓存条数

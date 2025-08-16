@@ -219,3 +219,4 @@ gui_state.json
 # test
 *test*
 
+*.db

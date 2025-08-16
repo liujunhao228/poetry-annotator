@@ -198,6 +198,12 @@ class ConfigManager:
         
         return prompt_config
     
+    def get_visualizer_config(self) -> Dict[str, Any]:
+        """获取数据可视化配置"""
+        return {
+            'enable_custom_download': self.config.getboolean('Visualizer', 'enable_custom_download', fallback=False)
+        }
+    
     def get_all_config(self) -> Dict[str, Any]:
         """获取所有配置"""
         all_configs = {
@@ -206,6 +212,7 @@ class ConfigManager:
             'data': self.get_data_config(),
             'categories': self.get_categories_config(),
             'prompt': self.get_prompt_config(),
+            'visualizer': self.get_visualizer_config(),
             'models': {}
         }
         for name in self.list_model_configs():

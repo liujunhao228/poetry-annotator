@@ -11,6 +11,7 @@ from data_visualizer.app.data_fetcher import (
     get_apriori_results_data,
     get_model_annotation_trends_data
 )
+from data_visualizer.config import ENABLE_CUSTOM_DOWNLOAD
 
 def display_model_performance(db_key: str):
     """Displays model performance metrics and table for a given db_key."""
@@ -39,7 +40,7 @@ def display_author_poem_count(db_key: str, top_n: int = 20):
         st.info("暂无诗人作品数量数据。")
 
 def display_emotion_sunburst(db_key: str):
-    """Displays the emotion distribution sunburst chart with enhanced download option."""
+    """Displays the emotion distribution sunburst chart with optional enhanced download option."""
     sunburst_df = get_emotion_distribution_data(db_key)
     if sunburst_df.empty:
         st.warning(f"数据库 '{db_key}' 中未找到情感分布数据。")
@@ -55,35 +56,40 @@ def display_emotion_sunburst(db_key: str):
         fig.update_layout(margin=dict(t=50, l=10, r=10, b=10))
         st.plotly_chart(fig, use_container_width=True)
         
-        # 添加自定义下载按钮
-        # 创建一个两列布局，将按钮放在右侧
-        _, download_col = st.columns([0.85, 0.15])
-        with download_col:
-            # 使用滑块让用户选择图片分辨率
-            resolution = st.slider("下载分辨率 (DPI)", 100, 600, 300, 50, key=f"resolution_slider_{db_key}")
-            
-            # 确保在导出前正确应用模板和颜色序列
-            fig_for_export = fig.update_layout(
-                template="plotly",
-                colorway=px.colors.qualitative.Set1  # 显式设置颜色序列
-            )
-            
-            # 使用原始图表对象导出，确保颜色正确保留
-            img_bytes = fig_for_export.to_image(
-                format="png", 
-                width=1200, 
-                height=900, 
-                scale=resolution/100
-            )
-            
-            # 创建下载按钮
-            st.download_button(
-                label="📥 下载高清图",
-                data=img_bytes,
-                file_name=f"emotion_sunburst_{db_key}_{resolution}dpi.png",
-                mime="image/png",
-                help=f"下载分辨率为 {resolution} DPI 的高清旭日图"
-            )
+        # 根据配置决定是否显示自定义下载功能
+        if ENABLE_CUSTOM_DOWNLOAD:
+            # 添加自定义下载按钮
+            # 创建一个两列布局，将按钮放在右侧
+            _, download_col = st.columns([0.85, 0.15])
+            with download_col:
+                # 使用滑块让用户选择图片分辨率
+                resolution = st.slider("下载分辨率 (DPI)", 100, 600, 300, 50, key=f"resolution_slider_{db_key}")
+                
+                # 确保在导出前正确应用模板和颜色序列
+                fig_for_export = fig.update_layout(
+                    template="plotly",
+                    colorway=px.colors.qualitative.Set1  # 显式设置颜色序列
+                )
+                
+                # 使用原始图表对象导出，确保颜色正确保留
+                img_bytes = fig_for_export.to_image(
+                    format="png", 
+                    width=1200, 
+                    height=900, 
+                    scale=resolution/100
+                )
+                
+                # 创建下载按钮
+                st.download_button(
+                    label="📥 下载高清图",
+                    data=img_bytes,
+                    file_name=f"emotion_sunburst_{db_key}_{resolution}dpi.png",
+                    mime="image/png",
+                    help=f"下载分辨率为 {resolution} DPI 的高清旭日图"
+                )
+        else:
+            # 显示标准的Plotly下载选项
+            st.info("自定义下载功能已禁用。如需启用，请在配置文件中设置 'enable_custom_download = true'")
     except Exception as e:
         st.error(f"为 '{db_key}' 绘制旭日图时发生错误: {e}")
         st.subheader("用于绘图的数据帧:")
