@@ -11,6 +11,22 @@ import sys
 import json
 from pathlib import Path
 
+# 设置控制台编码以解决中文显示问题
+if sys.platform.startswith('win'):
+    import locale
+    # 尝试设置控制台编码为utf-8
+    try:
+        # 设置标准输入输出的编码
+        sys.stdin.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        # Python < 3.7 没有reconfigure方法
+        pass
+    
+    # 在Windows上设置环境变量
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+
 # 添加项目根目录到 Python 路径，确保能正确导入 src 下的模块
 project_root = Path(__file__).parent.parent.absolute()
 if str(project_root) not in sys.path:
@@ -70,6 +86,12 @@ class TaskExecutorTab(ttk.Frame):
         将消息放入队列，以便在主线程中安全地更新GUI。
         """
         if message:
+            # 确保消息是正确的编码
+            if isinstance(message, bytes):
+                try:
+                    message = message.decode('utf-8')
+                except UnicodeDecodeError:
+                    message = message.decode('utf-8', errors='replace')
             self.output_queue.put(message)
 
     def _run_task_thread(self, command):
@@ -83,7 +105,11 @@ class TaskExecutorTab(ttk.Frame):
             creation_flags = 0
             if sys.platform == "win32":
                 creation_flags = subprocess.CREATE_NO_WINDOW
-                
+            
+            # 设置环境变量确保子进程编码正确
+            env = os.environ.copy()
+            env['PYTHONIOENCODING'] = 'utf-8'
+            
             self.process = subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
@@ -92,7 +118,8 @@ class TaskExecutorTab(ttk.Frame):
                 encoding='utf-8',
                 errors='replace',
                 bufsize=1,
-                creationflags=creation_flags
+                creationflags=creation_flags,
+                env=env  # 传递环境变量
             )
             
             if self.process.stdout is not None:
@@ -795,5 +822,10 @@ class PoetryToolGUI(tk.Tk):
         self.destroy()
 
 if __name__ == "__main__":
+    # 确保Tkinter界面使用正确的编码
+    if sys.platform.startswith('win'):
+        # 在Windows上设置Tkinter的编码
+        os.environ['TK_DEFAULT_FONT'] = 'Arial Unicode MS'
+        
     app = PoetryToolGUI()
     app.mainloop()

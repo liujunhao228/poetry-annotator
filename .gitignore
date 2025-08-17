@@ -208,15 +208,16 @@ config.ini
 
 # data
 ids/
+logs/
 data/source_json/TangShi/
 data/source_json/SongCi/
 data/validation
 .progress_cache/
 .recovery_cache/
-logs/
 gui_state.json
 
 # test
 *test*
 
 *.db
+src/extract_sample_data.py
