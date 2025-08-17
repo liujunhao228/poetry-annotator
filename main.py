@@ -22,23 +22,34 @@ def main():
     parser = argparse.ArgumentParser(description="LLM诗词情感标注工具")
     parser.add_argument(
         "--mode",
-        choices=["cli", "gui", "visualizer"],
+        choices=["cli", "gui", "gui-review", "visualizer"],
         default="cli",
-        help="启动模式: cli(命令行模式)、gui(图形界面模式) 或 visualizer(数据可视化模式) (默认: cli)"
+        help="启动模式: cli(命令行模式)、gui(功能工具集GUI模式)、gui-review(标注校对GUI模式) 或 visualizer(数据可视化模式) (默认: cli)"
     )
     
     # 解析参数
     args, unknown = parser.parse_known_args()
     
     if args.mode == "gui":
-        # 启动GUI模式
-        # 导入GUI模块
+        # 启动GUI模式 (使用scripts/gui_launcher.py)
         gui_script_path = Path(__file__).parent / "scripts" / "gui_launcher.py"
         if gui_script_path.exists():
             # 直接运行GUI脚本
             os.system(f"{sys.executable} {gui_script_path}")
         else:
             print("错误: 找不到GUI启动器脚本 (scripts/gui_launcher.py)")
+            sys.exit(1)
+    elif args.mode == "gui-review":
+        # 启动标注校对GUI模式 (使用src/gui.py)
+        try:
+            # 直接导入并运行标注校对GUI模块
+            from src.gui import main as gui_main
+            gui_main()
+        except ImportError as e:
+            print(f"错误: 无法导入标注校对GUI模块 - {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"错误: 启动标注校对GUI模式时出现问题 - {e}")
             sys.exit(1)
     elif args.mode == "visualizer":
         # 启动数据可视化模式
