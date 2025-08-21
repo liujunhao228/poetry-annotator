@@ -1,7 +1,8 @@
 # src/llm_services/gemini_service.py
 
 import json
-from typing import Dict, Any, Optional, List, Tuple
+import asyncio
+from typing import Dict, Any, Optional, List, Tuple, AsyncGenerator
 import httpx
 
 # 使用新的 Google Gemini Python SDK
@@ -10,9 +11,16 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold, Generati
 from google.api_core import exceptions as google_exceptions
 
 from .base_service import BaseLLMService
+from .schemas import PoemData, EmotionSchema
+from .exceptions import LLMServiceAPIError, LLMServiceTimeoutError, LLMServiceRateLimitError
 
 
 class GeminiService(BaseLLMService):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """异步上下文管理器出口"""
+        # Gemini SDK不需要显式关闭连接
+        # 调用父类的__aexit__
+        await super().__aexit__(exc_type, exc_val, exc_tb)
     """
     Google Gemini API 服务实现 (已重构)
     
@@ -116,7 +124,7 @@ class GeminiService(BaseLLMService):
             self.logger.error(error_message, exc_info=True)
             return False, error_message
 
-    async def annotate_poem(self, poem: Dict[str, Any], emotion_schema: str) -> Dict[str, Any]:
+    async def annotate_poem(self, poem: PoemData, emotion_schema: EmotionSchema) -> List[Dict[str, Any]]:
         """
         使用 Gemini API 标注一首诗词。
         """
@@ -136,13 +144,16 @@ class GeminiService(BaseLLMService):
                 "safety_settings": self.safety_settings_dict,
                 "request_options": request_options
             }
-            self.log_request_details(request_data_for_log, headers={"Authorization": f"Bearer {self.api_key}"}, prompt=full_prompt)
+            self.log_request_details(request_data_for_log, headers={"Authorization": f"Bearer {self._mask_api_key(self.api_key)}"}, prompt=full_prompt)
 
-            # --- 应用速率限制器 ---
-            await self._ensure_rate_limiter()  # 首先确保限速器已初始化
-            if self.rate_limiter:
-                await self.rate_limiter.acquire()
-                self.logger.debug("速率限制器：已获取令牌，继续执行API请求。")
+            # --- 应用速率控制器 ---
+            await self._ensure_rate_controller()
+            if self.rate_controller:
+                await self.rate_controller.acquire()
+            
+            # --- 应用请求间延迟 ---
+            if self.request_delay > 0:
+                await asyncio.sleep(self.request_delay)
             
             response = await self.genai_model.generate_content_async(
                 full_prompt,
@@ -150,7 +161,6 @@ class GeminiService(BaseLLMService):
             )
             
             response_text = response.text
-            # 确保从 `usage_metadata` (如果存在) 获取 token 统计信息
             usage = {}
             if hasattr(response, 'usage_metadata'):
                 usage = {
@@ -159,25 +169,82 @@ class GeminiService(BaseLLMService):
                     "total_token_count": response.usage_metadata.total_token_count,
                 }
             
-            self.log_response_details(response.to_dict(), usage)
+            self.log_response_details(
+                poem_id=poem.id,
+                parsed_data=None, # In non-stream, this would be the result
+                response_data=response.to_dict(),
+                response_text=response_text,
+                usage=usage
+            )
 
             return self.validate_response(response_text)
             
         except (google_exceptions.RetryError, google_exceptions.DeadlineExceeded) as e:
-            self.logger.warning(f"[Gemini] API 连接/超时错误，可重试: {e}")
-            self.log_error_details(e, request_data_for_log, full_prompt)
-            raise # 重新抛出，让 tenacity 和 pybreaker 处理
+            self.logger.warning(f"[Gemini] API 连接/超时错误: {e}")
+            self.log_error_details(poem.id, e, request_data_for_log, full_prompt)
+            raise LLMServiceTimeoutError(f"Gemini API 超时: {e}") from e
         
+        except google_exceptions.ResourceExhausted as e:
+            self.logger.warning(f"[Gemini] API 速率限制错误: {e}")
+            self.log_error_details(poem.id, e, request_data_for_log, full_prompt)
+            raise LLMServiceRateLimitError(f"Gemini API 速率限制: {e}") from e
+
         except (google_exceptions.GoogleAPICallError, google_exceptions.InvalidArgument) as e:
             self.logger.error(f"[Gemini] API 不可重试错误: {e}", exc_info=True)
-            self.log_error_details(e, request_data_for_log, full_prompt)
-            # 对于不可重试的错误，直接抛出，让外层捕获并标记为失败
-            raise ValueError(f"Gemini API Error: {e}") from e
+            self.log_error_details(poem.id, e, request_data_for_log, full_prompt)
+            raise LLMServiceAPIError(f"Gemini API 调用失败: {e}") from e
 
         except Exception as e:
             self.logger.error(f"[Gemini] API 调用时发生未知错误: {e}", exc_info=True)
-            self.log_error_details(e, request_data_for_log, full_prompt)
-            raise # 重新抛出，让 tenacity 和 pybreaker 处理
+            self.log_error_details(poem.id, e, request_data_for_log, full_prompt)
+            raise LLMServiceAPIError(f"Gemini 未知错误: {e}") from e
+
+    async def annotate_poem_stream(self, poem: PoemData, emotion_schema: EmotionSchema) -> AsyncGenerator[str, None]:
+        """
+        [新增] 使用 Gemini API 流式标注一首诗词。
+        """
+        request_data_for_log = None
+        full_prompt = "提示词未生成"
+        try:
+            system_prompt, user_prompt = self.prepare_prompts(poem, emotion_schema)
+            full_prompt = f"{system_prompt}\n\n{user_prompt}"
+
+            request_options = {'timeout': self.timeout}
+            
+            request_data_for_log = {
+                "model_name": self.genai_model.model_name,
+                "generation_config": self.generation_config_dict,
+                "safety_settings": self.safety_settings_dict,
+                "request_options": request_options,
+                "stream": True
+            }
+            self.log_request_details(request_data_for_log, headers={"Authorization": f"Bearer {self._mask_api_key(self.api_key)}"}, prompt=full_prompt)
+
+            await self._ensure_rate_controller()
+            if self.rate_controller:
+                await self.rate_controller.acquire()
+            
+            if self.request_delay > 0:
+                await asyncio.sleep(self.request_delay)
+            
+            response_stream = await self.genai_model.generate_content_async(
+                full_prompt,
+                stream=True,
+                request_options=request_options
+            )
+            
+            async for chunk in response_stream:
+                yield chunk.text
+
+        except Exception as e:
+            self.logger.error(f"[Gemini] 流式API调用时发生未知错误: {e}", exc_info=True)
+            self.log_error_details(poem.id, e, request_data_for_log, full_prompt)
+            if "rate limit" in str(e).lower():
+                raise LLMServiceRateLimitError(f"Gemini API 速率限制: {e}") from e
+            elif isinstance(e, (google_exceptions.RetryError, google_exceptions.DeadlineExceeded)):
+                raise LLMServiceTimeoutError(f"Gemini API 超时: {e}") from e
+            else:
+                raise LLMServiceAPIError(f"Gemini API 流式调用失败: {e}") from e
 
     def get_service_info(self) -> Dict[str, Any]:
         """获取当前服务的详细配置信息。"""

@@ -4,7 +4,7 @@
 
 ## 功能特性
 
-- **多模型支持**：支持多种大语言模型以及多种API格式
+- **多模型支持**：支持多种大语言模型以及多种API格式，采用适配器架构设计，易于扩展
 - **情感分类体系**：采用17大类、200+细项的中国古典诗词情感分类体系
 - **多种运行模式**：提供命令行、图形界面和数据可视化三种交互方式
 - **并发处理**：支持多线程并发请求，提高处理效率
@@ -12,6 +12,7 @@
 - **灵活配置**：支持多模型配置、数据库配置、日志配置等
 - **数据可视化**：集成Streamlit数据可视化界面，便于分析标注结果
 - **辅助工具**：提供任务分发、随机抽样、日志恢复等实用工具，以及对应的GUI界面
+- **速率控制**：支持多种速率控制算法，可灵活配置QPS/RPM、并发数等参数
 
 ## 目录结构
 
@@ -28,15 +29,16 @@ poetry-annotator/
 ├── src/                    # 核心源代码目录
 ├── main.py                 # 程序入口
 ├── README.md               # 说明文档
-└── requirements.txt        # 依赖包列表
+├── pyproject.toml          # 项目配置和依赖管理文件
+└── uv.lock                 # 依赖锁定文件
 ```
 
 ## 安装与配置
 
 ### 环境要求
 
-- Python 3.8+
-- pip包管理工具
+- Python 3.9+
+- 包管理工具（推荐使用 `uv` 或 `pip`）
 
 ### 安装步骤
 
@@ -46,17 +48,25 @@ poetry-annotator/
    cd poetry-annotator
    ```
 
-2. 创建虚拟环境（更推荐`conda`）：
+2. 创建虚拟环境（推荐使用 `uv`）：
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # Linux/Mac
+   # 使用 uv 创建虚拟环境（推荐）
+   uv venv
+   
+   # 或使用 Python 内置 venv
+   python -m venv .venv
+   source .venv/bin/activate  # Linux/Mac
    # 或
-   venv\Scripts\activate     # Windows
+   .venv\Scripts\activate     # Windows
    ```
 
 3. 安装依赖包：
    ```bash
-   pip install -r requirements.txt
+   # 使用 uv 安装依赖（推荐）
+   uv sync
+   
+   # 或使用 pip 安装依赖
+   pip install -e .
    ```
 
 ### 配置文件设置
@@ -72,7 +82,7 @@ poetry-annotator/
    - 日志设置
    - 情感分类体系文件路径
 
-3. 配置模型提供商：
+4. 配置模型提供商：
    目前支持多种模型提供商，需要在配置文件中设置相应的API密钥和模型名称：
    
    ```ini
@@ -82,12 +92,20 @@ poetry-annotator/
    api_key = your_gemini_api_key_here
    
    [Model.qwen-long]
-   provider = siliconflow
+   provider = siliconflow # HTTP式请求
    model_name = Qwen/Qwen3-235B-A22B-Instruct-2507
    api_key = your_api_key_here
    base_url = https://api-inference.modelscope.cn/v1/chat/completions # OpenAI 格式的 API 均可
+   
+   # 使用DashScope(阿里云百炼)兼容OpenAI API的模型
+   [Model.qwen-plus-dashscope]
+   provider = dashscope
+   model_name = qwen-plus
+   api_key = your_dashscope_api_key_here
+   enable_search = false  # DashScope特有参数
    ```
-4. 数据库配置：
+   
+### 数据库配置：
    ```ini
    # 单数据库模式
    db_path = data/poetry.db
@@ -95,6 +113,41 @@ poetry-annotator/
    # 多数据库模式
    db_paths = TangShi=data/TangShi.db,SongCi=data/SongCi.db
    ```
+
+### 速率控制配置：
+   ```ini
+   [Model.qwen-long]
+   provider = siliconflow
+   model_name = Qwen/Qwen3-235B-A22B-Instruct-2507
+   api_key = your_api_key_here
+   # 支持QPS或RPM速率限制（二选一）
+   rate_limit_qps = 1
+   # rate_limit_rpm = 60
+   # 最大并发请求数
+   # max_concurrent = 2
+   # 突发容量
+   # rate_limit_burst = 5
+   # 请求间延迟（秒）
+   request_delay = 1.0
+   ```
+
+### 数据库初始化
+
+项目支持多种数据库初始化方式，可以根据需要选择：
+
+```bash
+# 方式1: 使用主程序命令初始化所有配置的数据库
+python main.py --mode init-db
+
+# 方式2: 使用专门的初始化脚本
+python scripts/init_databases.py
+
+# 方式3: 初始化单个数据库（使用旧版脚本）
+python scripts/init_database.py
+```
+
+数据库初始化会根据配置文件中的`db_path`或`db_paths`设置创建相应的数据库文件，并建立必要的表结构。
+对于多数据库模式，系统会为每个配置的数据库创建独立的文件，并初始化相同的表结构。
 
 ## 使用方法
 
@@ -142,6 +195,13 @@ python main.py --mode visualizer
 - 情感分类分布图表
 - 标注质量评估
 - 导出分析报告
+
+### 速率控制监控
+
+```bash
+# 查看速率控制统计信息
+python main.py rate-stats
+```
 
 ## 情感分类体系
 

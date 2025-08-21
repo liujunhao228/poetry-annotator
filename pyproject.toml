@@ -1,0 +1,34 @@
+[project]
+name = "poetry-annotator"
+version = "1.0.0"
+description = "基于大语言模型的中国古典诗词情感分类标注工具"
+readme = "README.md"
+license = { text = "MIT" }
+python_requires='>=3.9'
+dependencies = [
+    "httpx>=0.27.0",
+    "tenacity>=8.2.3",
+    "pybreaker>=1.2.0",
+    "tqdm>=4.66.1",
+    "click>=8.1.7",
+    "google-generativeai>=0.7.0",
+    "streamlit>=1.32.0",
+    "pandas>=2.2.0",
+    "demjson3>=3.0.6",
+    "json5>=0.9.14",
+    "openai>=1.100.1",
+    "aiosqlite>=0.21.0",
+    "pyyaml>=6.0.2",
+]
+
+[project.optional-dependencies]
+visualizer = [
+    "streamlit>=1.32.0",
+    "pandas>=2.2.0",
+    "matplotlib>=3.8.0",
+    "seaborn>=0.13.0",
+    "plotly>=5.18.0",
+]
+
+[project.scripts]
+poetry-annotator = "main:main"

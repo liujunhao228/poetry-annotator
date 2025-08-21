@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
+from tkinter import ttk, messagebox, scrolledtext, filedialog
 import sys
 import os
 from pathlib import Path
@@ -34,6 +34,10 @@ class AnnotationReviewerTab(ttk.Frame):
         self.current_poem_info = None
         self.current_sentence_annotations = None
         self.selected_item = None
+        
+        # ID列表相关状态
+        self.id_list = []  # 存储加载的ID列表
+        self.current_id_index = -1  # 当前在ID列表中的索引
 
         # 绑定诗词ID变量变化的追踪器
         self.poem_id_var.trace_add("write", self._on_poem_id_var_change)
@@ -76,7 +80,18 @@ class AnnotationReviewerTab(ttk.Frame):
         self.query_button = ttk.Button(query_frame, text="查询", command=self._on_query)
         self.query_button.grid(row=0, column=6, padx=(0, 10))
         
-        configure_grid_row_column(query_frame, col_weights=[0, 0, 0, 0, 0, 1, 0])
+        # ID列表加载按钮
+        self.load_id_list_button = ttk.Button(query_frame, text="加载ID列表", command=self._load_id_list)
+        self.load_id_list_button.grid(row=0, column=7, padx=(0, 10))
+        
+        # 导航按钮
+        self.prev_button = ttk.Button(query_frame, text="上一首", command=self._prev_poem, state=tk.DISABLED)
+        self.prev_button.grid(row=0, column=8, padx=(0, 5))
+        
+        self.next_button = ttk.Button(query_frame, text="下一首", command=self._next_poem, state=tk.DISABLED)
+        self.next_button.grid(row=0, column=9, padx=(0, 10))
+        
+        configure_grid_row_column(query_frame, col_weights=[0, 0, 0, 0, 0, 1, 0, 0, 0, 0])
 
         # 2. 诗词信息展示区域 (中部上方)
         poem_info_frame = create_option_frame(self, "诗词信息", (10, 5))
@@ -244,6 +259,8 @@ class AnnotationReviewerTab(ttk.Frame):
     def _on_poem_id_change(self):
         """当诗词ID输入框失去焦点或按回车时的处理函数"""
         self._update_model_combobox()
+        # 更新导航按钮状态
+        self._update_navigation_state_after_manual_input()
 
     def _update_model_combobox(self):
         """更新模型下拉框"""
@@ -267,6 +284,29 @@ class AnnotationReviewerTab(ttk.Frame):
             # 输入的不是有效数字，清空模型列表
             self.model_combobox['values'] = []
             self.model_var.set("")
+
+    def _update_navigation_state_after_manual_input(self):
+        """在用户手动输入ID后更新导航状态"""
+        if not self.id_list:
+            return  # 没有加载ID列表
+            
+        poem_id_str = self.poem_id_var.get().strip()
+        if not poem_id_str:
+            self.current_id_index = -1
+            self._update_navigation_buttons_state()
+            return
+            
+        try:
+            poem_id = int(poem_id_str)
+            # 检查输入的ID是否在ID列表中
+            if poem_id in self.id_list:
+                self.current_id_index = self.id_list.index(poem_id)
+            else:
+                self.current_id_index = -1  # 不在列表中
+        except ValueError:
+            self.current_id_index = -1  # 无效ID
+            
+        self._update_navigation_buttons_state()
 
     def _on_query(self):
         """处理查询按钮点击事件"""
@@ -311,7 +351,98 @@ class AnnotationReviewerTab(ttk.Frame):
         self.current_poem_info = poem_info
         self.current_sentence_annotations = sentence_annotations
 
+        # 如果当前ID在ID列表中，更新当前索引
+        if self.id_list:
+            try:
+                self.current_id_index = self.id_list.index(poem_id)
+            except ValueError:
+                self.current_id_index = -1
+            self._update_navigation_buttons_state()
+
         self.status_label.config(text="查询成功")
+
+    def _load_id_list(self):
+        """加载ID列表文件"""
+        file_path = filedialog.askopenfilename(
+            title="选择ID列表文件",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+        )
+        
+        if not file_path:
+            return  # 用户取消了选择
+
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                # 读取所有行并解析为整数ID
+                id_list = []
+                for line in f:
+                    line = line.strip()
+                    if line:  # 跳过空行
+                        try:
+                            id_list.append(int(line))
+                        except ValueError:
+                            messagebox.showwarning("格式错误", f"跳过无效ID: {line}")
+                
+                if not id_list:
+                    messagebox.showwarning("加载失败", "ID列表文件为空或没有有效ID")
+                    return
+                
+                # 更新ID列表和相关状态
+                self.id_list = id_list
+                self.current_id_index = -1  # 重置索引
+                self._update_navigation_buttons_state()
+                
+                messagebox.showinfo("加载成功", f"成功加载 {len(id_list)} 个ID")
+                
+        except Exception as e:
+            messagebox.showerror("加载失败", f"加载ID列表文件时出错: {str(e)}")
+
+    def _prev_poem(self):
+        """导航到上一首诗词"""
+        if not self.id_list or self.current_id_index <= 0:
+            return  # 没有ID列表或已在第一首
+            
+        self.current_id_index -= 1
+        self._navigate_to_current_poem()
+
+    def _next_poem(self):
+        """导航到下一首诗词"""
+        if not self.id_list or self.current_id_index >= len(self.id_list) - 1:
+            return  # 没有ID列表或已在最后一首
+            
+        self.current_id_index += 1
+        self._navigate_to_current_poem()
+
+    def _navigate_to_current_poem(self):
+        """导航到当前索引指向的诗词"""
+        if not self.id_list or self.current_id_index < 0 or self.current_id_index >= len(self.id_list):
+            return  # 索引无效
+            
+        poem_id = self.id_list[self.current_id_index]
+        
+        # 更新诗词ID输入框
+        self.poem_id_var.set(str(poem_id))
+        
+        # 自动获取模型并查询
+        self._update_model_combobox()
+        model_id = self.model_var.get().strip()
+        
+        if model_id:
+            # 自动触发查询
+            self._on_query()
+        else:
+            messagebox.showwarning("查询失败", f"诗词ID {poem_id} 没有可用的标注模型")
+
+    def _update_navigation_buttons_state(self):
+        """更新导航按钮的状态"""
+        if not self.id_list:
+            self.prev_button.config(state=tk.DISABLED)
+            self.next_button.config(state=tk.DISABLED)
+            return
+            
+        # 根据当前索引更新按钮状态
+        self.prev_button.config(state=tk.NORMAL if self.current_id_index > 0 else tk.DISABLED)
+        self.next_button.config(state=tk.NORMAL if self.current_id_index < len(self.id_list) - 1 else tk.DISABLED)
 
     def _update_poem_info_display(self, poem_info):
         """更新诗词信息显示区域"""

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 import logging
 import os
+import json
 
 # 处理相对导入问题
 # 优先尝试相对导入（当作为包的一部分被导入时）
@@ -13,10 +14,11 @@ try:
     # 当作为包运行时（推荐方式）
     from .config_manager import config_manager
     from .data_manager import get_data_manager
-    from .label_parser import label_parser
+    from .label_parser import get_label_parser
     from .llm_factory import llm_factory
     from .annotator import Annotator
     from .logging_config import setup_default_logging, get_logger
+    from .rate_control_manager import rate_control_manager
 except ImportError as e:
     relative_import_failed = True
     print(f"相对导入失败: {e}")
@@ -33,17 +35,17 @@ if relative_import_failed:
     try:
         from config_manager import config_manager
         from data_manager import get_data_manager
-        from label_parser import label_parser
+        from label_parser import get_label_parser
         from llm_factory import llm_factory
         from annotator import Annotator
         from logging_config import setup_default_logging, get_logger
+        from rate_control_manager import rate_control_manager
     except ImportError as e:
         print(f"绝对导入也失败了: {e}")
         raise # Re-raise the exception to stop execution
 
-
-# 获取主日志记录器
-logger = get_logger(__name__)
+# 获取标签解析器实例
+label_parser = get_label_parser()
 
 
 # 获取主日志记录器
@@ -140,8 +142,8 @@ def setup(config, init_db, clear_existing):
                 if md_file.exists() and (not xml_file.exists() or md_file.stat().st_mtime > xml_file.stat().st_mtime):
                     logger.info(f"检测到Markdown文件更新，正在重新生成XML文件...")
                     # 重新创建label_parser实例以触发解析和生成
-                    from .label_parser import LabelParser
-                    LabelParser()  # 初始化时会自动处理Markdown到XML的转换
+                    from .label_parser import get_label_parser
+                    get_label_parser()  # 初始化时会自动处理Markdown到XML的转换
                     logger.info("情感分类体系XML文件已更新")
                 elif xml_file.exists():
                     logger.info("情感分类体系XML文件已是最新")
@@ -192,41 +194,58 @@ async def run_multi_model_annotation(models: Tuple[str], limit: Optional[int], i
     batch_logger = logger
     batch_logger.info(f"开始新的标注批次任务 - 模型: {target_models}, 范围: {id_range or '全部'}")
 
-    # 为每个模型创建并运行一个标注任务
-    tasks = []
-    for model_alias in target_models:
-        try:
-            logger.info(f"创建模型配置 '{model_alias}' 的标注器...")
-            # 不再设置环境变量用于批次日志
-            annotator = Annotator(config_name=model_alias)
-            task = annotator.run(
-                limit=limit,
-                start_id=start_id,
-                end_id=end_id,
-                force_rerun=force_rerun
-            )
-            tasks.append(task)
-            logger.info(f"模型配置 '{model_alias}' 的标注任务已创建")
-            batch_logger.info(f"模型配置 '{model_alias}' 的标注任务已创建")
-        except Exception as e:
-            logger.error(f"创建模型配置 '{model_alias}' 的标注器失败: {e}")
-            batch_logger.error(f"创建模型配置 '{model_alias}' 的标注器失败: {e}")
+    # 使用异步任务组管理器
+    from .utils.async_task_manager import async_task_group_context
     
-    if not tasks:
-        logger.warning("没有可执行的标注任务。")
-        batch_logger.warning("没有可执行的标注任务。")
-        return
+    async with async_task_group_context(max_concurrent=len(target_models), group_name="多模型标注任务组") as task_manager:
+        # 为每个模型创建并运行一个标注任务
+        for model_alias in target_models:
+            try:
+                logger.info(f"创建模型配置 '{model_alias}' 的标注器...")
+                # 不再设置环境变量用于批次日志
+                annotator = Annotator(config_name=model_alias)
+                # 异步初始化标注器
+                await annotator.async_init()
+                task = await task_manager.submit_task(
+                    annotator.run(
+                        limit=limit,
+                        start_id=start_id,
+                        end_id=end_id,
+                        force_rerun=force_rerun
+                    )
+                )
+                logger.info(f"模型配置 '{model_alias}' 的标注任务已创建")
+                batch_logger.info(f"模型配置 '{model_alias}' 的标注任务已创建")
+            except Exception as e:
+                logger.error(f"创建模型配置 '{model_alias}' 的标注器失败: {e}")
+                batch_logger.error(f"创建模型配置 '{model_alias}' 的标注器失败: {e}")
+        
+        if task_manager.get_task_count() == 0:
+            logger.warning("没有可执行的标注任务。")
+            batch_logger.warning("没有可执行的标注任务。")
+            return
 
-    # 并发执行所有模型任务
-    logger.info(f"开始并发执行 {len(tasks)} 个标注任务...")
-    batch_logger.info(f"开始并发执行 {len(tasks)} 个标注任务...")
-    results = await asyncio.gather(*tasks)
+        # 等待所有任务完成
+        logger.info(f"开始并发执行 {task_manager.get_task_count()} 个标注任务...")
+        batch_logger.info(f"开始并发执行 {task_manager.get_task_count()} 个标注任务...")
+
+    # 获取结果和错误
+    results = task_manager.get_results()
+    errors = task_manager.get_errors()
 
     # 汇总并打印最终报告
-    total_completed, total_failed = 0, 0
+    total_completed, total_failed = 0, len(errors)
     logger.info("\n=== 多模型标注任务最终报告 ===")
     batch_logger.info("\n=== 多模型标注任务最终报告 ===")
+    
     for res in results:
+        # 处理异常结果
+        if isinstance(res, Exception):
+            logger.error(f"模型任务执行出错: {res}")
+            batch_logger.error(f"模型任务执行出错: {res}")
+            total_failed += 1
+            continue
+            
         logger.info(
             f"模型配置 [{res['model']}]: "
             f"总计={res['total']}, 成功={res['completed']}, 失败={res['failed']}"
@@ -237,6 +256,7 @@ async def run_multi_model_annotation(models: Tuple[str], limit: Optional[int], i
         )
         total_completed += res.get('completed', 0)
         total_failed += res.get('failed', 0)
+        
     logger.info("---------------------------------")
     batch_logger.info("---------------------------------")
     logger.info(f"所有模型总计: 成功={total_completed}, 失败={total_failed}")
@@ -349,6 +369,60 @@ def list_models():
         
     except Exception as e:
         logger.error(f"获取已配置模型列表失败: {e}", exc_info=True)
+
+
+@cli.command(name="rate-stats")
+def rate_stats():
+    """显示速率控制统计信息"""
+    try:
+        logger.info("获取速率控制统计信息...")
+        stats = rate_control_manager.get_all_stats()
+        
+        if not stats:
+            print("\n=== 速率控制统计信息 ===")
+            print("当前没有活跃的速率控制器。")
+            logger.info("当前没有活跃的速率控制器")
+            return
+        
+        print("\n=== 速率控制统计信息 ===")
+        for name, controller_stats in stats.items():
+            print(f"\n控制器: {name}")
+            print(f"  类型: {controller_stats.get('type', 'unknown')}")
+            
+            if controller_stats.get('type') == 'composite':
+                # 复合控制器
+                for sub_controller in controller_stats.get('controllers', []):
+                    print(f"    子控制器类型: {sub_controller.get('type', 'unknown')}")
+                    # 根据不同类型的控制器显示不同信息
+                    if sub_controller.get('type') == 'token_bucket':
+                        print(f"      速率: {sub_controller.get('rate', 'N/A')}")
+                        print(f"      容量: {sub_controller.get('capacity', 'N/A')}")
+                        print(f"      当前令牌数: {sub_controller.get('current_tokens', 'N/A'):.2f}")
+                    elif sub_controller.get('type') == 'leaky_bucket':
+                        print(f"      速率: {sub_controller.get('rate', 'N/A')}")
+                        print(f"      容量: {sub_controller.get('capacity', 'N/A')}")
+                        print(f"      队列大小: {sub_controller.get('queue_size', 'N/A')}")
+                    elif sub_controller.get('type') == 'fixed_window':
+                        print(f"      窗口大小: {sub_controller.get('window_size', 'N/A')}")
+                        print(f"      最大请求数: {sub_controller.get('max_requests', 'N/A')}")
+                        print(f"      当前请求数: {sub_controller.get('current_requests', 'N/A')}")
+                
+                # 并发限制器信息
+                concurrent_limiter = controller_stats.get('concurrent_limiter')
+                if concurrent_limiter:
+                    print(f"    并发限制器:")
+                    print(f"      最大并发数: {concurrent_limiter.get('max_concurrent', 'N/A')}")
+                    print(f"      当前并发数: {concurrent_limiter.get('current_concurrent', 'N/A')}")
+            else:
+                # 单一控制器
+                print(f"    速率: {controller_stats.get('rate', 'N/A')}")
+                print(f"    容量: {controller_stats.get('capacity', 'N/A')}")
+                print(f"    当前令牌数: {controller_stats.get('current_tokens', 'N/A'):.2f}")
+        
+        print()
+        
+    except Exception as e:
+        logger.error(f"获取速率控制统计信息失败: {e}", exc_info=True)
 
 
 @cli.command(name="recover-from-logs")

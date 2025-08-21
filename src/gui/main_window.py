@@ -22,12 +22,10 @@ if sys.platform.startswith('win'):
 # 注意：通常入口脚本会处理路径添加，这里可以省略或保留注释作为提醒
     
 # 从拆分后的模块导入
-from src.gui.distribution_tab import DistributionTab
-from src.gui.sampling_tab import SamplingTab
-from src.gui.recovery_tab import RecoveryTab
-from src.gui.annotation_review_tab import AnnotationReviewerTab
-# config_manager 需要在这里导入，因为主窗口需要检查脚本是否存在
-# from src.config_manager import config_manager # 不再需要，因为我们直接检查文件路径
+from .distribution_tab import DistributionTab
+from .sampling_tab import SamplingTab
+from .recovery_tab import RecoveryTab
+from .annotation_review_tab import AnnotationReviewerTab
 
 
 class PoetryToolGUI(tk.Tk):

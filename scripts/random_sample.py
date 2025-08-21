@@ -1,4 +1,3 @@
-import sqlite3
 import random
 import argparse
 import sys
@@ -9,32 +8,29 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.data_manager import DataManager
+from src.data_manager import DataManager, get_data_manager
 from src.config_manager import config_manager
 
-def get_random_poem_ids(db_path, sample_size=1, filter_enabled=False, exclude_annotated=False, model_identifier=None):
+
+def get_random_poem_ids(db_name, sample_size=1, exclude_annotated=False, model_identifier=None, active_only=False):
     """
     高效随机抽取诗词ID。
-    新增功能：可以通过 filter_enabled 参数控制是否过滤掉包含'□'（缺字标记）的诗词。
     新增功能：可以通过 exclude_annotated 和 model_identifier 参数控制是否排除已标注的诗词。
+    新增功能：可以通过 active_only 参数控制是否只抽取 data_status 为 'active' 的诗词。
     """
-    # --- 根据实际数据结构调整过滤子句 ---
-    # 检测的字段为：title (标题), author (作者), full_text (完整文本)
-    filter_clause = ""
-    if filter_enabled:
-        # 使用 SQLite 的拼接操作符 || 将字段内容合并，然后一次性检查。
-        # IFNULL 用于处理字段值为 NULL 的情况，避免整个表达式结果为 NULL。
-        filter_clause = " (IFNULL(title, '') || IFNULL(author, '') || IFNULL(full_text, '')) NOT LIKE '%□%' "
-    
-    conn = None 
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+        # 获取指定数据库的数据管理器
+        data_manager = get_data_manager(db_name)
+        db_adapter = data_manager.db_adapter
         
         # --- 构建查询条件 ---
         where_conditions = []
-        if filter_enabled:
-            where_conditions.append(filter_clause)
+        query_params = []
+        
+        # 如果需要只抽取 active 状态的诗词
+        if active_only:
+            where_conditions.append("data_status = ?")
+            query_params.append('active')
         
         # 如果需要排除已标注的诗词
         completed_ids_list = []
@@ -45,47 +41,43 @@ def get_random_poem_ids(db_path, sample_size=1, filter_enabled=False, exclude_an
                     SELECT poem_id FROM annotations 
                     WHERE model_identifier = ? AND status = 'completed'
                 """
-                cursor.execute(completed_query, (model_identifier,))
-                completed_ids = {row[0] for row in cursor.fetchall()}
+                rows = db_adapter.execute_query(completed_query, (model_identifier,))
+                completed_ids = {row[0] for row in rows}
             else:
                 # 查询所有已成功标注的诗词ID（不区分模型）
                 completed_query = """
                     SELECT poem_id FROM annotations 
                     WHERE status = 'completed'
                 """
-                cursor.execute(completed_query)
-                completed_ids = {row[0] for row in cursor.fetchall()}
+                rows = db_adapter.execute_query(completed_query)
+                completed_ids = {row[0] for row in rows}
             
             if completed_ids:
                 # 构造排除已完成ID的条件
                 placeholders = ','.join('?' * len(completed_ids))
                 where_conditions.append(f"id NOT IN ({placeholders})")
+                # 注意：completed_ids_list 不直接添加到 query_params，而是在后续动态拼接查询时处理
                 completed_ids_list = list(completed_ids)
         
         # 构建WHERE子句
         where_clause = ""
-        query_params = []
         if where_conditions:
             where_clause = "WHERE " + " AND ".join(where_conditions)
-            if exclude_annotated and model_identifier:
-                query_params.extend([model_identifier] + completed_ids_list)
-            elif exclude_annotated and not model_identifier:
-                query_params.extend(completed_ids_list)
-            elif completed_ids_list:
-                query_params.extend(completed_ids_list)
+            # query_params 已经包含了 active_only 的参数
+            # completed_ids_list 的参数在后续动态拼接查询时处理
         
         # 获取最大ID和符合条件的记录总数
-        cursor.execute("SELECT MAX(id) FROM poems")
-        max_id_result = cursor.fetchone()
+        rows = db_adapter.execute_query("SELECT MAX(id) FROM poems")
+        max_id_result = rows[0] if rows else [None]
         max_id = max_id_result[0] if max_id_result else 0
         
         count_query = f"SELECT COUNT(id) FROM poems {where_clause}"
-        cursor.execute(count_query, query_params)
-        total_records_result = cursor.fetchone()
+        rows = db_adapter.execute_query(count_query, tuple(query_params))
+        total_records_result = rows[0] if rows else [None]
         total_records = total_records_result[0] if total_records_result else 0
         
         if not max_id or total_records == 0:
-            if filter_enabled or (exclude_annotated and model_identifier) or (exclude_annotated and not model_identifier):
+            if exclude_annotated and model_identifier:
                 print("数据库中没有符合条件的诗词记录。", file=sys.stderr)
             else:
                 print("数据库中没有诗词记录。", file=sys.stderr)
@@ -101,8 +93,8 @@ def get_random_poem_ids(db_path, sample_size=1, filter_enabled=False, exclude_an
         # 优化策略：如果所需ID数量占总数较大比例
         if sample_size > total_records / 2: 
             select_query = f"SELECT id FROM poems {where_clause}"
-            cursor.execute(select_query, query_params)
-            all_ids = [row[0] for row in cursor.fetchall()]
+            rows = db_adapter.execute_query(select_query, tuple(query_params))
+            all_ids = [row[0] for row in rows]
             random.shuffle(all_ids) 
             selected_ids.update(all_ids[:sample_size]) 
         else:
@@ -122,20 +114,19 @@ def get_random_poem_ids(db_path, sample_size=1, filter_enabled=False, exclude_an
                 query_params_local = list(potential_candidate_ids)
                 
                 # 添加过滤条件
-                if where_conditions:
-                    query += f" AND {filter_clause}" if filter_enabled else ""
-                    if exclude_annotated and model_identifier and completed_ids_list:
-                        completed_placeholders = ','.join('?' * len(completed_ids_list))
-                        query += f" AND id NOT IN ({completed_placeholders})"
-                        query_params_local.extend(completed_ids_list)
-                    elif exclude_annotated and not model_identifier and completed_ids_list:
-                        completed_placeholders = ','.join('?' * len(completed_ids_list))
-                        query += f" AND id NOT IN ({completed_placeholders})"
-                        query_params_local.extend(completed_ids_list)
+                # 如果启用了 active_only，query_params_local 需要包含 'active' 参数
+                if active_only:
+                    query += " AND data_status = ?"
+                    query_params_local.append('active')
+                    
+                if exclude_annotated and completed_ids_list:
+                    completed_placeholders = ','.join('?' * len(completed_ids_list))
+                    query += f" AND id NOT IN ({completed_placeholders})"
+                    query_params_local.extend(completed_ids_list)
                 
-                cursor.execute(query, query_params_local)
+                rows = db_adapter.execute_query(query, tuple(query_params_local))
                 # 只添加需要的数量，避免超过sample_size
-                fetched_ids = [row[0] for row in cursor.fetchall()]
+                fetched_ids = [row[0] for row in rows]
                 for pid in fetched_ids:
                     if len(selected_ids) < sample_size:
                         selected_ids.add(pid)
@@ -144,21 +135,10 @@ def get_random_poem_ids(db_path, sample_size=1, filter_enabled=False, exclude_an
         
         return list(selected_ids)
     
-    except sqlite3.Error as e:
-        # --- 更新错误提示信息 ---
-        if "no such column" in str(e) and filter_enabled:
-             print(f"数据库错误: {e}", file=sys.stderr)
-             print("错误提示：筛选功能要求 poems 表中包含 title, author, 和 full_text 列。", file=sys.stderr)
-             print("如果您的列名不同，请修改 'random_sample.py' 脚本中的 'filter_clause' 变量。", file=sys.stderr)
-        else:
-            print(f"数据库错误: {e}", file=sys.stderr)
-        return []
     except Exception as e:
         print(f"发生未知错误: {e}", file=sys.stderr)
         return []
-    finally:
-        if conn:
-            conn.close()
+
 
 def get_db_path_by_name(db_name):
     """
@@ -176,19 +156,19 @@ def get_db_path_by_name(db_name):
     else:
         raise ValueError(f"无法找到数据库 '{db_name}' 的配置。")
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='随机抽取诗词ID并输出到文件')
     parser.add_argument('--db', type=str, default='poetry.db', help='SQLite数据库文件路径 (默认: poetry.db)')
     parser.add_argument('--db-name', type=str, help='数据库名称（从配置文件中获取路径）')
     parser.add_argument('-n', '--count', type=int, default=1, help='要抽取的诗词ID数量 (默认: 1)')
-    
-    parser.add_argument('--filter-missing', action='store_true', 
-                        help='启用筛选功能，排除任何内容含有"□"符号的诗词。')
                         
     parser.add_argument('--exclude-annotated', action='store_true',
                         help='启用排除已标注诗词功能。如果不指定 --model 参数，则排除所有已标注的诗词（不管标识符是什么）')
     parser.add_argument('--model', type=str, 
                         help='模型标识符，用于排除已标注诗词 (与 --exclude-annotated 配合使用)。如果不指定，则排除所有已标注的诗词')
+    parser.add_argument('--active-only', action='store_true',
+                        help='只抽取状态为 active 的诗词')
                         
     parser.add_argument('--sort', action='store_true', help='按ID升序排序输出到文件')
     parser.add_argument('--no-shuffle', action='store_true', help='禁用默认的输出随机排序 (与 --sort 互斥，若两者都不选则默认随机排序)')
@@ -216,22 +196,27 @@ if __name__ == "__main__":
     # 现在允许 --exclude-annotated 不指定 --model，表示排除所有已标注的诗词
     pass
 
-    # --- 获取数据库路径 ---
-    db_path = args.db
+    # --- 获取数据库名称 ---
+    db_name = "default"
     if args.db_name:
-        try:
-            db_path = get_db_path_by_name(args.db_name)
-        except ValueError as e:
-            print(f"错误: {e}", file=sys.stderr)
-            sys.exit(1)
+        db_name = args.db_name
+    elif args.db and args.db != 'poetry.db':
+        # 如果指定了具体的数据库路径，需要根据路径找到对应的数据库名称
+        db_config = config_manager.get_database_config()
+        if 'db_paths' in db_config:
+            db_paths = db_config['db_paths']
+            for name, path in db_paths.items():
+                if os.path.abspath(path) == os.path.abspath(args.db):
+                    db_name = name
+                    break
 
     # --- 获取诗词ID ---
     poem_ids = get_random_poem_ids(
-        db_path, 
+        db_name, 
         args.count, 
-        filter_enabled=args.filter_missing,
         exclude_annotated=args.exclude_annotated,
-        model_identifier=args.model
+        model_identifier=args.model,
+        active_only=args.active_only  # 传递 active_only 参数
     )
     
     # --- 处理输出排序 ---

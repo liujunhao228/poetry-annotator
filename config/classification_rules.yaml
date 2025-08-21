@@ -1,0 +1,35 @@
+# 诗词预处理分类规则配置文件
+# 定义关键词匹配规则用于诗词的预处理分类
+# 仅初筛使用
+
+rules:
+
+  # 交际类
+  social_emotion:
+    enabled: true
+    keywords:
+      - "贈"
+      - "酬"
+      - "謝"
+      - "寄"
+      - "答"
+      - "奉"
+      - "宴"
+      - "會"
+      - "訪"
+      - "尋"
+      - "遇"
+      - "餞"
+      - "上" # 可能含有噪声数据
+      - "下" # 可能含有噪声数据
+      - "送"
+      - "謁"
+    fields: ["title"]
+    category: "交际"
+
+# 全局设置
+global_settings:
+  # 默认检查的字段（如果规则中未指定 fields）
+  default_check_fields: ["title", "full_text"]
+  # 分类字段名
+  classification_field: "pre_classification"

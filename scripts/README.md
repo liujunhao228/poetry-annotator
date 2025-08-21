@@ -137,7 +137,6 @@ python random_sample.py --count <抽样数量> [其他选项]
 - `--db`：SQLite数据库文件路径（默认: poetry.db）
 - `--db-name`：数据库名称（从配置文件中获取路径）
 - `-n/--count`：要抽取的诗词ID数量（默认: 1）
-- `--filter-missing`：启用筛选功能，排除任何内容含有"□"符号的诗词
 - `--exclude-annotated`：启用排除已标注诗词功能
 - `--model`：模型标识符，用于排除已标注诗词
 - `--sort`：按ID升序排序输出到文件
@@ -185,6 +184,30 @@ python recover_from_log_v7.py --dir <日志目录> [其他选项]
 - `--dir`：包含日志文件 (*.log) 的目录路径
 - `--db-path`：手动指定数据库文件路径
 - `--write`：使用此标志以实际写入数据库（默认为试运行）
+
+### 11. data_cleaning.py
+数据清洗工具，用于清洗诗词数据，标记包含缺字、空内容或其他问题的数据。
+
+**主要功能：**
+- 检测并标记包含缺字符号"□"的诗词
+- 检测并标记空内容（去除标点符号后无有效文字）的诗词
+- 检测并标记标题或内容中括号内含有特殊符号的"存疑"诗词
+- 重置所有诗词数据状态为"active"
+- 生成数据清洗报告
+
+**使用方法：**
+```bash
+python data_cleaning.py --db-name <数据库名称> --clean [--dry-run]
+python data_cleaning.py --db-name <数据库名称> --reset [--dry-run]
+python data_cleaning.py --db-name <数据库名称> --report
+```
+
+**参数说明：**
+- `--db-name`：数据库名称（从配置文件中获取）
+- `--clean`：执行数据清洗操作
+- `--reset`：重置所有数据状态为active
+- `--report`：生成清洗报告
+- `--dry-run`：试运行模式，不实际修改数据
 
 ## 使用说明
 

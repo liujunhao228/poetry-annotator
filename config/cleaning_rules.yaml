@@ -1,0 +1,47 @@
+rules:
+  # 定义缺字检查
+  missing_char:
+    enabled: true
+    symbols: [\"□\"] # 可以轻松添加更多缺字符号
+    # 指定在哪些字段中查找
+    fields: [\"title\", \"author\", \"full_text\"]
+    # 设置匹配后要更新的状态
+    status: \"missing_char\"
+
+  # 定义空内容检查
+  empty_content:
+    enabled: true
+    # 指定要清理的标点符号，用于判断是否为空
+    punctuation_to_clean: \"，。、；：？！“”‘’（）【】《》〈〉〔〕［］｛｝…—–·〃々〇〉〈〔〕［］｛｝｟｠〖〗〘〙〚〛.,;:?!\\\"\\\"''()[]{}-_=+*/\\\\|~`@#$%^& \\t\\n\\r\"
+    # 指定在哪些字段中判断是否为空 (通常只检查 full_text)
+    fields: [\"full_text\"]
+    status: \"empty_content\"
+
+  # 定义可疑符号检查
+  suspicious_symbols:
+    enabled: true
+    symbols: [\"【】《》〈〉〔〕［］｛｝…—–·〃々〇〉〈〔〕［］｛｝｟｠〖〗〘〙〚〛\"]
+    # 指定在哪些字段中查找
+    fields: [\"title\", \"full_text\"]
+    # 定义括号模式
+    bracket_patterns:
+      - '（([^）]*)）'  # 中文括号（全角）
+      - '\\(([^)]*)\\)'   # 英文括号（半角）
+      - '【([^】]*)】'  # 中文方括号
+      - '\\[([^\\]]*)\\]'  # 英文方括号
+      - '《([^》]*)》'  # 中文书名号
+      - '<([^>]*)>'     # 英文尖括号
+    status: \"suspicious\"
+
+  # 定义无效状态重置检查
+  invalid_status:
+    enabled: true
+    # 有效的状态列表，不在其中的将被重置为 'active'
+    valid_statuses: [\"active\", \"missing_char\", \"empty_content\", \"suspicious\"]
+    # 重置后的默认状态
+    reset_to_status: \"active\"
+
+# 全局设置
+global_settings:
+  # 默认检查的字段（如果规则中未指定 fields）
+  default_check_fields: [\"title\", \"author\", \"full_text\"]

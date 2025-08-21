@@ -2,6 +2,10 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 import pytz
+from pathlib import Path
+
+# 测试 Path 是否可用
+test_path = Path('.')
 
 # 从主项目导入日志配置系统
 try:

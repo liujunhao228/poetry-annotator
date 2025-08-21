@@ -108,10 +108,10 @@ class SamplingTab(TaskExecutorTab):
         self.count_entry = ttk.Entry(basic_options_frame, textvariable=self.count_var, width=15)
         self.count_entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
         
-        # 过滤缺虚号
-        self.filter_missing_var = tk.BooleanVar(value=False)
-        self.filter_missing_check = ttk.Checkbutton(basic_options_frame, text="过滤缺虚号 (排除任何含'□'的诗词)", variable=self.filter_missing_var)
-        self.filter_missing_check.grid(row=1, column=0, columnspan=3, padx=5, pady=5, sticky="w")
+        # 只抽取active状态的诗词
+        self.active_only_var = tk.BooleanVar(value=False)
+        self.active_only_check = ttk.Checkbutton(basic_options_frame, text="只抽取active状态的诗词", variable=self.active_only_var)
+        self.active_only_check.grid(row=1, column=0, columnspan=3, padx=5, pady=5, sticky="w")
         
         # 排除已标注
         self.exclude_annotated_frame = ttk.LabelFrame(basic_options_frame, text="排除已标注")
@@ -206,7 +206,7 @@ class SamplingTab(TaskExecutorTab):
             'file_log_level': self.log_level_selector.get_file_level(),
             'selected_db': self.db_selector.get_selected_db(),
             'count': self.count_var.get(),
-            'filter_missing': self.filter_missing_var.get(),
+            'active_only': self.active_only_var.get(),
             'exclude_annotated': self.exclude_annotated_var.get(),
             'exclude_model': self.exclude_model_var.get(),
             'sort_choice': self.sort_choice_var.get(),
@@ -240,7 +240,7 @@ class SamplingTab(TaskExecutorTab):
                 self.db_selector.db_var.set(selected_db)
                 
             self.count_var.set(config.get('count', "100"))
-            self.filter_missing_var.set(config.get('filter_missing', False))
+            self.active_only_var.set(config.get('active_only', False))
             self.exclude_annotated_var.set(config.get('exclude_annotated', False))
             self.exclude_model_var.set(config.get('exclude_model', ""))
             
@@ -268,8 +268,8 @@ class SamplingTab(TaskExecutorTab):
         widgets_to_update = []
         if hasattr(self, 'count_entry'):
             widgets_to_update.append(self.count_entry)
-        if hasattr(self, 'filter_missing_check'):
-            widgets_to_update.append(self.filter_missing_check)
+        if hasattr(self, 'active_only_check'):
+            widgets_to_update.append(self.active_only_check)
         if hasattr(self, 'exclude_annotated_check'):
             widgets_to_update.append(self.exclude_annotated_check)
             
@@ -329,8 +329,10 @@ class SamplingTab(TaskExecutorTab):
             self.log_message(f"错误: 抽样数量 '{count}' 必须为正整数。\n")
             return
         command.extend(["-n", count])
-        if self.filter_missing_var.get(): 
-            command.append("--filter-missing")
+        
+        # 添加active-only选项
+        if self.active_only_var.get():
+            command.append("--active-only")
         
         # 添加排除已标注的选项
         if self.exclude_annotated_var.get():

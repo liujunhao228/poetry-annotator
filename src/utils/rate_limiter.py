@@ -5,7 +5,7 @@ import time
 from typing import Optional
 
 class AsyncTokenBucket:
-    """一个简单的异步令牌桶速率限制器"""
+    """一个简单的异步令牌桶速率限制器（保持向后兼容）"""
 
     def __init__(self, rate: float, capacity: int, loop: Optional[asyncio.AbstractEventLoop] = None):
         """

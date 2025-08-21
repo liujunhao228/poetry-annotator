@@ -16,21 +16,53 @@ if str(project_root) not in sys.path:
 
 # 使用绝对导入方式
 from src.main import cli
+from src.db_initializer import get_db_initializer
 
 def main():
     # 创建参数解析器
     parser = argparse.ArgumentParser(description="LLM诗词情感标注工具")
     parser.add_argument(
         "--mode",
-        choices=["cli", "gui", "gui-review", "visualizer"],
+        choices=["cli", "gui", "gui-review", "visualizer", "init-db"],
         default="cli",
-        help="启动模式: cli(命令行模式)、gui(功能工具集GUI模式)、gui-review(标注校对GUI模式) 或 visualizer(数据可视化模式) (默认: cli)"
+        help="启动模式: cli(命令行模式)、gui(功能工具集GUI模式)、gui-review(标注校对GUI模式)、visualizer(数据可视化模式) 或 init-db(初始化数据库) (默认: cli)"
     )
     
     # 解析参数
     args, unknown = parser.parse_known_args()
     
-    if args.mode == "gui":
+    if args.mode == "init-db":
+        # 初始化数据库模式
+        print("开始初始化数据库...")
+        db_initializer = get_db_initializer()
+        results = db_initializer.initialize_all_databases()
+        
+        print("\n数据库初始化结果:")
+        for db_name, result in results.items():
+            print(f"  {db_name}: {result.get('status', 'unknown')} - {result.get('message', '')}")
+            
+        # 导入数据
+        print("\n开始导入数据...")
+        from src.db_initializer import initialize_all_databases_from_source_folders
+        import_results = initialize_all_databases_from_source_folders()
+        
+        print("\n数据导入结果:")
+        for db_name, result in import_results.items():
+            print(f"  {db_name}: authors={result.get('authors', 0)}, poems={result.get('poems', 0)}")
+            
+        print("\n数据库统计信息:")
+        stats = db_initializer.get_database_stats()
+        for db_name, stat in stats.items():
+            print(f"  {db_name}:")
+            print(f"    状态: {stat.get('status', 'unknown')}")
+            if stat.get('status') == 'ok':
+                print(f"    路径: {stat.get('path', 'N/A')}")
+                tables = stat.get('tables', {})
+                for table, count in tables.items():
+                    print(f"    {table}: {count} 条记录")
+            else:
+                print(f"    信息: {stat.get('message', 'N/A')}")
+    elif args.mode == "gui":
         # 启动GUI模式 (使用scripts/gui_launcher.py)
         gui_script_path = Path(__file__).parent / "scripts" / "gui_launcher.py"
         if gui_script_path.exists():
@@ -97,4 +129,4 @@ def main():
         cli()
 
 if __name__ == '__main__':
-    main() 
+    main()

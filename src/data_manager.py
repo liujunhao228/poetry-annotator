@@ -4,21 +4,9 @@ import os
 import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-try:
-    from .config_manager import config_manager
-except ImportError:
-    # 当作为独立模块运行时
-    import sys
-    sys.path.append(str(Path(__file__).parent))
-    from config_manager import config_manager
+from .config_manager import config_manager
+from .db_adapter import get_database_adapter, normalize_poem_data
 from datetime import datetime
-try:
-    from .db_adapter import get_database_adapter, normalize_poem_data
-except ImportError:
-    # 当作为独立模块运行时
-    import sys
-    sys.path.append(str(Path(__file__).parent))
-    from db_adapter import get_database_adapter, normalize_poem_data
 
 
 class DataManager:
@@ -52,9 +40,14 @@ class DataManager:
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"数据管理器初始化 - 数据库: {self.db_path}, 数据源: {self.source_dir}")
         
+        # 检查数据库文件是否存在，如果不存在则初始化
+        if not Path(self.db_path).exists():
+            self.logger.info(f"数据库文件 {self.db_path} 不存在，正在初始化...")
+            self._initialize_database_if_not_exists()
+        
         # 初始化数据库适配器
         self.db_adapter = get_database_adapter('sqlite', self.db_path)
-        self._init_database()
+        # DataManager 不再负责初始化数据库表结构
         
         # 为不同数据库设置ID前缀，确保全局唯一性
         self._set_id_prefix()
@@ -91,50 +84,8 @@ class DataManager:
     @classmethod
     def initialize_all_databases_from_source_folders(cls, clear_existing: bool = False) -> Dict[str, Dict[str, int]]:
         """根据source_json下的子文件夹初始化所有数据库"""
-        data_config = config_manager.get_data_config()
-        source_json_dir = Path(data_config['source_dir'])
-        
-        # 获取数据库配置
-        db_config = config_manager.get_database_config()
-        db_paths = db_config.get('db_paths', {})
-        
-        # 获取所有子文件夹
-        subfolders = [f for f in source_json_dir.iterdir() if f.is_dir()]
-        
-        results = {}
-        
-        for folder in subfolders:
-            folder_name = folder.name
-            
-            # 如果该文件夹在数据库配置中，则使用配置的数据库路径
-            if folder_name in db_paths:
-                db_path = db_paths[folder_name]
-            else:
-                # 否则使用默认路径格式 data/{folder_name}.db
-                db_path = f"data/{folder_name}.db"
-            
-            # 创建DataManager实例，使用folder_name作为数据库名称
-            manager = cls(db_name=folder_name)
-            # 为该数据库实例设置正确的source_dir
-            manager.source_dir = str(folder)
-            
-            # 重新初始化db_adapter以确保使用正确的数据库路径
-            manager.db_adapter = get_database_adapter('sqlite', manager.db_path)
-            
-            # 初始化数据库
-            manager._init_database()
-            
-            # 初始化数据
-            result = manager.initialize_database_from_json(clear_existing=clear_existing)
-            results[folder_name] = result
-            
-        return results
-    
-    def _init_database(self):
-        """初始化数据库 - 采用新表结构，时间戳字段不再用CURRENT_TIMESTAMP，需手动插入带时区的ISO时间字符串"""
-        self.logger.info("开始初始化数据库...")
-        self.db_adapter.init_database()
-        self.logger.info("数据库初始化完成")
+        from .db_initializer import initialize_all_databases_from_source_folders
+        return initialize_all_databases_from_source_folders(clear_existing)
 
     def load_data_from_json(self, json_file: str) -> List[Dict[str, Any]]:
         """从JSON文件加载数据"""
@@ -267,8 +218,8 @@ class DataManager:
             # 使用 'title' 字段
             cursor.execute('''
                 INSERT OR REPLACE INTO poems 
-                (id, title, author, paragraphs, full_text, author_desc, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (id, title, author, paragraphs, full_text, author_desc, data_status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 global_id,  # 使用全局唯一ID
                 normalized_data.get('title', ''), # 从 'title' 获取
@@ -276,6 +227,7 @@ class DataManager:
                 json.dumps(paragraphs, ensure_ascii=False),
                 full_text,
                 normalized_data.get('author_desc', ''),
+                'active',  # 默认数据状态为active
                 now,
                 now
             ))

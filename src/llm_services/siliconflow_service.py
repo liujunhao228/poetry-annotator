@@ -5,9 +5,10 @@ import asyncio
 import json
 import logging
 import re  # 导入正则表达式模块
-from typing import Dict, Any, Optional, List, Union, Tuple
+from typing import Dict, Any, Optional, List, Union, Tuple, AsyncGenerator
 import httpx
 from .base_service import BaseLLMService
+from .schemas import PoemData, EmotionSchema
 
 
 class SiliconFlowService(BaseLLMService):
@@ -199,8 +200,7 @@ class SiliconFlowService(BaseLLMService):
         # 如果没有适配器或者适配器名称不匹配，直接返回原始数据
         return response_data
 
-    # 实现基类的新抽象方法。
-    async def annotate_poem(self, poem: Dict[str, Any], emotion_schema: str) -> Dict[str, Any]:
+    async def annotate_poem(self, poem: PoemData, emotion_schema: EmotionSchema) -> List[Dict[str, Any]]:
         """
         实现基类的抽象方法，并集成响应适配器和速率限制。
         此方法是唯一的API调用入口，负责完整的处理流程。
@@ -214,6 +214,8 @@ class SiliconFlowService(BaseLLMService):
             
             # 步骤 2: 构建请求体
             request_data = self.build_request_body(system_prompt, user_prompt)
+            # 确保流式响应为 False
+            request_data["stream"] = False
             
             # 步骤 3: 记录和发送请求
             self.log_request_details(
@@ -221,11 +223,16 @@ class SiliconFlowService(BaseLLMService):
                 headers=dict(self.client.headers.items()),
                 prompt=system_prompt
             )
-            # --- 应用速率限制器 ---
-            await self._ensure_rate_limiter()  # 确保限速器已初始化
-            if self.rate_limiter:
-                await self.rate_limiter.acquire()
-                self.logger.debug(f"[{self.provider.capitalize()}] 速率限制器：已获取令牌，继续执行API请求。")
+            # --- 应用速率控制器 ---
+            await self._ensure_rate_controller()  # 确保控制器已初始化
+            if self.rate_controller:
+                await self.rate_controller.acquire()
+                self.logger.debug(f"[{self.provider.capitalize()}] 速率控制器：已获取执行权限，继续执行API请求。")
+            
+            # --- 应用请求间延迟 ---
+            if self.request_delay > 0:
+                self.logger.debug(f"[{self.provider.capitalize()}] 应用请求间延迟: {self.request_delay} 秒")
+                await asyncio.sleep(self.request_delay)
             
             response = await self.client.post(f"{self.base_url}", json=request_data)
             response.raise_for_status()
@@ -240,31 +247,117 @@ class SiliconFlowService(BaseLLMService):
             response_text = self._extract_response_content(adapted_response_data)
             usage = adapted_response_data.get('usage', {})
             
-            self.log_response_details(adapted_response_data, usage)
-            
             result = self.validate_response(response_text)
+            
+            # [修改] 传递 poem_id 和完整响应内容用于日志记录
+            # 确保 poem 是 PoemData 实例，使用 .id 访问属性而不是 .get()
+            self.log_response_details(
+                poem_id=poem.id,
+                parsed_data=result, # 解析后的数据
+                response_data=adapted_response_data, # 完整的响应数据字典
+                response_text=response_text, # 纯文本内容
+                usage=usage # Token使用情况
+            )
+            
             return result
+
 
         except httpx.HTTPStatusError as e:
             status_code = e.response.status_code
             if status_code in [429, 500, 502, 503, 504]:
                 self.logger.warning(f"[{self.provider.capitalize()}] API可重试HTTP错误 (status: {status_code}): {e}")
-                self.log_error_details(e, request_data, user_prompt_for_logging)
+                # 确保 poem 是 PoemData 实例，使用 .id 访问属性而不是 .get()
+                self.log_error_details(poem.id, e, request_data, user_prompt_for_logging)
                 raise
             else:
                 self.logger.error(f"[{self.provider.capitalize()}] API不可重试HTTP错误 (status: {status_code}): {e}", exc_info=True)
-                self.log_error_details(e, request_data, user_prompt_for_logging)
-                return self.format_error_response(f"API HTTP错误 (status: {status_code}): {e.response.text}")
+                # 确保 poem 是 PoemData 实例，使用 .id 访问属性而不是 .get()
+                self.log_error_details(poem.id, e, request_data, user_prompt_for_logging)
+                raise LLMServiceAPIError(f"API HTTP错误 (status: {status_code}): {e.response.text}")
                 
         except (httpx.TimeoutException, httpx.ConnectError) as e:
             self.logger.warning(f"[{self.provider.capitalize()}] API连接/超时错误: {e}")
-            self.log_error_details(e, request_data, user_prompt_for_logging)
-            raise
+            # 确保 poem 是 PoemData 实例，使用 .id 访问属性而不是 .get()
+            self.log_error_details(poem.id, e, request_data, user_prompt_for_logging)
+            raise LLMServiceTimeoutError(f"API连接/超时错误: {e}")
             
         except Exception as e:
             self.logger.error(f"[{self.provider.capitalize()}] API调用时发生未知错误: {e}", exc_info=True)
-            self.log_error_details(e, request_data, user_prompt_for_logging)
-            return self.format_error_response(str(e))
+            # 确保 poem 是 PoemData 实例，使用 .id 访问属性而不是 .get()
+            self.log_error_details(poem.id, e, request_data, user_prompt_for_logging)
+            raise LLMServiceAPIError(f"API调用失败: {e}")
+
+    async def annotate_poem_stream(self, poem: PoemData, emotion_schema: EmotionSchema) -> AsyncGenerator[str, None]:
+        """
+        [新增] 实现流式响应方法。
+        """
+        request_data = None
+        user_prompt_for_logging: str = "Prompt未生成"
+        try:
+            system_prompt, user_prompt = self.prepare_prompts(poem, emotion_schema)
+            user_prompt_for_logging = user_prompt
+
+            messages = self._build_messages(system_prompt, user_prompt)
+            
+            request_data = self.build_request_body(system_prompt, user_prompt)
+            # 关键: 确保启用流式响应
+            request_data["stream"] = True
+
+            self.log_request_details(
+                request_body=request_data,
+                headers=dict(self.client.headers.items()),
+                prompt=system_prompt
+            )
+
+            await self._ensure_rate_controller()
+            if self.rate_controller:
+                await self.rate_controller.acquire()
+            
+            if self.request_delay > 0:
+                await asyncio.sleep(self.request_delay)
+            
+            # 使用 httpx 的 stream 方法发送流式请求
+            async with self.client.stream("POST", f"{self.base_url}", json=request_data) as response:
+                response.raise_for_status()
+                # 逐行读取响应流
+                async for line in response.aiter_lines():
+                    if line.startswith("data: "):
+                        data_str = line[6:] # Remove "data: " prefix
+                        if data_str.strip() == "[DONE]":
+                            break
+                        try:
+                            chunk_data = json.loads(data_str)
+                            # [修改] 直接从流式响应块中提取 delta.content
+                            # 流式响应的结构与完整响应不同，增量内容在 delta.content 中
+                            choices = chunk_data.get('choices', [])
+                            if choices:
+                                delta = choices[0].get('delta', {})
+                                content = delta.get('content', '')
+                                if content:
+                                    yield content
+                        except json.JSONDecodeError:
+                            self.logger.warning(f"[{self.provider.capitalize()}] 无法解析流式响应块为JSON: {data_str}")
+                        except Exception as e:
+                            self.logger.warning(f"[{self.provider.capitalize()}] 处理流式响应块时出错: {e}")
+        
+        except httpx.HTTPStatusError as e:
+            status_code = e.response.status_code
+            self.logger.error(f"[{self.provider.capitalize()}] 流式API HTTP错误 (status: {status_code}): {e}", exc_info=True)
+            self.log_error_details(poem.id, e, request_data, user_prompt_for_logging)
+            if status_code in [429, 500, 502, 503, 504]:
+                raise # 可重试的错误向上抛出
+            else:
+                raise LLMServiceAPIError(f"流式API HTTP错误 (status: {status_code}): {e.response.text}")
+                
+        except (httpx.TimeoutException, httpx.ConnectError) as e:
+            self.logger.warning(f"[{self.provider.capitalize()}] 流式API连接/超时错误: {e}")
+            self.log_error_details(poem.id, e, request_data, user_prompt_for_logging)
+            raise LLMServiceTimeoutError(f"流式API连接/超时错误: {e}")
+            
+        except Exception as e:
+            self.logger.error(f"[{self.provider.capitalize()}] 流式API调用时发生未知错误: {e}", exc_info=True)
+            self.log_error_details(poem.id, e, request_data, user_prompt_for_logging)
+            raise LLMServiceAPIError(f"流式API调用失败: {e}")
 
     def _validate_siliconflow_response(self, response_data: Dict[str, Any]):
         """验证 SiliconFlow/OpenAI 兼容的API响应结构"""
@@ -354,10 +447,9 @@ class SiliconFlowService(BaseLLMService):
         
         return info
     
-    async def __aenter__(self):
-        """异步上下文管理器入口"""
-        return self
-    
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """异步上下文管理器出口"""
-        await self.client.aclose()
+        if hasattr(self, 'client') and self.client:
+            await self.client.aclose()
+        # 调用父类的__aexit__
+        await super().__aexit__(exc_type, exc_val, exc_tb)

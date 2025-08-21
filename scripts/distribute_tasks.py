@@ -72,44 +72,87 @@ class ProgressManager:
         id_file_hash = hashlib.md5(resolved_id_file_path.encode('utf-8')).hexdigest()
         
         self.state_file = self.state_dir / f"state_{model_name}_{id_file_hash}.json"
+        self.backup_file = self.state_dir / f"state_{model_name}_{id_file_hash}.backup.json"
       
         # 使用 DEBUG 级别记录详细路径，不会在控制台刷屏
         logger.debug(f"使用进度文件: {self.state_file} (基于ID文件: {id_file_path})")
 
     def load_state(self) -> dict:
         """加载进度。如果文件不存在或无效，返回默认值。"""
+        # 首先尝试加载主进度文件
         if self.state_file.exists():
-            # 使用 INFO 级别告知用户关键事件
-            logger.info(f"为任务 [{Path(self.state_file).stem}] 发现已有进度，尝试加载...")
-            with open(self.state_file, 'r', encoding='utf-8') as f:
+            state = self._load_state_file(self.state_file)
+            if state:
+                return state
+        
+        # 如果主进度文件不存在或无效，尝试加载备份文件
+        if self.backup_file.exists():
+            logger.warning(f"主进度文件无效或不存在，尝试加载备份文件: {self.backup_file}")
+            state = self._load_state_file(self.backup_file)
+            if state:
+                # 将备份文件恢复为主文件
                 try:
-                    state = json.load(f)
-                    if 'last_completed_chunk_index' in state:
-                        logger.info(f"进度加载成功: {state}")
-                        return state
-                    else:
-                        raise KeyError("缺少关键字段 'last_completed_chunk_index'")
-                except (json.JSONDecodeError, KeyError) as e:
-                    logger.warning(f"无法解析进度文件或格式错误，将重新开始: {e}。文件: {self.state_file}")
-                    self.clear_state()
-                    return self._default_state()
-        else:
-            logger.info(f"为任务 [{Path(self.state_file).stem}] 未发现进度文件，将从头开始。")
-            return self._default_state()
+                    self.backup_file.rename(self.state_file)
+                    logger.info(f"已从备份文件恢复进度: {self.state_file}")
+                    return state
+                except OSError as e:
+                    logger.error(f"无法从备份文件恢复进度: {e}")
+        
+        # 如果都没有有效的进度文件
+        logger.info(f"为任务 [{Path(self.state_file).stem}] 未发现有效的进度文件，将从头开始。")
+        return self._default_state()
+
+    def _load_state_file(self, file_path: Path) -> Optional[dict]:
+        """从指定文件加载进度状态"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                state = json.load(f)
+                # 验证状态文件的基本结构
+                required_keys = ['last_completed_chunk_index', 'total_processed_count', 
+                               'total_success_count', 'total_failed_count']
+                if all(key in state for key in required_keys):
+                    logger.info(f"进度加载成功: {state}")
+                    return state
+                else:
+                    raise KeyError(f"进度文件缺少必要字段: {required_keys}")
+        except (json.JSONDecodeError, KeyError, OSError) as e:
+            logger.warning(f"无法解析进度文件或格式错误: {e}。文件: {file_path}")
+            return None
 
     def save_state(self, state: dict):
-        with open(self.state_file, 'w', encoding='utf-8') as f:
-            json.dump(state, f, indent=4, ensure_ascii=False)
-        # 频繁的保存操作使用 DEBUG 级别
-        logger.debug(f"进度已保存: {state}")
+        """保存进度状态，包含备份机制"""
+        try:
+            # 先创建备份（如果主文件存在）
+            if self.state_file.exists():
+                self.state_file.replace(self.backup_file)
+            
+            # 写入新的状态文件
+            with open(self.state_file, 'w', encoding='utf-8') as f:
+                json.dump(state, f, indent=4, ensure_ascii=False)
+            
+            # 频繁的保存操作使用 DEBUG 级别
+            logger.debug(f"进度已保存: {state}")
+        except OSError as e:
+            logger.error(f"保存进度文件失败: {e}")
 
     def clear_state(self):
-        if self.state_file.exists():
-            try:
-                os.remove(self.state_file)
-                logger.info(f"已清除旧的进度文件: {self.state_file}")
-            except OSError as e:
-                logger.error(f"清除进度文件失败: {e}")
+        """清除进度文件和备份文件"""
+        cleared_files = []
+        for file_path in [self.state_file, self.backup_file]:
+            if file_path.exists():
+                try:
+                    os.remove(file_path)
+                    cleared_files.append(str(file_path))
+                except OSError as e:
+                    logger.error(f"清除进度文件失败: {e}")
+        
+        if cleared_files:
+            logger.info(f"已清除旧的进度文件: {', '.join(cleared_files)}")
+
+    def mark_task_completed(self):
+        """标记任务完成，清理进度文件"""
+        self.clear_state()
+        logger.info("任务已完成，进度文件已清理。")
 
     def _default_state(self) -> dict:
         return {
@@ -197,6 +240,7 @@ def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_
     total_duration_so_far = state.get('total_duration_so_far', 0.0)
   
     start_time_current_run = time.time()
+    task_completed_successfully = False
   
     try:
         id_chunks = list(read_poem_ids_in_chunks(id_file, chunk_size))
@@ -208,6 +252,7 @@ def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_
       
         if not chunks_to_process:
             logger.info(f"对于模型 [{model}] 和文件 [{Path(id_file).name}]，所有批次都已处理完毕，任务结束。")
+            task_completed_successfully = True
             return
           
         logger.info(f"总共有 {len(id_chunks)} 个批次，将从批次 {last_completed_chunk_index + 2} 开始处理 {len(chunks_to_process)} 个批次。")
@@ -249,12 +294,20 @@ def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_
                 progress_manager.save_state(state)
                 logger.debug(f"模型 [{model}] 的进度已更新至批次 {current_chunk_index + 1}。")
 
+                # 检查是否所有批次都已完成
+                if current_chunk_index + 1 == len(id_chunks):
+                    task_completed_successfully = True
+
     except FileNotFoundError as e:
         logger.error(f"任务 [{model}]-[{Path(id_file).name}] 失败: 读取ID文件时出错: {e}")
         return
     except Exception as e:
         logger.error(f"任务 [{model}]-[{Path(id_file).name}] 失败: 发生未知错误: {e}", exc_info=True)
         return
+    finally:
+        # 如果任务成功完成，清理进度文件
+        if task_completed_successfully:
+            progress_manager.mark_task_completed()
 
     end_time = time.time()
     total_duration_this_run = end_time - start_time_current_run
@@ -379,6 +432,8 @@ def cli(model, all_models, id_file, id_dir, force_rerun, chunk_size, fresh_start
     logger.info(f"强制重跑: {force_rerun}, 全新开始: {fresh_start}, 批次大小: {chunk_size}")
     logger.info(f"模型间最大并发数 (max_model_pipelines): {max_model_pipelines}")
     logger.info(f"模型内最大并发数 (max_workers): {max_workers}")
+    if fresh_start:
+        logger.info("注意: 已启用全新开始模式，将忽略并删除所有现有进度文件。")
     logger.info("将要执行的任务对:")
     for model_name, current_id_file in tasks_to_distribute:
         logger.info(f"  - 模型: [{model_name}] <---> 文件: [{Path(current_id_file).name}]")
@@ -412,6 +467,14 @@ def cli(model, all_models, id_file, id_dir, force_rerun, chunk_size, fresh_start
                 logger.info(f"主线程监控到任务 [{task_info[0]}]-[{task_info[1]}] 已成功结束。")
             except Exception as e:
                 logger.error(f"主线程捕获到任务 [{task_info[0]}]-[{task_info[1]}] 执行期间发生严重错误: {e}", exc_info=True)
+        
+        # 显示进度文件状态
+        progress_files = list(Path(".progress_cache").glob("state_*.json")) if Path(".progress_cache").exists() else []
+        if progress_files:
+            logger.info(f"注意: 仍有 {len(progress_files)} 个未完成任务的进度文件存在于 .progress_cache 目录中。")
+            logger.info("这些文件将在对应任务下次运行时自动加载，如需重新开始请使用 --fresh-start 参数。")
+        else:
+            logger.info("所有任务已完成，进度文件已清理。")
 
     total_runtime = time.time() - script_start_time
     logger.info("=" * 80)

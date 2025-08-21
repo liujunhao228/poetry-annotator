@@ -23,8 +23,9 @@ class LabelParser:
         
         # 从配置管理器获取路径，如果未提供的话
         if xml_path is None or md_path is None:
-            # 延迟导入以避免循环导入
+            # 使用相对导入
             from .config_manager import config_manager
+            
             categories_config = config_manager.get_categories_config()
             self.xml_path = xml_path or categories_config.get('xml_path', 'config/emotion_categories.xml')
             self.md_path = md_path or categories_config.get('md_path', 'config/中国古典诗词情感分类体系.md')
@@ -404,4 +405,20 @@ class LabelParser:
 
 
 # 全局标签解析器实例
-label_parser = LabelParser()  # 使用默认配置，从 config_manager 获取路径
+# 使用延迟初始化，避免在模块导入时就创建实例
+_label_parser_instance = None
+
+def get_label_parser():
+    """获取全局标签解析器实例（单例模式）"""
+    global _label_parser_instance
+    if _label_parser_instance is None:
+        _label_parser_instance = LabelParser()  # 使用默认配置，从 config_manager 获取路径
+    return _label_parser_instance
+
+# 为了向后兼容，仍然提供直接访问实例的方式
+# 但在新代码中建议使用 get_label_parser() 函数
+try:
+    label_parser = get_label_parser()
+except Exception:
+    # 在某些导入场景下可能会失败，这时label_parser为None
+    label_parser = None

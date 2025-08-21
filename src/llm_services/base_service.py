@@ -1,12 +1,19 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, AsyncGenerator
 import json
 import logging
 import os
 from pathlib import Path
-from ..llm_response_parser import llm_response_parser
-from ..config_manager import config_manager
-from ..utils.rate_limiter import AsyncTokenBucket
+from src.llm_response_parser import llm_response_parser
+from src.config_manager import config_manager
+from src.utils.rate_limiter import AsyncTokenBucket
+from src.utils.rate_controller import RateLimitConfig as InternalRateLimitConfig, create_rate_controller
+from src.utils.rate_monitor import rate_monitor
+from .llm_response_logger import LLMResponseLogger
+from .stream_reassembler import StreamReassembler
+from .schemas import PoemData, EmotionSchema
+from .exceptions import LLMServiceConfigError, LLMServiceResponseError
+
 
 class BaseLLMService(ABC):
     """LLM服务抽象基类 (已重构)"""
@@ -22,30 +29,62 @@ class BaseLLMService(ABC):
         self.api_key = self.config.get('api_key')
         self.base_url = self.config.get('base_url')
         if not self.model or not self.api_key:
-            raise ValueError(f"模型配置 '{model_config_name}' 必须包含 'model_name' 和 'api_key' 字段。")
+            raise LLMServiceConfigError(f"模型配置 '{model_config_name}' 必须包含 'model_name' 和 'api_key' 字段。")
         if self.api_key in ['your_gemini_api_key_here', 'your_siliconflow_api_key_here', '']:
-            raise ValueError(f"模型配置 '{model_config_name}' 的API密钥未正确配置。 ")
+            raise LLMServiceConfigError(f"模型配置 '{model_config_name}' 的API密钥未正确配置。 ")
 
-        # --- 延迟初始化速率限制器 ---
-        self.rate_limiter: Optional[AsyncTokenBucket] = None
-        self._rate_limit_qps: Optional[float] = None
-        self._rate_limit_burst: Optional[int] = None
+        # --- 延迟初始化速率控制器 ---
+        self.rate_controller = None
+        self.rate_limit_config = None
+        
+        # 解析速率限制配置
         rate_limit_qps_str = self.config.get('rate_limit_qps')
-        if rate_limit_qps_str:
+        rate_limit_rpm_str = self.config.get('rate_limit_rpm')
+        max_concurrent_str = self.config.get('max_concurrent')
+        rate_limit_burst_str = self.config.get('rate_limit_burst')
+        request_delay_str = self.config.get('request_delay')
+        
+        # 构建速率限制配置
+        if rate_limit_qps_str or rate_limit_rpm_str or max_concurrent_str:
             try:
-                qps = float(rate_limit_qps_str)
-                burst_str = self.config.get('rate_limit_burst', str(qps * 2))
-                burst = int(float(burst_str))
-                # 仅保存参数，不创建实例
-                self._rate_limit_qps = qps
-                self._rate_limit_burst = burst
+                qps = float(rate_limit_qps_str) if rate_limit_qps_str else None
+                rpm = float(rate_limit_rpm_str) if rate_limit_rpm_str else None
+                max_concurrent = int(max_concurrent_str) if max_concurrent_str else None
+                burst = int(float(rate_limit_burst_str)) if rate_limit_burst_str else None
+                
+                self.rate_limit_config = InternalRateLimitConfig(
+                    qps=qps,
+                    rpm=rpm,
+                    max_concurrent=max_concurrent,
+                    burst=burst
+                )
+                
                 self.logger.info(
                     f"为模型 '{self.model_config_name}' 配置速率限制: "
-                    f"QPS={qps}, 突发容量={burst} (将在首次异步调用时初始化)"
+                    f"QPS={qps}, RPM={rpm}, 最大并发={max_concurrent}, 突发容量={burst}"
                 )
             except (ValueError, TypeError) as e:
                 self.logger.warning(
                     f"无法为模型 '{self.model_config_name}' 解析速率限制配置，将不启用。错误: {e}"
+                )
+
+        # --- 请求间延迟 ---
+        self.request_delay: float = 0.0
+        if request_delay_str:
+            try:
+                delay = float(request_delay_str)
+                if delay >= 0:
+                    self.request_delay = delay
+                    self.logger.info(
+                        f"为模型 '{self.model_config_name}' 配置请求间延迟: {delay} 秒"
+                    )
+                else:
+                    self.logger.warning(
+                        f"请求间延迟配置值无效（必须>=0）: {delay}，将使用默认值 0 秒"
+                    )
+            except (ValueError, TypeError) as e:
+                self.logger.warning(
+                    f"无法为模型 '{self.model_config_name}' 解析请求间延迟配置，将不启用。错误: {e}"
                 )
 
         self.system_prompt_instruction_template: Optional[str] = None
@@ -54,14 +93,31 @@ class BaseLLMService(ABC):
 
         self._load_prompt_templates()
 
-    # --- 按需创建速率限制器的辅助方法 ---
-    async def _ensure_rate_limiter(self):
-        """在首次使用时，于异步上下文中初始化速率限制器。"""
-        # 只有在配置了QPS且实例尚未创建时才执行
-        if self._rate_limit_qps is not None and self.rate_limiter is None:
-            self.logger.debug("首次异步调用，正在初始化 AsyncTokenBucket...")
-            self.rate_limiter = AsyncTokenBucket(self._rate_limit_qps, self._rate_limit_burst)
-            self.logger.info("AsyncTokenBucket 速率限制器已成功初始化。")
+        # --- 初始化LLM响应日志记录器 ---
+        self.llm_response_logger = LLMResponseLogger(self.model_config_name)
+        
+        # --- 初始化流式响应重组器 ---
+        self.stream_reassembler = StreamReassembler(self.provider)
+
+    async def __aenter__(self):
+        """异步上下文管理器入口"""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """异步上下文管理器出口"""
+        # 基类不实现具体资源清理，由子类负责
+        pass
+
+    # --- 按需创建速率控制器的辅助方法 ---
+    async def _ensure_rate_controller(self):
+        """在首次使用时，于异步上下文中初始化速率控制器。"""
+        # 只有在配置了速率限制且实例尚未创建时才执行
+        if self.rate_limit_config is not None and self.rate_controller is None:
+            self.logger.debug("首次异步调用，正在初始化速率控制器...")
+            self.rate_controller = create_rate_controller(self.rate_limit_config)
+            # 注册到监控器
+            await rate_monitor.register_controller(self.model_config_name, self.rate_controller)
+            self.logger.info("速率控制器已成功初始化。")
 
     def _load_prompt_templates(self):
         """
@@ -185,44 +241,86 @@ class BaseLLMService(ABC):
         """
         return [{"id": f"S{i+1}", "sentence": sentence} for i, sentence in enumerate(paragraphs)]
 
-    def prepare_prompts(self, poem_data: Dict[str, Any], emotion_schema: str) -> Tuple[str, str]:
+    def prepare_prompts(self, poem_data: PoemData, emotion_schema: EmotionSchema) -> Tuple[str, str]:
         """
         集中化的提示词构建逻辑。
         这是服务类提供给外部的核心能力之一。
-        [修改] 使用 poem_data['title']
+        [修改] 使用 poem_data.title, poem_data.paragraphs, emotion_schema.text
         """
-        sentences_with_id = self._generate_sentences_with_id(poem_data['paragraphs'])
+        sentences_with_id = self._generate_sentences_with_id(poem_data.paragraphs)
         sentences_json = json.dumps(sentences_with_id, ensure_ascii=False, indent=2)
 
-        system_prompt = self._build_system_prompt(emotion_schema)
+        system_prompt = self._build_system_prompt(emotion_schema.text)
         user_prompt = self._build_user_prompt(
-            author=poem_data['author'],
-            title=poem_data['title'],
+            author=poem_data.author,
+            title=poem_data.title,
             sentences_with_id_json=sentences_json
         )
         return system_prompt, user_prompt
 
     @abstractmethod
-    async def annotate_poem(self, poem: Dict[str, Any], emotion_schema: str) -> Dict[str, Any]:
+    async def annotate_poem(self, poem: PoemData, emotion_schema: EmotionSchema) -> List[Dict[str, Any]]:
         """
-        [修改] 抽象方法签名已更新。
-        现在接收原始诗词数据和情感体系，负责完整的标注流程。
+        [修改] 抽象方法签名已更新，使用 DTO。
+        现在接收 PoemData 和 EmotionSchema DTO，负责完整的标注流程。
         !! 重要 !!
         子类在实现此方法时，应在发起实际网络请求前，先调用 self._ensure_rate_limiter()，
         然后再检查并调用速率限制器：
         
-        await self._ensure_rate_limiter() # 确保实例存在
-        if self.rate_limiter:
-            await self.rate_limiter.acquire()
+        await self._ensure_rate_controller()  # 确保控制器已初始化
+        if self.rate_controller:
+            await self.rate_controller.acquire()
+            # 如果使用了并发控制器，需要在完成后释放
+            if hasattr(self.rate_controller, 'release'):
+                # 在子类中需要调用 self.rate_controller.release() 来释放资源
+                pass
         
         # ... 之后是 httpx.AsyncClient.post(...) 等网络请求代码 ...
         Args:
-            poem: 包含诗词信息的字典。
-            emotion_schema: 情感分类体系的文本。
+            poem: 包含诗词信息的 PoemData DTO。
+            emotion_schema: 情感分类体系的 EmotionSchema DTO。
         Returns:
-            包含标注结果的字典。
+            一个经过验证的、包含标注信息的字典列表。
         """
         pass
+
+    @abstractmethod
+    async def annotate_poem_stream(self, poem: PoemData, emotion_schema: EmotionSchema) -> AsyncGenerator[str, None]:
+        """
+        [新增] 抽象方法，用于支持流式响应。
+        子类需要实现此方法以返回一个异步生成器，逐块产生响应内容。
+        Args:
+            poem: 包含诗词信息的 PoemData DTO。
+            emotion_schema: 情感分类体系的 EmotionSchema DTO。
+        Yields:
+            响应内容的字符串块。
+        """
+        yield
+
+    async def annotate_poem_stream_with_validation(self, poem: PoemData, emotion_schema: EmotionSchema) -> List[Dict[str, Any]]:
+        """
+        流式标注诗词并返回验证后的完整结果
+        
+        Args:
+            poem: 诗词数据
+            emotion_schema: 情感分类体系
+            
+        Returns:
+            验证后的标注结果列表
+        """
+        self.logger.info(f"[{self.provider}] 开始流式标注并验证诗词 {poem.id}")
+        
+        # 获取流式响应生成器
+        stream_generator = self.annotate_poem_stream(poem, emotion_schema)
+        
+        # 重组完整响应
+        complete_response = await self.stream_reassembler.parse_stream_chunks(stream_generator)
+        
+        # 验证完整响应
+        validated_result = self.stream_reassembler.validate_complete_response(complete_response)
+        
+        self.logger.info(f"[{self.provider}] 完成流式标注和验证，获得 {len(validated_result)} 条结果")
+        return validated_result
 
     @abstractmethod
     async def health_check(self) -> Tuple[bool, str]:
@@ -258,24 +356,27 @@ class BaseLLMService(ABC):
         # [新增] 添加一条简洁的 INFO 日志，让用户知道程序在做什么
         self.logger.info(f"向 [{self.provider.upper()}] 发送API请求...")
 
-    def log_response_details(self, parsed_data: Any, usage: Optional[Dict[str, Any]] = None):
-        """记录响应详情，长文本使用DEBUG级别"""
-        # 注释掉记录"完整响应详情"的逻辑
-        # self.logger.debug("=" * 80)
-        # self.logger.debug(f"[{self.provider.upper()}] 完整响应详情:")
-        # self.logger.debug(f"响应状态: 成功")
-        # if usage:
-        #     self.logger.debug(f"Token使用情况: {usage}")
-        
-        # 将详细的解析结果改为 DEBUG
-        # self.logger.debug(f"[{self.provider.upper()}] 解析结果:\n{json.dumps(parsed_data, ensure_ascii=False, indent=2)}")
-        # self.logger.debug("=" * 80)
-
-        # [新增] 在此添加一条简洁的 INFO 日志
+    def log_response_details(self, poem_id: str, parsed_data: Any, response_data: Dict[str, Any], response_text: str, usage: Optional[Dict[str, Any]] = None):
+        """记录响应详情，长文本使用DEBUG级别，并可选地记录完整响应到独立日志"""
+        # [保持] 简洁的 INFO 日志
         self.logger.info(f"成功接收并解析了来自 [{self.provider.upper()}] 的响应。")
 
-    def log_error_details(self, error: Exception, request_data: Optional[Dict[str, Any]] = None, prompt: Optional[str] = None):
-        """记录错误详情"""
+        # [修改] 移除原来的 DEBUG 打印完整响应的逻辑
+
+        # [新增] 如果配置要求保存完整响应，则使用专门的 logger 记录
+        llm_config = config_manager.get_llm_config()
+        save_full_response = llm_config.get('save_full_response', False)
+        if save_full_response:
+            self.llm_response_logger.log_response(
+                poem_id=poem_id,
+                response_data=response_data,  # 完整的响应数据字典
+                response_text=response_text,  # 纯文本内容
+                usage=usage                   # Token使用情况
+            )
+            self.logger.debug(f"[{self.provider.upper()}] 已将完整响应记录到独立日志文件。")
+
+    def log_error_details(self, poem_id: str, error: Exception, request_data: Optional[Dict[str, Any]] = None, prompt: Optional[str] = None):
+        """记录错误详情，并可选地记录完整错误信息到独立日志"""
         try:
             error_info = {
                 'error_type': type(error).__name__,
@@ -293,7 +394,18 @@ class BaseLLMService(ABC):
         except Exception as e:
             self.logger.warning(f"记录错误详情时发生错误: {e}")
 
-    def validate_response(self, response_text: str) -> List[Dict[str, Any]]:
+        # [新增] 如果配置要求保存完整响应（包括错误），则使用专门的 logger 记录错误
+        llm_config = config_manager.get_llm_config()
+        save_full_response = llm_config.get('save_full_response', False)
+        if save_full_response:
+            self.llm_response_logger.log_error(
+                poem_id=poem_id,
+                error=error,
+                request_data=self._mask_sensitive_data(request_data) if request_data else None
+            )
+            self.logger.debug(f"[{self.provider.upper()}] 已将错误详情记录到独立日志文件。")
+
+    def validate_response(self, response_text: str, save_full_response: bool = False) -> List[Dict[str, Any]]:
         """
         [已重构] 使用集成了验证逻辑的解析器，对LLM响应进行原子化的解析与验证。
         此方法现在完全委托 `llm_response_parser` 来完成所有工作。
@@ -302,10 +414,11 @@ class BaseLLMService(ABC):
         只有完全通过验证的结果才会被返回。
         Args:
             response_text: LLM的原始响应文本。
+            save_full_response: 是否保存完整响应内容。
         Returns:
             一个经过完全验证的、包含标注信息的字典列表。
         Raises:
-            ValueError: 如果响应无法被解析，或者解析后的所有内容都不符合业务规范。
+            LLMServiceResponseError: 如果响应无法被解析，或者解析后的所有内容都不符合业务规范。
         """
         try:
             self.logger.debug("开始使用LLMResponseParser统一解析并验证响应...")
@@ -317,13 +430,17 @@ class BaseLLMService(ABC):
             # 注释掉记录"详细验证内容"的逻辑
             # self.logger.debug(f"详细验证内容: {json.dumps(validated_list, ensure_ascii=False, indent=2)}") # 增加一条DEBUG用于追溯
             
+            # [新增] 如果配置要求保存完整响应，则记录完整响应内容
+            if save_full_response:
+                self.logger.debug(f"完整响应内容(前500字符): {response_text[:500]}{'...' if len(response_text) > 500 else ''}")
+            
             return validated_list
         except (ValueError, TypeError) as e:
             # 捕获解析器抛出的最终错误
             self.logger.error(f"响应统一解析验证失败: {e}", exc_info=True)
             # 将原始响应内容记录在 DEBUG 级别，避免在控制台输出大段错误文本
             self.logger.debug(f"导致失败的原始响应内容: {response_text}")
-            raise # 将异常向上抛出，由调用方(例如 Annotator)捕获并处理
+            raise LLMServiceResponseError(f"响应解析验证失败: {e}") from e # 将异常向上抛出，由调用方(例如 Annotator)捕获并处理
 
     # [已移除] _validate_annotation_list_content 方法已被移除，
     # 其功能已完全整合进 llm_response_parser.py 中，实现了解析与验证的统一。
