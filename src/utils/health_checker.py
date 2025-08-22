@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ..llm_factory import llm_factory
 from ..label_parser import get_label_parser
-from ..config_manager import config_manager # 导入以检查路径
+from ..config import config_manager # 导入以检查路径
 
 logger = logging.getLogger(__name__)
 

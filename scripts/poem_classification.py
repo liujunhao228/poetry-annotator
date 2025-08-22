@@ -20,9 +20,9 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # 导入 DataManager 和 get_data_manager
-# 假设 src/data_manager.py 和 src/config_manager.py 存在
-from src.data_manager import DataManager, get_data_manager
-from src.config_manager import config_manager
+# 假设 src/data/manager.py 和 src/config/config_manager.py 存在
+from src.data.manager import DataManager, get_data_manager
+from src.config import config_manager
 
 
 # --- 配置加载函数 ---

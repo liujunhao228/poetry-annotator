@@ -22,7 +22,7 @@ data_visualizer_path = os.path.join(project_root, 'poetry-annotator-data-visuali
 if data_visualizer_path not in sys.path:
     sys.path.insert(0, data_visualizer_path)
 
-from src.data_manager import get_data_manager
+from src.data import get_data_manager
 from data_visualizer.db_manager import DBManager
 
 # 初始化日志记录器

@@ -20,7 +20,7 @@ from typing import List, Optional, Union
 # if str(project_root) not in sys.path:
 #     sys.path.insert(0, str(project_root))
 
-from src.config_manager import config_manager
+from src.config import config_manager
 # from src.data_manager import DataManager # 在基类中似乎未直接使用
 
 
@@ -79,8 +79,6 @@ class TaskExecutorTab(ttk.Frame):
         self.log_frame.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
         self.log_frame.rowconfigure(0, weight=1)
         self.log_frame.columnconfigure(0, weight=1)
-        self.log_frame.rowconfigure(0, weight=1)
-        self.log_frame.columnconfigure(0, weight=1)
         
         self.log_text = scrolledtext.ScrolledText(
             self.log_frame, 
@@ -119,8 +117,7 @@ class TaskExecutorTab(ttk.Frame):
         try:
             if not os.path.exists(self.script_path):
                 self.output_queue.put(
-                    f"错误: 找不到脚本 '{self.script_name}'！请确保它与GUI启动器在同一目录下。\\n"
-                )
+                    f"错误: 找不到脚本 '{self.script_name}'！请确保它与GUI启动器在同一目录下。")
                 self.output_queue.put(None)
                 return
 
@@ -159,7 +156,7 @@ class TaskExecutorTab(ttk.Frame):
                 self.process.stdout.close()
             self.process.wait()
         except Exception as e:
-            self.output_queue.put(f"\\n****** 任务执行失败 ******\\n{e}\\n")
+            self.output_queue.put(f"****** 任务执行失败 ******{e}")
         finally:
             self.output_queue.put(None)  # 任务结束信号
 
@@ -194,13 +191,13 @@ class TaskExecutorTab(ttk.Frame):
     def _on_task_finished(self):
         """任务完成时的处理逻辑。"""
         return_code = self.process.returncode if self.process else -1
-        final_message = "\\n" + "="*80 + "\\n"
+        final_message = "" + "="*80 + ""
         
         if return_code == 0:
-            final_message += "任务执行成功完成。\\n"
+            final_message += "任务执行成功完成。"
             self.status_bar['text'] = "状态: 已完成"
         else:
-            final_message += f"任务执行结束，返回代码: {return_code} (0表示成功)。\\n"
+            final_message += f"任务执行结束，返回代码: {return_code} (0表示成功)。"
             self.status_bar['text'] = f"状态: 错误 (代码: {return_code})"
         
         self.output_queue.put(final_message)
@@ -211,13 +208,13 @@ class TaskExecutorTab(ttk.Frame):
     def stop_task(self):
         """终止正在运行的子进程。"""
         if self.process:
-            self.log_message("\\n****** 正在尝试终止任务... ******\\n")
+            self.log_message("****** 正在尝试终止任务... ******")
             self.process.terminate()
             try:
                 self.process.wait(timeout=2)
-                self.log_message("任务已终止。\\n")
+                self.log_message("任务已终止。")
             except subprocess.TimeoutExpired:
-                self.log_message("无法正常终止，将强制结束。\\n")
+                self.log_message("无法正常终止，将强制结束。")
                 self.process.kill()
             self.output_queue.put(None)
 

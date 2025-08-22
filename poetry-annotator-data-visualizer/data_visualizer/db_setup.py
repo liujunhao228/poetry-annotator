@@ -39,7 +39,7 @@ from data_visualizer.config import DB_PATHS, project_root
 
 # 从主项目配置管理器获取情感分类XML文件路径
 try:
-    from src.config_manager import config_manager
+    from src.config import config_manager
     categories_config = config_manager.get_categories_config()
     XML_PATH = categories_config.get('xml_path', os.path.join(str(project_root), 'config', 'emotion_categories.xml'))
     # 如果是相对路径，则相对于项目根目录解析
@@ -203,14 +203,14 @@ def initialize_database_schema(db_path: str):
     logger.info(f"检查/初始化数据库架构于 {db_path}...")
     
     # 使用主项目的数据库适配器来初始化表结构
-    try:
-        from src.db_adapter import get_database_adapter
-        db_adapter = get_database_adapter('sqlite', db_path)
-        db_adapter.init_database()
-        logger.info("数据库架构检查/初始化完成。")
-    except Exception as e:
-        logger.error(f"数据库初始化错误: {e}")
-        raise
+        try:
+            from src.data import get_database_adapter
+            db_adapter = get_database_adapter('sqlite', self.db_path)
+            db_adapter.init_database()
+            logger.info("数据库架构检查/初始化完成。")
+        except Exception as e:
+            logger.error(f"数据库初始化错误: {e}")
+            raise
 
 
 def setup_all_databases(db_paths: Dict[str, str]) -> Dict[str, bool]:

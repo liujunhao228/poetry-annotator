@@ -5,7 +5,8 @@ import logging
 import os
 from pathlib import Path
 from src.llm_response_parser import llm_response_parser
-from src.config_manager import config_manager
+from src.config.custom_json_validator import CustomJSONValidator, CustomValidationError # 新增导入
+from src.config import config_manager
 from src.utils.rate_limiter import AsyncTokenBucket
 from src.utils.rate_controller import RateLimitConfig as InternalRateLimitConfig, create_rate_controller
 from src.utils.rate_monitor import rate_monitor
@@ -98,6 +99,10 @@ class BaseLLMService(ABC):
         
         # --- 初始化流式响应重组器 ---
         self.stream_reassembler = StreamReassembler(self.provider)
+        
+        # --- 初始化自定义校验器 ---
+        config_root = Path(__file__).parent.parent / "config"
+        self.custom_validator = CustomJSONValidator(config_root / "custom_validation_rules.yaml")
 
     async def __aenter__(self):
         """异步上下文管理器入口"""
@@ -407,34 +412,39 @@ class BaseLLMService(ABC):
 
     def validate_response(self, response_text: str, save_full_response: bool = False) -> List[Dict[str, Any]]:
         """
-        [已重构] 使用集成了验证逻辑的解析器，对LLM响应进行原子化的解析与验证。
+        [已增强] 使用集成了验证逻辑的解析器，对LLM响应进行原子化的解析与验证。
         此方法现在完全委托 `llm_response_parser` 来完成所有工作。
         解析器会尝试多种策略从文本中提取一个JSON数组，并立即验证其内容
         是否符合业务规范（包含'id', 'primary', 'secondary'等字段和正确类型）。
-        只有完全通过验证的结果才会被返回。
+        在基础验证通过后，再使用自定义校验器根据配置文件进行二次校验。
+        只有完全通过所有验证的结果才会被返回。
         Args:
             response_text: LLM的原始响应文本。
             save_full_response: 是否保存完整响应内容。
         Returns:
             一个经过完全验证的、包含标注信息的字典列表。
         Raises:
-            LLMServiceResponseError: 如果响应无法被解析，或者解析后的所有内容都不符合业务规范。
+            LLMServiceResponseError: 如果响应无法被解析，或者解析/校验后的所有内容都不符合规范。
         """
         try:
             self.logger.debug("开始使用LLMResponseParser统一解析并验证响应...")
             # 只需要调用一次 parse，它会处理所有解析和验证的复杂逻辑
             validated_list = llm_response_parser.parse(response_text)
             
-            # 将原有的 INFO 日志细化
-            self.logger.info(f"响应解析及内容验证成功，共 {len(validated_list)} 条标注记录。") # 保留这条简洁的INFO
-            # 注释掉记录"详细验证内容"的逻辑
-            # self.logger.debug(f"详细验证内容: {json.dumps(validated_list, ensure_ascii=False, indent=2)}") # 增加一条DEBUG用于追溯
-            
+            # [新增] 在基础验证通过后，进行自定义规则的二次校验
+            try:
+                # 使用自定义校验器进行二次校验
+                custom_validated_list = self.custom_validator.validate(validated_list)
+                self.logger.info(f"响应解析、内容验证及自定义规则校验均成功，共 {len(custom_validated_list)} 条标注记录。规则集: '{self.custom_validator.active_ruleset_name}'")
+            except CustomValidationError as custom_e:
+                self.logger.error(f"响应通过基础解析验证，但自定义规则校验失败: {custom_e}")
+                raise LLMServiceResponseError(f"响应自定义规则校验失败: {custom_e}") from custom_e
+
             # [新增] 如果配置要求保存完整响应，则记录完整响应内容
             if save_full_response:
                 self.logger.debug(f"完整响应内容(前500字符): {response_text[:500]}{'...' if len(response_text) > 500 else ''}")
             
-            return validated_list
+            return validated_list # 返回原始列表，其内容已被自定义校验器确认
         except (ValueError, TypeError) as e:
             # 捕获解析器抛出的最终错误
             self.logger.error(f"响应统一解析验证失败: {e}", exc_info=True)

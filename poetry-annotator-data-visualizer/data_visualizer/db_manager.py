@@ -7,6 +7,16 @@ from data_visualizer.config import DB_PATHS, CACHE_MAX_SIZE_DB_QUERIES
 from data_visualizer.utils import logger, db_connect
 from typing import Any
 
+# 添加项目根目录到Python路径
+project_root = Path(__file__).parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+# 添加数据可视化模块到Python路径
+visualizer_path = Path(__file__).parent.parent
+if str(visualizer_path) not in sys.path:
+    sys.path.insert(0, str(visualizer_path))
+
 # 尝试导入 tqdm 用于进度显示
 try:
     from tqdm import tqdm
@@ -25,7 +35,7 @@ class DBManager:
         
         # 使用主项目的数据库适配器来初始化表结构
         try:
-            from src.db_adapter import get_database_adapter
+            from src.data import get_database_adapter
             db_adapter = get_database_adapter('sqlite', self.db_path)
             db_adapter.init_database()
             logger.info("数据库架构检查/初始化完成。")

@@ -3,8 +3,8 @@ import json
 import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional, AsyncIterator
-from .config_manager import config_manager
-from .db_adapter import get_database_adapter, normalize_poem_data
+from .config import config_manager
+from .data.adapter import get_database_adapter, normalize_poem_data
 from datetime import datetime, timezone, timedelta
 
 

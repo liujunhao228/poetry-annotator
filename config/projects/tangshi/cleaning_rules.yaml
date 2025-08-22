@@ -1,0 +1,19 @@
+# config/project_cleaning_rules.yaml
+
+# 项目数据清洗规则配置文件
+# 项目可以定义自己的清洗规则，覆盖或补充全局规则
+
+rules:
+  # 项目特定的清洗规则
+  project_specific_cleaning:
+    enabled: true
+    # 项目特定的清洗逻辑需要在代码中实现
+    # 这里只是一个示例
+    keywords: ["项目特定关键词"]
+    fields: ["title", "full_text"]
+    status: "project_specific_status"
+
+# 项目可以有自己的全局设置
+global_settings:
+  # 默认检查的字段（如果规则中未指定 fields）
+  default_check_fields: ["title", "author", "full_text"]

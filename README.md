@@ -105,13 +105,78 @@ poetry-annotator/
    enable_search = false  # DashScope特有参数
    ```
    
+## 配置管理体系
+
+项目采用了重构后的配置管理体系，具有清晰的层级结构和明确的职责划分。
+
+### 配置目录结构
+
+```
+config/
+├── metadata/
+│   └── config_metadata.json          # 配置元数据文件
+├── system/
+│   ├── active_project.json           # 激活的项目配置
+│   └── system_settings.json          # 系统级设置
+├── global/
+│   └── config.ini                    # 全局配置文件
+├── projects/
+│   ├── tangshi/
+│   │   ├── project.ini               # 唐诗项目配置
+│   │   ├── validation_rules.yaml     # 项目校验规则
+│   │   ├── preprocessing_rules.yaml  # 项目预处理规则
+│   │   └── cleaning_rules.yaml       # 项目清洗规则
+│   ├── songci/
+│   │   ├── project.ini               # 宋词项目配置
+│   │   ├── validation_rules.yaml     # 项目校验规则
+│   │   ├── preprocessing_rules.yaml  # 项目预处理规则
+│   │   └── cleaning_rules.yaml       # 项目清洗规则
+│   └── default/
+│       └── project.ini               # 默认项目配置
+├── rules/
+│   ├── validation/
+│   │   └── global_rules.yaml         # 全局校验规则
+│   ├── preprocessing/
+│   │   └── global_rules.yaml         # 全局预处理规则
+│   └── cleaning/
+│       └── global_rules.yaml         # 全局清洗规则
+└── templates/
+    └── prompt/                       # 提示词模板目录
+```
+
+### 配置文件说明
+
+- **全局配置** (`config/global/config.ini`): 包含适用于所有项目的通用设置
+- **项目配置** (`config/projects/*/project.ini`): 每个项目都有自己的配置目录，包含项目特定的设置
+- **系统配置** (`config/system/active_project.json`): 管理当前激活的项目和所有可用的项目列表
+- **规则配置** (`config/rules/`): 包含校验、预处理和清洗规则
+- **配置元数据** (`config/metadata/config_metadata.json`): 定义配置文件的路径和结构
+
+详细说明请参阅 [配置管理体系文档](docs/configuration_management.md)。
+
 ### 数据库配置：
    ```ini
    # 单数据库模式
    db_path = data/poetry.db
 
-   # 多数据库模式
+   # 多数据库模式（按数据集分离）
    db_paths = TangShi=data/TangShi.db,SongCi=data/SongCi.db
+   
+   # 分离数据库模式（按数据类型分离）
+   # 支持使用 {main_db_name} 占位符为每个主数据库创建独立的分离数据库
+   separate_db_paths = raw_data=data/{main_db_name}/raw_data.db,annotation=data/{main_db_name}/annotation.db,emotion=data/{main_db_name}/emotion.db
+   ```
+   
+   数据库支持两种分离模式：
+   1. **主数据库分离**：按数据集（如唐诗、宋词）分离，每个数据集使用独立的主数据库
+   2. **分离数据库**：按数据类型（原始数据、标注数据、情感分类数据）分离，每个主数据库可对应多个分离数据库
+   
+   在项目配置文件中，可以为特定项目指定独立的分离数据库配置：
+   ```ini
+   [Database]
+   config_name = TangShi
+   # 为该项目指定特定的分离数据库配置
+   separate_db_paths = raw_data=data/TangShi/raw_data.db,annotation=data/TangShi/annotation.db,emotion=data/TangShi/emotion.db
    ```
 
 ### 速率控制配置：

@@ -28,8 +28,8 @@ config_manager = None
 DataManager = None
 
 try:
-    from src.config_manager import config_manager
-    from src.data_manager import DataManager
+    from src.config import config_manager
+    from src.data.manager import DataManager
 except ImportError as e:
     print(f"警告：无法导入 config_manager 或 DataManager: {e}")
     print("请确保此脚本位于项目根目录，并且 `src` 目录在 python path 中。")

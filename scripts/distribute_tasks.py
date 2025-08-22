@@ -35,8 +35,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
 # [修改] 导入新的日志配置模块
-from src.config_manager import config_manager
-from src.data_manager import DataManager, get_data_manager
+from src.config import config_manager
+from src.data.manager import DataManager, get_data_manager
 from src.annotator import Annotator
 from src.logging_config import setup_default_logging, get_logger
 from src.utils.health_checker import health_checker
@@ -49,7 +49,7 @@ def get_db_path_by_name(db_name):
     """
     根据数据库名称获取数据库路径
     """
-    db_config = config_manager.get_database_config()
+    db_config = config_manager.get_effective_database_config()
     if 'db_paths' in db_config:
         db_paths = db_config['db_paths']
         if db_name in db_paths:

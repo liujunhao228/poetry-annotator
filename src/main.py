@@ -12,8 +12,9 @@ import json
 relative_import_failed = False
 try:
     # 当作为包运行时（推荐方式）
-    from .config_manager import config_manager
-    from .data_manager import get_data_manager
+    from .config import config_manager, project_config_manager
+    from .config.manager import ConfigManager  # 导入 ConfigManager 类
+    from .data import get_data_manager
     from .label_parser import get_label_parser
     from .llm_factory import llm_factory
     from .annotator import Annotator
@@ -33,8 +34,9 @@ if relative_import_failed:
         print(f"已将 {src_dir} 添加到 sys.path")
         
     try:
-        from config_manager import config_manager
-        from data_manager import get_data_manager
+        from config import config_manager, project_config_manager
+        from config.manager import ConfigManager  # 导入 ConfigManager 类
+        from data import get_data_manager
         from label_parser import get_label_parser
         from llm_factory import llm_factory
         from annotator import Annotator
@@ -61,13 +63,32 @@ logger = get_logger(__name__)
 @click.option('--enable-file-log', is_flag=True, default=None, 
               help='启用文件日志输出（可选，将覆盖配置文件设置）')
 @click.option('--db-name', type=str, help='数据库名称（从配置文件中获取路径）')
-def cli(log_level, log_file, enable_file_log, db_name):
+@click.option('--project', type=str, help='指定项目配置文件（可选，将覆盖当前激活的项目配置）')
+def cli(log_level, log_file, enable_file_log, db_name, project):
     """LLM诗词情感标注工具"""
+    # 如果指定了项目配置文件，更新当前激活的项目
+    if project:
+        try:
+            project_config_manager.set_active_project(project)
+            logger.info(f"已切换到项目配置: {project}")
+        except ValueError as e:
+            logger.error(f"项目配置切换失败: {e}")
+            return
+    
+    # 获取当前激活的项目配置文件
+    active_project = project_config_manager.get_active_project()
+    project_config_path = os.path.join("config/project", active_project)
+    
+    # 更新配置管理器实例以使用当前激活的项目配置
+    # 注意：这里我们让 ConfigManager 从 config_metadata.json 读取全局配置路径
+    global config_manager
+    config_manager = ConfigManager(project_config_path=project_config_path)
+    
     # 设置日志配置 - 优先使用配置文件，CLI参数可覆盖
     try:
         config = config_manager.get_logging_config()
         setup_default_logging(
-            log_level=log_level or config['log_level'],
+            log_level=log_level or config['console_log_level'],  # 注意这里字段名的变更
             enable_file_log=enable_file_log if enable_file_log is not None else config['enable_file_log'],
             log_file=log_file or config['log_file']
         )
@@ -88,29 +109,29 @@ def cli(log_level, log_file, enable_file_log, db_name):
     logger.info("LLM诗词情感标注工具启动")
     logger.info(f"Python版本: {sys.version}")
     logger.info(f"工作目录: {Path.cwd()}")
+    logger.info(f"当前项目配置: {active_project}")
     logger.info(f"日志级别: {logging.getLevelName(logger.level)}")
     logger.info("=" * 60)
 
 
 @cli.command()
-@click.option('--config', default='config/config.ini', help='配置文件路径')
-@click.option('--init-db', is_flag=True, help='初始化数据库（从JSON文件加载数据）')
-@click.option('--clear-existing', is_flag=True, help='清空现有数据后重新初始化')
-def setup(config, init_db, clear_existing):
+@click.option('--config', default=None, help='配置文件路径 (通过 config_metadata.json 确定)')
+def setup(config):
     """初始化项目环境"""
     try:
         logger.info("开始初始化项目环境...")
         
         # 检查配置文件
-        config_path = Path(config)
+        # 注意：现在全局配置路径由 config_metadata.json 确定
+        global_config_path = config_manager.global_config_path
+        config_path = Path(global_config_path)
         if not config_path.exists():
             template_path = config_path.with_suffix('.ini.template')
-            logger.info(f"配置文件 {config} 不存在，自行从模板创建...")
-            logger.info(f"请复制 {template_path} 为 {config} 并配置您的API密钥。")
+            logger.info(f"配置文件 {global_config_path} 不存在，自行从模板创建...")
+            logger.info(f"请复制 {template_path} 为 {global_config_path} 并配置您的API密钥。")
             return
 
-        config_manager.config_path = config
-        config_manager._load_config()
+        # config_manager 已经在 cli() 中初始化，无需再次加载
         logger.info("配置文件加载成功")
         
         # 记录配置信息
@@ -153,18 +174,6 @@ def setup(config, init_db, clear_existing):
                 logger.warning("未配置情感分类体系文件路径")
         except Exception as e:
             logger.warning(f"情感分类体系文件检查失败: {e}")
-        
-        if init_db:
-            logger.info("开始从JSON文件初始化数据库...")
-            try:
-                # 使用新的多数据库初始化方法
-                results = data_manager.initialize_all_databases_from_source_folders(clear_existing=clear_existing)
-                logger.info("所有数据库初始化完成!")
-                for folder_name, result in results.items():
-                    logger.info(f"数据库 [{folder_name}]: 作者: {result['authors']}, 诗词: {result['poems']}")
-            except Exception as e:
-                logger.error(f"数据库初始化失败: {e}")
-                return
         
         logger.info("项目环境初始化完成！")
         
@@ -423,6 +432,47 @@ def rate_stats():
         
     except Exception as e:
         logger.error(f"获取速率控制统计信息失败: {e}", exc_info=True)
+
+
+@cli.command(name="project")
+@click.option('--list', 'list_projects', is_flag=True, help='列出所有可用的项目配置')
+@click.option('--active', is_flag=True, help='显示当前激活的项目配置')
+@click.option('--set', 'set_project', type=str, help='设置当前激活的项目配置')
+def project_command(list_projects, active, set_project):
+    """管理项目配置"""
+    try:
+        if list_projects:
+            # 列出所有可用的项目配置
+            available_projects = project_config_manager.get_available_projects()
+            print("\n=== 可用的项目配置 ===")
+            for project in available_projects:
+                marker = " * " if project == project_config_manager.get_active_project() else "   "
+                print(f"{marker}{project}")
+            print()
+            logger.info(f"列出 {len(available_projects)} 个可用项目配置")
+            
+        elif active:
+            # 显示当前激活的项目配置
+            active_project = project_config_manager.get_active_project()
+            print(f"\n当前激活的项目配置: {active_project}\n")
+            logger.info(f"当前激活的项目配置: {active_project}")
+            
+        elif set_project:
+            # 设置当前激活的项目配置
+            try:
+                project_config_manager.set_active_project(set_project)
+                print(f"\n已将项目配置设置为: {set_project}\n")
+                logger.info(f"已将项目配置设置为: {set_project}")
+            except ValueError as e:
+                print(f"\n错误: {e}\n")
+                logger.error(f"设置项目配置失败: {e}")
+        else:
+            # 显示帮助信息
+            ctx = click.get_current_context()
+            click.echo(ctx.get_help())
+            
+    except Exception as e:
+        logger.error(f"项目配置管理命令执行失败: {e}", exc_info=True)
 
 
 @cli.command(name="recover-from-logs")

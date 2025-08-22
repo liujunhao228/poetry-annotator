@@ -165,7 +165,7 @@ def setup_default_logging(console_level: Optional[str] = None,
         log_file: 日志文件路径（可选，用于覆盖配置文件）
     """
     try:
-        from .config_manager import config_manager
+        from .config import config_manager
         config = config_manager.get_logging_config()
         # 使用配置文件中的值，除非显式通过参数覆盖
         final_console_level = console_level or config['console_log_level']

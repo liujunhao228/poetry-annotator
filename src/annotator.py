@@ -11,10 +11,10 @@ from tqdm import tqdm
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 import pybreaker
 
-from .data_manager import get_data_manager
+from .data import get_data_manager
 from .async_data_manager import AsyncDataManager
 from .llm_factory import llm_factory
-from .config_manager import config_manager
+from .config import config_manager
 from .label_parser import get_label_parser
 from .annotation_data_logger import AnnotationDataLogger
 from .llm_services.schemas import PoemData, EmotionSchema
@@ -268,7 +268,7 @@ class Annotator:
         logger.info(f"[{self.model_identifier}] 开始为诗词ID流式传输并验证标注: {poem_id}")
 
         # 获取数据库路径
-        db_config = config_manager.get_database_config()
+        db_config = config_manager.get_effective_database_config()
         if 'db_paths' in db_config:
             db_path = next(iter(db_config['db_paths'].values()))
         else:
@@ -320,7 +320,7 @@ class Annotator:
         logger.info(f"开始标注任务 - 限制: {limit or '无'}, 范围: {start_id or '开始'}-{end_id or '结束'}, 强制重跑: {force_rerun}, 指定ID: {poem_ids is not None}")
         
         # 获取数据库路径
-        db_config = config_manager.get_database_config()
+        db_config = config_manager.get_effective_database_config()
         if 'db_paths' in db_config:
             # 使用第一个数据库路径
             db_path = next(iter(db_config['db_paths'].values()))

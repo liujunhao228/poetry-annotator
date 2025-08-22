@@ -18,7 +18,7 @@ if str(project_root) not in sys.path:
 
 # 导入配置管理器
 try:
-    from src.config_manager import config_manager
+    from src.config import config_manager
 except ImportError:
     print("错误: 无法导入配置管理器，请检查项目结构")
     sys.exit(1)

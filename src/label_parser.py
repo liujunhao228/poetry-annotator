@@ -24,7 +24,7 @@ class LabelParser:
         # 从配置管理器获取路径，如果未提供的话
         if xml_path is None or md_path is None:
             # 使用相对导入
-            from .config_manager import config_manager
+            from .config import config_manager
             
             categories_config = config_manager.get_categories_config()
             self.xml_path = xml_path or categories_config.get('xml_path', 'config/emotion_categories.xml')

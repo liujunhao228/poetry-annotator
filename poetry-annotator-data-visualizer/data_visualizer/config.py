@@ -21,9 +21,9 @@ if str(visualizer_project_root) not in sys.path:
 # --- 从这里开始，导入主项目的 config_manager 应该可以工作 ---
 # 导入主项目的配置管理器
 try:
-    from src.config_manager import config_manager # 这应该可以工作了
+    from src.config import config_manager  # 这应该可以工作了
     # 从主项目配置获取数据库路径
-    db_config = config_manager.get_database_config()
+    db_config = config_manager.get_effective_database_config()
     
     # 解析主项目配置中的数据库路径，并确保使用绝对路径
     if 'db_paths' in db_config:
@@ -51,7 +51,7 @@ try:
         }
         
     # 获取可视化相关配置
-    visualizer_config = config_manager.get_visualizer_config()
+    visualizer_config = config_manager.get_effective_visualizer_config()
     ENABLE_CUSTOM_DOWNLOAD = visualizer_config.get('enable_custom_download', False)
 except Exception as e:
     print(f"无法从主项目配置管理器获取数据库配置: {e}")

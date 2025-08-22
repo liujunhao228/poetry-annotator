@@ -217,7 +217,6 @@ data/validation
 gui_state.json
 
 # test
-*test*
 
 *.db
 src/extract_sample_data.py

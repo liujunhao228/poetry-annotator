@@ -19,8 +19,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.data_manager import DataManager, get_data_manager
-from src.config_manager import config_manager
+from src.data.manager import DataManager, get_data_manager
+from src.config import config_manager
 
 # --- 新增：配置加载函数 ---
 def load_cleaning_config(config_path: str = None) -> dict:

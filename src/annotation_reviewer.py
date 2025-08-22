@@ -8,7 +8,7 @@
 支持多数据库模式，可以切换不同的诗词数据库（如唐诗、宋词等）进行标注校对。
 
 依赖模块:
-- src.data_manager: 提供诗词、作者、标注数据的查询功能。
+- src.data: 提供诗词、作者、标注数据的查询功能。
 - poetry-annotator-data-visualizer.data_visualizer.db_manager: 提供情感分类体系的查询功能。
 """
 
@@ -28,8 +28,8 @@ data_visualizer_path = os.path.join(project_root, 'poetry-annotator-data-visuali
 if data_visualizer_path not in sys.path:
     sys.path.insert(0, data_visualizer_path)
 
-from src.data_manager import get_data_manager
-from src.config_manager import config_manager
+from src.data import get_data_manager
+from src.config import config_manager
 from src.emotion_classifier import EmotionClassifier
 from src.formatters import format_poem_info_for_display, format_sentence_annotations_for_table, SentenceAnnotation
 from data_visualizer.db_manager import DBManager
@@ -69,7 +69,7 @@ class AnnotationReviewerLogic:
         
         :return: 一个字典，key为数据库名称，value为数据库路径
         """
-        db_config = config_manager.get_database_config()
+        db_config = config_manager.get_effective_database_config()
         
         # 处理新的多数据库配置
         if 'db_paths' in db_config:

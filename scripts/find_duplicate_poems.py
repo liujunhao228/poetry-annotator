@@ -11,8 +11,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.data_manager import get_data_manager
-from src.config_manager import config_manager
+from src.data import get_data_manager
+from src.config import config_manager
 
 # 配置日志记录
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

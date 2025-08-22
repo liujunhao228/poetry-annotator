@@ -18,7 +18,7 @@ from .common_widgets import (
     create_option_frame,
     configure_grid_row_column
 )
-from src.config_manager import config_manager
+from src.config import config_manager
 
 
 class SamplingTab(TaskExecutorTab):
@@ -84,7 +84,6 @@ class SamplingTab(TaskExecutorTab):
         log_level_frame = create_option_frame(parent, "日志级别控制")
         log_level_frame.grid(row=row, column=0, sticky="ew", padx=5, pady=5)
         
-        # 将 log_level_frame 作为父容器(master)传入
         self.log_level_selector = LogLevelSelector(log_level_frame)
         self.log_level_selector.pack(fill="x", expand=True, padx=5, pady=2)
         
@@ -93,7 +92,6 @@ class SamplingTab(TaskExecutorTab):
         db_frame = create_option_frame(parent, "数据库选择")
         db_frame.grid(row=row, column=0, sticky="ew", padx=5, pady=5)
         
-        # 将 db_frame 作为父容器(master)传入
         self.db_selector = DatabaseSelector(db_frame)
         self.db_selector.pack(fill="x", expand=True, padx=5, pady=2)
         
@@ -379,7 +377,7 @@ class SamplingTab(TaskExecutorTab):
         
         # 显示将要执行的命令
         display_command = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in command)
-        self.log_message(f"执行命令: {display_command}\n" + "="*80 + "\n")
+        self.log_message(f"执行命令: {display_command}" + "="*80 + "")
         
         # 更新UI为"运行中"状态
         self._update_ui_state(is_running=True)

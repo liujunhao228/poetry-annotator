@@ -8,8 +8,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.data_manager import DataManager, get_data_manager
-from src.config_manager import config_manager
+from src.data import DataManager, get_data_manager
+from src.config import config_manager
 
 
 def get_random_poem_ids(db_name, sample_size=1, exclude_annotated=False, model_identifier=None, active_only=False):
@@ -144,7 +144,7 @@ def get_db_path_by_name(db_name):
     """
     根据数据库名称获取数据库路径
     """
-    db_config = config_manager.get_database_config()
+    db_config = config_manager.get_effective_database_config()
     if 'db_paths' in db_config:
         db_paths = db_config['db_paths']
         if db_name in db_paths:
@@ -202,7 +202,7 @@ if __name__ == "__main__":
         db_name = args.db_name
     elif args.db and args.db != 'poetry.db':
         # 如果指定了具体的数据库路径，需要根据路径找到对应的数据库名称
-        db_config = config_manager.get_database_config()
+        db_config = config_manager.get_effective_database_config()
         if 'db_paths' in db_config:
             db_paths = db_config['db_paths']
             for name, path in db_paths.items():

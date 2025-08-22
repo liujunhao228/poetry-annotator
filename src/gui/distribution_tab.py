@@ -83,7 +83,6 @@ class DistributionTab(TaskExecutorTab):
         log_level_frame = create_option_frame(parent, "日志级别控制")
         log_level_frame.grid(row=row, column=0, sticky="ew", padx=5, pady=5)
         
-        # 【修复】将 log_level_frame 作为父容器(master)传入
         self.log_level_selector = LogLevelSelector(log_level_frame)
         self.log_level_selector.pack(fill="x", expand=True, padx=5, pady=2)
         
@@ -92,7 +91,6 @@ class DistributionTab(TaskExecutorTab):
         db_frame = create_option_frame(parent, "数据库选择")
         db_frame.grid(row=row, column=0, sticky="ew", padx=5, pady=5)
         
-        # 【修复】将 db_frame 作为父容器(master)传入
         self.db_selector = DatabaseSelector(db_frame)
         self.db_selector.pack(fill="x", expand=True, padx=5, pady=2)
         
@@ -101,7 +99,6 @@ class DistributionTab(TaskExecutorTab):
         model_frame = create_option_frame(parent, "模型选择")
         model_frame.grid(row=row, column=0, sticky="ew", padx=5, pady=5)
         
-        # 【修复】将 model_frame 作为父容器(master)传入
         self.model_selector = ModelSelector(model_frame)
         self.model_selector.pack(fill="x", expand=True, padx=5, pady=2)
         
@@ -295,7 +292,9 @@ class DistributionTab(TaskExecutorTab):
             
         # --- 2. 准备UI并执行任务 ---
         # 清空日志区域
-        self.log_text.config(state="normal"); self.log_text.delete(1.0, tk.END); self.log_text.config(state="disabled")
+        self.log_text.config(state="normal")
+        self.log_text.delete(1.0, tk.END)
+        self.log_text.config(state="disabled")
         
         # 显示将要执行的命令
         display_command = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in command)

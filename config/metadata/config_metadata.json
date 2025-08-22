@@ -1,0 +1,23 @@
+{
+  "global_config_file": "config/global/config.ini",
+  "active_project_config_file": "config/system/active_project.json",
+  "validation_rules": {
+    "global_file": "config/rules/validation/global_rules.yaml",
+    "project_files": [
+      "config/projects/{project_name}/validation_rules.yaml",
+      "config/projects/{project_name}/custom_validation_rules.yaml"
+    ]
+  },
+  "preprocessing_rules": {
+    "global_file": "config/rules/preprocessing/global_rules.yaml",
+    "project_files": [
+      "config/projects/{project_name}/preprocessing_rules.yaml"
+    ]
+  },
+  "cleaning_rules": {
+    "global_file": "config/rules/cleaning/global_rules.yaml",
+    "project_files": [
+      "config/projects/{project_name}/cleaning_rules.yaml"
+    ]
+  }
+}

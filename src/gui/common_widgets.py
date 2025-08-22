@@ -3,12 +3,13 @@
 
 """
 定义可复用的 Tkinter GUI 组件。
+适配全新的配置管理与数据管理体系。
 """
 
 import tkinter as tk
 from tkinter import ttk, filedialog
 from pathlib import Path
-from src.config_manager import config_manager
+from src.config import config_manager
 
 
 class LogLevelSelector(ttk.Frame):
@@ -57,6 +58,7 @@ class LogLevelSelector(ttk.Frame):
 class DatabaseSelector(ttk.Frame):
     """
     一个用于选择数据库的组合框框架。
+    适配新的多数据库配置管理体系。
     """
     def __init__(self, master, label_text="数据库:", initial_selection=None):
         super().__init__(master)
@@ -76,7 +78,8 @@ class DatabaseSelector(ttk.Frame):
     def _populate_databases(self):
         """填充数据库下拉框"""
         try:
-            db_config = config_manager.get_database_config()
+            # 使用新的配置管理器API获取数据库配置
+            db_config = config_manager.get_effective_database_config()
             if 'db_paths' in db_config:
                 db_names = list(db_config['db_paths'].keys())
                 if db_names:
@@ -112,7 +115,8 @@ class DatabaseSelector(ttk.Frame):
         if not db_name:
             return None
         try:
-            db_config = config_manager.get_database_config()
+            # 使用新的配置管理器API获取数据库配置
+            db_config = config_manager.get_effective_database_config()
             if 'db_paths' in db_config and db_name in db_config['db_paths']:
                 return db_config['db_paths'][db_name]
             elif 'db_path' in db_config and db_name == "default":
@@ -132,6 +136,7 @@ class ModelSelector(ttk.Frame):
     """
     一个用于选择模型的组合框框架。
     支持单个模型选择或使用所有模型的选项。
+    适配新的模型配置管理体系。
     """
     def __init__(self, master, label_text="模型:", 
                  single_model_text="指定单个模型", all_models_text="使用所有已配置的模型",
@@ -166,7 +171,15 @@ class ModelSelector(ttk.Frame):
     def _populate_models(self):
         """填充模型下拉框"""
         try:
-            models = config_manager.list_model_configs()
+            # 使用新的配置管理器API获取模型配置列表
+            model_configs = config_manager.get_effective_model_configs()
+            # 提取模型名称
+            models = []
+            for i, config in enumerate(model_configs):
+                # 优先使用 model_identifier 作为显示名称，如果没有则使用 name，再没有则使用索引
+                model_name = config.get('model_identifier') or config.get('name') or f"模型{i}"
+                models.append(model_name)
+            
             if models:
                 self.model_combobox['values'] = models
                 if not self.model_var.get():

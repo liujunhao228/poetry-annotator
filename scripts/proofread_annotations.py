@@ -9,14 +9,14 @@ from typing import List, Generator
 
 # 确保能正确导入项目模块
 try:
-    from src.data_manager import DataManager
-    from src.config_manager import config_manager
+    from src.data.manager import DataManager
+    from src.config import config_manager
     from src.logging_config import setup_default_logging, get_logger
 except ImportError:
     project_root = Path(__file__).resolve().parent.parent
     sys.path.insert(0, str(project_root))
-    from src.data_manager import DataManager
-    from src.config_manager import config_manager
+    from src.data.manager import DataManager
+    from src.config import config_manager
     from src.logging_config import setup_default_logging, get_logger
 
 # 使用与项目其他部分一致的日志记录器

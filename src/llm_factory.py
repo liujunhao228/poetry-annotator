@@ -1,7 +1,7 @@
 # src/llm_factory.py
 from typing import Dict, Any, Optional
 import logging
-from .config_manager import config_manager
+from .config import config_manager
 from .llm_services.base_service import BaseLLMService
 from .llm_services.siliconflow_service import SiliconFlowService
 from .llm_services.gemini_service import GeminiService

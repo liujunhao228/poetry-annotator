@@ -200,9 +200,12 @@ class AnnotationReviewerTab(ttk.Frame):
 
     def _populate_emotion_comboboxes(self):
         """填充情感分类下拉框"""
-        emotion_list = self.logic.get_full_emotion_list_for_selection(level=2)
-        emotion_names = [e['name'] for e in emotion_list]
-        self.primary_emotion_combobox['values'] = emotion_names
+        try:
+            emotion_list = self.logic.get_full_emotion_list_for_selection(level=2)
+            emotion_names = [e['name'] for e in emotion_list]
+            self.primary_emotion_combobox['values'] = emotion_names
+        except Exception as e:
+            print(f"填充情感分类下拉框时出错: {e}")
 
     def _populate_db_combobox(self):
         """填充数据库下拉框"""
@@ -217,6 +220,8 @@ class AnnotationReviewerTab(ttk.Frame):
                 self.db_var.trace_add("write", self._on_db_change)
         except Exception as e:
             print(f"填充数据库下拉框时出错: {e}")
+            # 设置错误状态
+            self.db_combobox.set("加载失败")
 
     def _on_db_change(self, *args):
         """当数据库选择改变时的处理函数"""
@@ -284,6 +289,10 @@ class AnnotationReviewerTab(ttk.Frame):
             # 输入的不是有效数字，清空模型列表
             self.model_combobox['values'] = []
             self.model_var.set("")
+        except Exception as e:
+            print(f"更新模型下拉框时出错: {e}")
+            self.model_combobox['values'] = []
+            self.model_var.set("")
 
     def _update_navigation_state_after_manual_input(self):
         """在用户手动输入ID后更新导航状态"""
@@ -336,7 +345,12 @@ class AnnotationReviewerTab(ttk.Frame):
         self.status_label.config(text="查询中...")
         self.master.update_idletasks()  # 更新界面以显示"查询中..."
 
-        poem_info, sentence_annotations = self.logic.query_poem_and_annotation(poem_id, model_id)
+        try:
+            poem_info, sentence_annotations = self.logic.query_poem_and_annotation(poem_id, model_id)
+        except Exception as e:
+            messagebox.showerror("查询失败", f"查询诗词时出错: {str(e)}")
+            self.status_label.config(text="错误: 查询失败")
+            return
 
         if not poem_info:
             messagebox.showerror("查询失败", f"未找到ID为 {poem_id} 的诗词")
@@ -393,9 +407,11 @@ class AnnotationReviewerTab(ttk.Frame):
                 self._update_navigation_buttons_state()
                 
                 messagebox.showinfo("加载成功", f"成功加载 {len(id_list)} 个ID")
+                self.status_label.config(text=f"加载成功: {len(id_list)} 个ID")
                 
         except Exception as e:
             messagebox.showerror("加载失败", f"加载ID列表文件时出错: {str(e)}")
+            self.status_label.config(text="错误: 加载ID列表失败")
 
     def _prev_poem(self):
         """导航到上一首诗词"""
@@ -432,6 +448,7 @@ class AnnotationReviewerTab(ttk.Frame):
             self._on_query()
         else:
             messagebox.showwarning("查询失败", f"诗词ID {poem_id} 没有可用的标注模型")
+            self.status_label.config(text=f"警告: 诗词ID {poem_id} 无模型")
 
     def _update_navigation_buttons_state(self):
         """更新导航按钮的状态"""
@@ -446,18 +463,22 @@ class AnnotationReviewerTab(ttk.Frame):
 
     def _update_poem_info_display(self, poem_info):
         """更新诗词信息显示区域"""
-        display_info = self.logic.format_poem_info_for_display(poem_info)
-        
-        title = display_info.get('标题', '未知')
-        author = display_info.get('作者', '未知')
-        self.poem_info_label.config(text=f"标题: {title}    作者: {author}")
-        
-        # 更新全文显示
-        full_text = poem_info.get('full_text', '')
-        self.full_text_widget.config(state=tk.NORMAL)
-        self.full_text_widget.delete(1.0, tk.END)
-        self.full_text_widget.insert(1.0, full_text)
-        self.full_text_widget.config(state=tk.DISABLED)
+        try:
+            display_info = self.logic.format_poem_info_for_display(poem_info)
+            
+            title = display_info.get('标题', '未知')
+            author = display_info.get('作者', '未知')
+            self.poem_info_label.config(text=f"标题: {title}    作者: {author}")
+            
+            # 更新全文显示
+            full_text = poem_info.get('full_text', '')
+            self.full_text_widget.config(state=tk.NORMAL)
+            self.full_text_widget.delete(1.0, tk.END)
+            self.full_text_widget.insert(1.0, full_text)
+            self.full_text_widget.config(state=tk.DISABLED)
+        except Exception as e:
+            print(f"更新诗词信息显示区域时出错: {e}")
+            self.status_label.config(text="错误: 更新诗词信息失败")
 
     def _update_annotation_table(self, sentence_annotations):
         """更新标注结果表格"""
@@ -468,17 +489,21 @@ class AnnotationReviewerTab(ttk.Frame):
         if not sentence_annotations:
             return
 
-        # 格式化数据并插入到表格中
-        table_data = self.logic.format_sentence_annotations_for_table(sentence_annotations)
-        for i, row_data in enumerate(table_data):
-            tag = 'evenrow' if i % 2 == 0 else 'oddrow'
-            values = (
-                row_data.get("句子ID", ""),
-                row_data.get("句子文本", ""),
-                row_data.get("当前主情感", ""),
-                row_data.get("当前次情感", "")
-            )
-            self.tree.insert("", tk.END, values=values, tags=(tag,))
+        try:
+            # 格式化数据并插入到表格中
+            table_data = self.logic.format_sentence_annotations_for_table(sentence_annotations)
+            for i, row_data in enumerate(table_data):
+                tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+                values = (
+                    row_data.get("句子ID", ""),
+                    row_data.get("句子文本", ""),
+                    row_data.get("当前主情感", ""),
+                    row_data.get("当前次情感", "")
+                )
+                self.tree.insert("", tk.END, values=values, tags=(tag,))
+        except Exception as e:
+            print(f"更新标注结果表格时出错: {e}")
+            self.status_label.config(text="错误: 更新标注表格失败")
 
     def _on_tree_select(self, event):
         """处理 Treeview 行选择事件"""

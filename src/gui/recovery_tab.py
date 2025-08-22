@@ -190,7 +190,9 @@ class RecoveryTab(TaskExecutorTab):
             
         # --- 2. 准备UI并执行任务 ---
         # 清空日志区域
-        self.log_text.config(state="normal"); self.log_text.delete(1.0, tk.END); self.log_text.config(state="disabled")
+        self.log_text.config(state="normal")
+        self.log_text.delete(1.0, tk.END)
+        self.log_text.config(state="disabled")
         
         # 显示将要执行的命令
         display_command = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in command)
