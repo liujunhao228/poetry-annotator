@@ -10,7 +10,7 @@ from src.config.schema import (
     GlobalConfig, GlobalLLMConfig, GlobalDatabaseConfig, GlobalDataPathConfig,
     GlobalPromptConfig, GlobalLoggingConfig, GlobalVisualizerConfig,
     GlobalModelConfigTemplate, GlobalValidationRuleSet, GlobalPreprocessingRuleSet,
-    GlobalCleaningRuleSet
+    GlobalCleaningRuleSet, GlobalPluginConfig
 )
 
 
@@ -101,10 +101,14 @@ class GlobalConfigLoader:
 
         # 模型配置模板（模型特定配置在_model_configs中处理）
         global_config.model_template = GlobalModelConfigTemplate()
+        
+        # 插件配置（在plugin_loader中处理）
+        global_config.plugins = GlobalPluginConfig()
 
         # 校验规则配置在单独的YAML文件中处理
         # 预处理规则配置在单独的YAML文件中处理
         # 清洗规则配置在单独的YAML文件中处理
+        # 插件配置在plugin_loader中处理
 
         return global_config
 
@@ -228,28 +232,9 @@ class GlobalConfigLoader:
         }
 
     def _get_global_prompt_config(self) -> Dict[str, str]:
-        """获取全局提示词配置（默认）"""
-        if not os.path.exists(self.global_config_path):
-            return {}
-
-        config = configparser.ConfigParser(interpolation=None)
-        config.read(self.global_config_path, encoding='utf-8')
-
-        if not config.has_section('Prompt'):
-            return {}
-
-        return {
-            'template_path': config.get('Prompt', 'template_path', fallback=None),
-            'system_prompt_instruction_template': config.get(
-                'Prompt', 'system_prompt_instruction_template',
-                fallback='config/system_prompt_instruction.txt'),
-            'system_prompt_example_template': config.get(
-                'Prompt', 'system_prompt_example_template',
-                fallback='config/system_prompt_example.txt'),
-            'user_prompt_template': config.get(
-                'Prompt', 'user_prompt_template',
-                fallback='config/user_prompt_template.txt')
-        }
+        """获取全局提示词配置（旧版本兼容接口）"""
+        # 不再使用模板文件，返回空配置
+        return {}
 
     def _get_all_global_model_configs(self) -> List[Dict[str, Any]]:
         """获取所有全局模型配置"""

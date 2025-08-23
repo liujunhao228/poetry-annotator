@@ -1,0 +1,10 @@
+{
+  "id": 4,
+  "relationship_action": "RA03",
+  "emotional_strategy": "ES02",
+  "context_analysis": {
+    "communication_scene": ["SC03"],
+    "risk_level": "RS01"
+  },
+  "brief_rationale": "以提问开启公共话题，将个人凭吊升华为集体文化记忆寻根。"
+}

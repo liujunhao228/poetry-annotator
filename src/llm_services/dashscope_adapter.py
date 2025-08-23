@@ -8,6 +8,7 @@ import asyncio
 from .openai_service import OpenAIService
 from .base_service import BaseLLMService
 from .schemas import PoemData, EmotionSchema
+from ..llm_response_parser import ILLMResponseParser
 
 
 class DashScopeAdapter(BaseLLMService):
@@ -18,12 +19,12 @@ class DashScopeAdapter(BaseLLMService):
     并将通用的 API 调用委托给 OpenAIService。
     """
 
-    def __init__(self, config: Dict[str, Any], model_config_name: str):
+    def __init__(self, config: Dict[str, Any], model_config_name: str, response_parser: Optional[ILLMResponseParser] = None):
         """
         初始化并解析配置字典
         """
-        # 调用基类构造函数，传递完整的config字典和模型配置名称
-        super().__init__(config, model_config_name)
+        # 调用基类构造函数，传递完整的config字典、模型配置名称和可选的response_parser实例
+        super().__init__(config, model_config_name, response_parser)
         
         # 配置解析和验证逻辑
         self._parse_and_validate_config()

@@ -1,123 +1,161 @@
 """
-配置验证器，处理配置的验证逻辑。
+配置验证器，用于验证配置的完整性。
 """
 
-import configparser
 import os
-from typing import Dict, Any
+import configparser
+from typing import Dict, Any, List, Optional
 
 
 class ConfigValidator:
     """配置验证器"""
-    
+
     def __init__(self, global_config_path: str):
         self.global_config_path = global_config_path
 
-    def validate_config(self, project_config_path: str = None) -> bool:
-        """验证配置的完整性"""
-        try:
-            # 检查必要的全局配置
-            if not os.path.exists(self.global_config_path):
-                print(f"错误: 全局配置文件不存在: {self.global_config_path}")
-                return False
-
-            global_config = configparser.ConfigParser(interpolation=None)
-            global_config.read(self.global_config_path, encoding='utf-8')
-
-            required_sections = ['LLM', 'Database', 'Data', 'Categories', 'Prompt']
-            for section in required_sections:
-                if not global_config.has_section(section):
-                    print(f"警告: 全局配置缺少节 [{section}]")
-                    return False
-
-            # 检查LLM配置
-            # llm_config = self.get_llm_config()  # 这里需要传入GlobalConfig对象
-
-            # 检查数据库配置
-            db_config = self._get_global_database_config()
-            if not db_config:
-                print("错误: 未设置全局数据库路径 (db_path 或 db_paths)")
-                return False
-
-            # 检查数据路径配置
-            data_config = self._get_global_data_config()
-            if not data_config.get('source_dir') or not data_config.get('output_dir'):
-                print("错误: 未设置全局数据路径")
-                return False
-
-            # 如果有项目配置，也进行检查
-            if project_config_path:
-                if not os.path.exists(project_config_path):
-                    print(f"警告: 项目配置文件不存在: {project_config_path}")
-                    # 不强制要求项目配置文件存在
-                else:
-                    project_config = configparser.ConfigParser(interpolation=None)
-                    project_config.read(project_config_path, encoding='utf-8')
-
-                    # 可以添加项目配置的验证逻辑
-
-            return True
-
-        except Exception as e:
-            print(f"配置验证失败: {e}")
-            return False
+    def validate_config(self, project_config_path: Optional[str] = None) -> bool:
+        """
+        验证配置的完整性
+        
+        Args:
+            project_config_path: 项目配置文件路径（可选）
             
-    def _get_global_database_config(self) -> Dict[str, Any]:
-        """获取全局数据库配置（默认），支持主数据库和分离数据库"""
-        # 这里需要从全局配置文件中读取实际的路径
+        Returns:
+            配置是否有效
+        """
+        # 验证全局配置
+        if not self._validate_global_config():
+            return False
+        
+        # 如果提供了项目配置路径，验证项目配置
+        if project_config_path and not self._validate_project_config(project_config_path):
+            return False
+        
+        return True
+
+    def _validate_global_config(self) -> bool:
+        """验证全局配置"""
         if not os.path.exists(self.global_config_path):
-            return {}
-
+            print(f"错误: 全局配置文件不存在: {self.global_config_path}")
+            return False
+        
         config = configparser.ConfigParser(interpolation=None)
-        config.read(self.global_config_path, encoding='utf-8')
+        try:
+            config.read(self.global_config_path, encoding='utf-8')
+        except Exception as e:
+            print(f"错误: 读取全局配置文件失败: {e}")
+            return False
+        
+        # 验证必需的节
+        required_sections = ['LLM', 'Database', 'Data', 'Prompt', 'Logging', 'Visualizer']
+        for section in required_sections:
+            if not config.has_section(section):
+                print(f"错误: 全局配置文件缺少必需的节: [{section}]")
+                return False
+        
+        # 验证必需的字段
+        # LLM节
+        llm = config['LLM']
+        required_llm_fields = ['max_workers', 'max_model_pipelines', 'max_retries', 'retry_delay', 
+                              'breaker_fail_max', 'breaker_reset_timeout', 'save_full_response']
+        for field in required_llm_fields:
+            if not llm.get(field):
+                print(f"错误: 全局配置文件LLM节缺少必需的字段: {field}")
+                return False
+        
+        # Database节
+        # Database节没有必需字段
+        
+        # Data节
+        data = config['Data']
+        required_data_fields = ['source_dir', 'output_dir']
+        for field in required_data_fields:
+            if not data.get(field):
+                print(f"错误: 全局配置文件Data节缺少必需的字段: {field}")
+                return False
+        
+        # Prompt节
+        # 不再需要模板文件路径
+        pass
+        
+        # Logging节
+        log = config['Logging']
+        required_log_fields = ['console_log_level', 'file_log_level', 'enable_file_log', 
+                              'enable_console_log', 'max_file_size', 'backup_count', 'quiet_third_party']
+        for field in required_log_fields:
+            if not log.get(field):
+                print(f"错误: 全局配置文件Logging节缺少必需的字段: {field}")
+                return False
+        
+        # Visualizer节
+        viz = config['Visualizer']
+        required_viz_fields = ['enable_custom_download']
+        for field in required_viz_fields:
+            if not viz.get(field):
+                print(f"错误: 全局配置文件Visualizer节缺少必需的字段: {field}")
+                return False
+        
+        return True
 
-        if not config.has_section('Database'):
-            return {}
-
-        result = {}
-
-        # 尝试获取新的多数据库配置
-        db_paths_str = config.get('Database', 'db_paths', fallback=None)
-        if db_paths_str:
-            # 解析 "name1=path1,name2=path2" 格式
-            db_paths = {}
-            for item in db_paths_str.split(','):
-                if '=' in item:
-                    name, path = item.split('=', 1)
-                    db_paths[name.strip()] = path.strip()
-            result['db_paths'] = db_paths
-
-        # 尝试获取分离数据库配置
-        separate_db_paths_str = config.get('Database', 'separate_db_paths', fallback=None)
-        if separate_db_paths_str:
-            # 解析 "name1=path1,name2=path2" 格式
-            separate_db_paths = {}
-            for item in separate_db_paths_str.split(','):
-                if '=' in item:
-                    name, path = item.split('=', 1)
-                    separate_db_paths[name.strip()] = path.strip()
-            result['separate_db_paths'] = separate_db_paths
-
-        # 回退到旧的单数据库配置
-        if not result.get('db_paths'):
-            db_path = config.get('Database', 'db_path', fallback=None)
-            if db_path:
-                result['db_path'] = db_path
-
-        return result
-
-    def _get_global_data_config(self) -> Dict[str, str]:
-        """获取全局数据路径配置（默认）"""
-        if not os.path.exists(self.global_config_path):
-            return {}
-
+    def _validate_project_config(self, project_config_path: str) -> bool:
+        """验证项目配置"""
+        if not os.path.exists(project_config_path):
+            print(f"错误: 项目配置文件不存在: {project_config_path}")
+            return False
+        
         config = configparser.ConfigParser(interpolation=None)
-        config.read(self.global_config_path, encoding='utf-8')
-
-        if not config.has_section('Data'):
-            return {}
-
-        return {
-            'source_dir': config.get('Data', 'source_dir', fallback=None),
-            'output_dir': config.get('Data', 'output_dir', fallback=None)
-        }
+        try:
+            config.read(project_config_path, encoding='utf-8')
+        except Exception as e:
+            print(f"错误: 读取项目配置文件失败: {e}")
+            return False
+        
+        # 验证必需的节
+        required_sections = ['Database', 'Data', 'Prompt', 'Model', 'Validation', 'Preprocessing', 'Cleaning']
+        for section in required_sections:
+            if not config.has_section(section):
+                print(f"错误: 项目配置文件缺少必需的节: [{section}]")
+                return False
+        
+        # 验证必需的字段
+        # Database节
+        db = config['Database']
+        if not (db.get('config_name') or db.get('db_paths') or db.get('db_path')):
+            print("错误: 项目配置文件Database节必须指定config_name、db_paths或db_path之一")
+            return False
+        
+        # Data节
+        data = config['Data']
+        if not (data.get('config_name') or (data.get('source_dir') and data.get('output_dir'))):
+            print("错误: 项目配置文件Data节必须指定config_name或source_dir和output_dir")
+            return False
+        
+        # Prompt节
+        # 不再需要模板文件路径
+        pass
+        
+        # Model节
+        model = config['Model']
+        if not model.get('model_names'):
+            print("错误: 项目配置文件Model节缺少必需的字段: model_names")
+            return False
+        
+        # Validation节
+        validation = config['Validation']
+        if not validation.get('ruleset_name'):
+            print("错误: 项目配置文件Validation节缺少必需的字段: ruleset_name")
+            return False
+        
+        # Preprocessing节
+        preprocessing = config['Preprocessing']
+        if not preprocessing.get('ruleset_name'):
+            print("错误: 项目配置文件Preprocessing节缺少必需的字段: ruleset_name")
+            return False
+        
+        # Cleaning节
+        cleaning = config['Cleaning']
+        if not cleaning.get('ruleset_name'):
+            print("错误: 项目配置文件Cleaning节缺少必需的字段: ruleset_name")
+            return False
+        
+        return True

@@ -42,132 +42,80 @@ class DatabaseInitializer:
         self.db_configs = self._get_database_configs()
         
     def _get_database_configs(self) -> Dict[str, str]:
-        """获取所有数据库配置"""
+        """获取所有主数据库配置名称"""
         db_config = config_manager.get_database_config()
         
-        # 处理新的多数据库配置
+        # 获取所有配置的主数据库名称
         if 'db_paths' in db_config:
-            db_paths = db_config['db_paths']
-            # 确保使用绝对路径
-            resolved_paths = {}
-            for name, path in db_paths.items():
-                if not Path(path).is_absolute():
-                    resolved_paths[name] = str(Path(path).resolve())
-                else:
-                    resolved_paths[name] = path
-            return resolved_paths
+            return {name: "" for name in db_config['db_paths'].keys()}
         # 回退到旧的单数据库配置
         elif 'db_path' in db_config:
-            path = db_config['db_path']
-            if not Path(path).is_absolute():
-                path = str(Path(path).resolve())
-            return {"default": path}
+            return {"default": ""}
         else:
-            raise ValueError("配置文件中未找到数据库路径配置。")
+            # 如果没有主数据库配置，使用全局配置中的separate_db_paths来获取主数据库名称
+            separate_db_config = db_config.get('separate_db_paths', {})
+            if separate_db_config:
+                # 从分离数据库路径中提取主数据库名称
+                main_db_names = set()
+                for path in separate_db_config.values():
+                    # 查找 {main_db_name} 占位符中的名称
+                    if '{main_db_name}' in path:
+                        # 如果使用占位符，我们需要从配置中获取所有可能的主数据库名称
+                        # 这里我们简单地返回一个默认名称
+                        main_db_names.add("default")
+                    else:
+                        # 从路径中提取主数据库名称
+                        parts = path.split('/')
+                        if len(parts) > 2:
+                            main_db_names.add(parts[1])
+                return {name: "" for name in main_db_names}
+            else:
+                return {"default": ""}
     
     def initialize_all_databases(self, clear_existing: bool = False) -> Dict[str, Dict[str, Any]]:
-        """初始化所有配置的数据库"""
+        """初始化所有配置的分离数据库"""
         results = {}
         
-        for db_name, db_path in self.db_configs.items():
+        # 为每个主数据库初始化分离数据库
+        for db_name in self.db_configs.keys():
             try:
-                self.logger.info(f"开始初始化数据库 {db_name} ({db_path})")
-                result = self.initialize_database(db_name, db_path, clear_existing)
+                self.logger.info(f"开始初始化分离数据库结构 for {db_name}")
+                # 使用初始化分离数据库的方法
+                result = self.initialize_separate_databases(clear_existing)
                 results[db_name] = result
-                self.logger.info(f"数据库 {db_name} 初始化完成")
+                self.logger.info(f"分离数据库 {db_name} 初始化完成")
             except Exception as e:
-                self.logger.error(f"初始化数据库 {db_name} 失败: {e}")
+                self.logger.error(f"初始化分离数据库 {db_name} 失败: {e}")
                 results[db_name] = {"error": str(e)}
                 
         return results
     
     def initialize_database(self, db_name: str, db_path: str, clear_existing: bool = False) -> Dict[str, Any]:
-        """初始化单个数据库"""
-        # 确保数据库目录存在
-        db_path_obj = Path(db_path)
-        db_path_obj.parent.mkdir(parents=True, exist_ok=True)
+        """初始化单个数据库（已废弃，仅保留用于兼容性）"""
+        self.logger.warning("initialize_database 方法已废弃，使用 initialize_separate_databases 代替")
         
-        # 初始化数据库适配器
-        db_adapter = get_database_adapter('sqlite', db_path)
-        
-        # 初始化数据库表结构
-        db_adapter.init_database()
-        
-        # 导入情感分类体系
-        imported_count = 0
+        # 调用初始化分离数据库的方法
         try:
-            label_parser = get_label_parser()
-            # 获取所有分类的详细信息，包括英文名称
-            categories_data = []
-            for primary_id, primary_data in label_parser.categories.items():
-                # 添加一级分类
-                categories_data.append({
-                    'id': primary_data['id'],
-                    'name_zh': primary_data['name_zh'],
-                    'name_en': primary_data.get('name_en', ''),
-                    'parent_id': None,
-                    'level': 1
-                })
-                # 添加二级分类
-                for secondary in primary_data.get('secondaries', []):
-                    categories_data.append({
-                        'id': secondary['id'],
-                        'name_zh': secondary['name_zh'],
-                        'name_en': secondary.get('name_en', ''),
-                        'parent_id': primary_data['id'],
-                        'level': 2
-                    })
+            from .separate_databases import get_separate_db_manager
+            # 获取针对特定主数据库的分离数据库管理器
+            separate_db_manager = get_separate_db_manager(main_db_name=db_name)
             
-            # 使用批量插入和事务优化性能
-            if categories_data:
-                conn = db_adapter.connect()
-                try:
-                    # 开启事务
-                    conn.execute('BEGIN TRANSACTION')
-                    
-                    # 准备批量插入数据
-                    insert_data = [
-                        (
-                            category['id'],
-                            category['name_zh'],
-                            category['name_en'],
-                            category['parent_id'],
-                            category['level']
-                        )
-                        for category in categories_data
-                    ]
-                    
-                    # 执行批量插入
-                    conn.executemany('''
-                        INSERT OR REPLACE INTO emotion_categories 
-                        (id, name_zh, name_en, parent_id, level)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', insert_data)
-                    
-                    # 提交事务
-                    conn.commit()
-                    imported_count = len(categories_data)
-                    self.logger.info(f"向数据库 {db_name} 批量导入了 {imported_count} 个情感分类")
-                    
-                except Exception as e:
-                    # 回滚事务
-                    conn.rollback()
-                    self.logger.error(f"批量导入情感分类时出错，已回滚事务: {e}")
-                    raise
-                finally:
-                    conn.close()
-                    
+            # 初始化该主数据库对应的分离数据库
+            result = separate_db_manager.initialize_all_databases(clear_existing)
+            
+            # 返回兼容格式的结果
+            return {
+                "db_name": db_name,
+                "status": "success",
+                "message": f"分离数据库 {db_name} 初始化完成"
+            }
         except Exception as e:
-            self.logger.error(f"向数据库 {db_name} 导入情感分类时出错: {e}")
-        
-        result = {
-            "db_name": db_name,
-            "db_path": db_path,
-            "status": "success",
-            "message": f"数据库 {db_name} 初始化成功，导入了 {imported_count} 个情感分类"
-        }
-        
-        return result
+            self.logger.error(f"初始化分离数据库 {db_name} 失败: {e}")
+            return {
+                "db_name": db_name,
+                "status": "error",
+                "message": str(e)
+            }
         
     def initialize_separate_databases(self, clear_existing: bool = False) -> Dict[str, Dict[str, Any]]:
         """初始化分离的数据库结构，为每个主数据库创建独立的分离数据库"""
@@ -187,36 +135,19 @@ class DatabaseInitializer:
         return results
     
     def get_database_stats(self) -> Dict[str, Dict[str, Any]]:
-        """获取所有数据库的统计信息，包括主数据库和对应的分离数据库"""
+        """获取所有分离数据库的统计信息"""
         stats = {}
         
-        for db_name, db_path in self.db_configs.items():
+        # 为每个主数据库获取分离数据库统计信息
+        for db_name in self.db_configs.keys():
             try:
-                if not Path(db_path).exists():
-                    stats[db_name] = {
-                        "status": "missing",
-                        "message": "数据库文件不存在"
-                    }
-                    continue
-                    
-                db_adapter = get_database_adapter('sqlite', db_path)
+                from .separate_databases import get_separate_db_manager
+                # 获取针对特定主数据库的分离数据库管理器
+                separate_db_manager = get_separate_db_manager(main_db_name=db_name)
                 
-                # 获取表统计信息
-                tables_stats = {}
-                tables = ['poems', 'annotations', 'authors']
-                
-                for table in tables:
-                    try:
-                        rows = db_adapter.execute_query(f"SELECT COUNT(*) FROM {table}")
-                        tables_stats[table] = rows[0][0] if rows else 0
-                    except Exception:
-                        tables_stats[table] = "N/A"
-                
-                stats[db_name] = {
-                    "status": "ok",
-                    "path": db_path,
-                    "tables": tables_stats
-                }
+                # 获取分离数据库统计信息
+                separate_stats = separate_db_manager.get_database_stats()
+                stats[db_name] = separate_stats
             except Exception as e:
                 stats[db_name] = {
                     "status": "error",

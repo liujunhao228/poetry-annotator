@@ -4,12 +4,13 @@ import json
 import logging
 import os
 from pathlib import Path
-from src.llm_response_parser import llm_response_parser
+from src.llm_response_parser import llm_response_parser, ILLMResponseParser
 from src.config.custom_json_validator import CustomJSONValidator, CustomValidationError # 新增导入
 from src.config import config_manager
 from src.utils.rate_limiter import AsyncTokenBucket
 from src.utils.rate_controller import RateLimitConfig as InternalRateLimitConfig, create_rate_controller
 from src.utils.rate_monitor import rate_monitor
+from src.prompt_builder import prompt_builder
 from .llm_response_logger import LLMResponseLogger
 from .stream_reassembler import StreamReassembler
 from .schemas import PoemData, EmotionSchema
@@ -18,7 +19,7 @@ from .exceptions import LLMServiceConfigError, LLMServiceResponseError
 
 class BaseLLMService(ABC):
     """LLM服务抽象基类 (已重构)"""
-    def __init__(self, config: Dict[str, Any], model_config_name: str):
+    def __init__(self, config: Dict[str, Any], model_config_name: str, response_parser: Optional[ILLMResponseParser] = None):
         """
         构造函数现在接收完整的配置字典
         """
@@ -28,6 +29,10 @@ class BaseLLMService(ABC):
         self.provider = self.config.get('provider', 'unknown')
         self.model = self.config.get('model_name')
         self.api_key = self.config.get('api_key')
+        # --- 初始化响应解析器 ---
+        # 如果传入了 response_parser 实例，则使用它；否则使用默认的全局实例
+        # 这为未来通过工厂或配置注入不同的解析器提供了可能
+        self.response_parser: ILLMResponseParser = response_parser or llm_response_parser
         self.base_url = self.config.get('base_url')
         if not self.model or not self.api_key:
             raise LLMServiceConfigError(f"模型配置 '{model_config_name}' 必须包含 'model_name' 和 'api_key' 字段。")
@@ -88,12 +93,9 @@ class BaseLLMService(ABC):
                     f"无法为模型 '{self.model_config_name}' 解析请求间延迟配置，将不启用。错误: {e}"
                 )
 
-        self.system_prompt_instruction_template: Optional[str] = None
-        self.system_prompt_example_template: Optional[str] = None
-        self.user_prompt_template: Optional[str] = None
-
-        self._load_prompt_templates()
-
+        # --- 初始化Prompt构建器 ---
+        self.prompt_builder = prompt_builder
+        
         # --- 初始化LLM响应日志记录器 ---
         self.llm_response_logger = LLMResponseLogger(self.model_config_name)
         
@@ -124,36 +126,7 @@ class BaseLLMService(ABC):
             await rate_monitor.register_controller(self.model_config_name, self.rate_controller)
             self.logger.info("速率控制器已成功初始化。")
 
-    def _load_prompt_templates(self):
-        """
-        统一加载提示词模板的逻辑。
-        """
-        try:
-            # 优先使用模型特定的模板配置
-            prompt_config = config_manager.get_model_prompt_config(self.model_config_name)
-            self.logger.info(f"为模型 '{self.model_config_name}' 加载提示词模板... ")
-        except Exception as e:
-            self.logger.warning(f"无法获取模型 '{self.model_config_name}' 的特定提示词配置，将回退到全局默认配置: {e} ")
-            prompt_config = config_manager.get_prompt_config()
-        # 加载拆分后的系统提示词模板
-        instruction_path = prompt_config.get('system_prompt_instruction_template')
-        example_path = prompt_config.get('system_prompt_example_template')
-        user_path = prompt_config.get('user_prompt_template')
-        if instruction_path:
-            self.system_prompt_instruction_template = self._load_template_file(instruction_path)
-            self.logger.info(f"系统提示词（指令部分）加载成功: {instruction_path} ")
-        else:
-            raise ValueError("系统提示词（指令部分）路径未配置 ")
-        if example_path:
-            self.system_prompt_example_template = self._load_template_file(example_path)
-            self.logger.info(f"系统提示词（示例部分）加载成功: {example_path} ")
-        else:
-            raise ValueError("系统提示词（示例部分）路径未配置 ")
-        if user_path:
-            self.user_prompt_template = self._load_template_file(user_path)
-            self.logger.info(f"用户提示词模板加载成功: {user_path} ")
-        else:
-            raise ValueError("用户提示词模板路径未配置 ")
+    # 移除_load_prompt_templates方法，因为现在使用插件化Prompt构建器
 
     def _mask_api_key(self, text: str) -> str:
         """对API密钥进行掩码处理"""
@@ -190,55 +163,9 @@ class BaseLLMService(ABC):
         """
         加载模板文件内容
         """
-        try:
-            if not os.path.isabs(template_path):
-                project_root = Path(__file__).parent.parent.parent
-                template_path_abs = project_root / template_path
-            else:
-                template_path_abs = Path(template_path)
+        raise NotImplementedError("模板文件加载功能已移除，现在使用插件化Prompt构建器")
 
-            if not template_path_abs.exists():
-                raise FileNotFoundError(f"模板文件不存在: {template_path_abs}")
-
-            content = template_path_abs.read_text(encoding='utf-8')
-
-            if not content.strip():
-                raise ValueError(f"模板文件为空: {template_path_abs} ")
-            self.logger.debug(f"成功加载模板文件: {template_path_abs} (大小: {len(content)} 字符) ")
-            return content
-
-        except Exception as e:
-            self.logger.error(f"加载模板文件失败 '{template_path}': {e} ")
-            raise
-
-    def _build_system_prompt(self, emotion_schema: str) -> str:
-        """
-        构建系统提示词的内部方法。
-        现在会格式化指令部分，然后拼接静态的示例部分。
-        """
-        if self.system_prompt_instruction_template is None or self.system_prompt_example_template is None:
-            raise RuntimeError("系统提示词模板（指令或示例）未加载。")
-        
-        # 1. 格式化包含变量的指令部分
-        formatted_instruction = self.system_prompt_instruction_template.format(emotion_schema=emotion_schema)
-        
-        # 2. 拼接指令和静态示例，用换行符分隔
-        # 示例模板是静态的，无需格式化
-        full_system_prompt = f"{formatted_instruction}\n\n{self.system_prompt_example_template}"
-        
-        return full_system_prompt
-
-    def _build_user_prompt(self, author: str, title: str, sentences_with_id_json: str) -> str:
-        """
-        构建用户提示词的内部方法 - [修改] 使用 title 替代 rhythmic
-        """
-        if self.user_prompt_template is None:
-            raise RuntimeError("用户提示词模板未加载。 ")
-        return self.user_prompt_template.format(
-            author=author,
-            title=title,
-            sentences_with_id_json=sentences_with_id_json
-        )
+    # 移除_build_system_prompt和_build_user_prompt方法，因为现在使用插件化Prompt构建器
 
     def _generate_sentences_with_id(self, paragraphs: List[str]) -> List[Dict[str, str]]:
         """
@@ -252,15 +179,11 @@ class BaseLLMService(ABC):
         这是服务类提供给外部的核心能力之一。
         [修改] 使用 poem_data.title, poem_data.paragraphs, emotion_schema.text
         """
-        sentences_with_id = self._generate_sentences_with_id(poem_data.paragraphs)
-        sentences_json = json.dumps(sentences_with_id, ensure_ascii=False, indent=2)
-
-        system_prompt = self._build_system_prompt(emotion_schema.text)
-        user_prompt = self._build_user_prompt(
-            author=poem_data.author,
-            title=poem_data.title,
-            sentences_with_id_json=sentences_json
+        # 使用统一的Prompt构建器构建Prompt
+        system_prompt, user_prompt = self.prompt_builder.build_prompts(
+            poem_data, emotion_schema, self.model_config_name
         )
+        
         return system_prompt, user_prompt
 
     @abstractmethod
@@ -412,8 +335,8 @@ class BaseLLMService(ABC):
 
     def validate_response(self, response_text: str, save_full_response: bool = False) -> List[Dict[str, Any]]:
         """
-        [已增强] 使用集成了验证逻辑的解析器，对LLM响应进行原子化的解析与验证。
-        此方法现在完全委托 `llm_response_parser` 来完成所有工作。
+        [已增强] 使用注入的解析器实例，对LLM响应进行原子化的解析与验证。
+        此方法现在完全委托 `self.response_parser` 来完成所有工作。
         解析器会尝试多种策略从文本中提取一个JSON数组，并立即验证其内容
         是否符合业务规范（包含'id', 'primary', 'secondary'等字段和正确类型）。
         在基础验证通过后，再使用自定义校验器根据配置文件进行二次校验。
@@ -427,9 +350,9 @@ class BaseLLMService(ABC):
             LLMServiceResponseError: 如果响应无法被解析，或者解析/校验后的所有内容都不符合规范。
         """
         try:
-            self.logger.debug("开始使用LLMResponseParser统一解析并验证响应...")
-            # 只需要调用一次 parse，它会处理所有解析和验证的复杂逻辑
-            validated_list = llm_response_parser.parse(response_text)
+            self.logger.debug("开始使用注入的解析器统一解析并验证响应...")
+            # 使用实例变量 self.response_parser 而不是全局变量
+            validated_list = self.response_parser.parse(response_text)
             
             # [新增] 在基础验证通过后，进行自定义规则的二次校验
             try:

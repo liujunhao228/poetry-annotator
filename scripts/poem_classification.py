@@ -19,9 +19,8 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# 导入 DataManager 和 get_data_manager
-# 假设 src/data/manager.py 和 src/config/config_manager.py 存在
-from src.data.manager import DataManager, get_data_manager
+# 导入 get_data_manager
+from src.data import get_data_manager
 from src.config import config_manager
 
 
@@ -98,6 +97,7 @@ def classify_poems_data(db_name: str = "default", dry_run: bool = False, config_
     
     # 获取数据管理器
     data_manager = get_data_manager(db_name)
+    # 使用原始数据数据库适配器
     db_adapter = data_manager.db_adapter
     
     # 统计信息
@@ -257,6 +257,7 @@ def reset_pre_classification(db_name: str = "default", dry_run: bool = False, co
     classification_field = global_settings.get('classification_field', 'pre_classification')
 
     data_manager = get_data_manager(db_name)
+    # 使用原始数据数据库适配器
     db_adapter = data_manager.db_adapter
     
     stats = {
@@ -322,6 +323,7 @@ def get_classification_report(db_name: str = "default", config_path: str = None)
     classification_field = global_settings.get('classification_field', 'pre_classification')
 
     data_manager = get_data_manager(db_name)
+    # 使用原始数据数据库适配器
     db_adapter = data_manager.db_adapter
     
     report = {

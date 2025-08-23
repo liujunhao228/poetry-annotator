@@ -81,13 +81,6 @@ class ProjectConfigLoader:
         # 项目提示词配置
         if config.has_section('Prompt'):
             prompt_config = ProjectPromptConfig()
-            prompt_config.template_path = config.get('Prompt', 'template_path', fallback=None)
-            prompt_config.system_prompt_instruction_template = config.get(
-                'Prompt', 'system_prompt_instruction_template', fallback=None)
-            prompt_config.system_prompt_example_template = config.get(
-                'Prompt', 'system_prompt_example_template', fallback=None)
-            prompt_config.user_prompt_template = config.get(
-                'Prompt', 'user_prompt_template', fallback=None)
             prompt_config.config_name = config.get('Prompt', 'config_name', fallback='default')
             project_config.prompt = prompt_config
 
@@ -157,16 +150,6 @@ class ProjectConfigLoader:
         # 提示词配置
         config.add_section('Prompt')
         prompt = project_config.prompt
-        if prompt.template_path:
-            config.set('Prompt', 'template_path', prompt.template_path)
-        if prompt.system_prompt_instruction_template:
-            config.set('Prompt', 'system_prompt_instruction_template',
-                       prompt.system_prompt_instruction_template)
-        if prompt.system_prompt_example_template:
-            config.set('Prompt', 'system_prompt_example_template',
-                       prompt.system_prompt_example_template)
-        if prompt.user_prompt_template:
-            config.set('Prompt', 'user_prompt_template', prompt.user_prompt_template)
         config.set('Prompt', 'config_name', prompt.config_name)
 
         # 模型配置

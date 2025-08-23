@@ -21,8 +21,18 @@ class DatabaseAdapter(ABC):
         pass
     
     @abstractmethod
-    def init_database(self):
-        """初始化数据库表结构"""
+    def init_raw_data_database(self):
+        """初始化原始数据数据库表结构"""
+        pass
+
+    @abstractmethod
+    def init_annotation_database(self):
+        """初始化标注数据数据库表结构"""
+        pass
+
+    @abstractmethod
+    def init_emotion_database(self):
+        """初始化情感分类数据库表结构"""
         pass
     
     @abstractmethod
@@ -103,105 +113,12 @@ class SQLiteAdapter(DatabaseAdapter):
                 raise DatabaseError(f"无法回滚事务: {e}")
 
     def init_database(self):
-        """初始化SQLite数据库表结构"""
-        self.logger.info("开始初始化SQLite数据库...")
-        try:
-            conn = self.connect()
-            cursor = conn.cursor()
-
-            # 创建诗词表 - 兼容title和rhythmic字段
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS poems (
-                    id INTEGER PRIMARY KEY,
-                    title TEXT,
-                    author TEXT,
-                    paragraphs TEXT,
-                    full_text TEXT,
-                    author_desc TEXT,
-                    data_status TEXT DEFAULT 'active',
-                    pre_classification TEXT,
-                    created_at TEXT,
-                    updated_at TEXT
-                )
-            ''')
-
-            # 创建标注结果表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS annotations (
-                    id INTEGER PRIMARY KEY,
-                    poem_id INTEGER,
-                    model_identifier TEXT NOT NULL,
-                    status TEXT NOT NULL CHECK(status IN ('completed', 'failed')),
-                    annotation_result TEXT,
-                    error_message TEXT,
-                    created_at TEXT,
-                    updated_at TEXT,
-                    FOREIGN KEY(poem_id) REFERENCES poems(id)
-                )
-            ''')
-
-            # 创建作者表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS authors (
-                    name TEXT PRIMARY KEY,
-                    description TEXT,
-                    short_description TEXT,
-                    created_at TEXT
-                )
-            ''')
-
-            # 为数据可视化添加额外的表
-            # 情感分类表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS emotion_categories (
-                    id TEXT PRIMARY KEY,
-                    name_zh TEXT NOT NULL,
-                    name_en TEXT,
-                    parent_id TEXT,
-                    level INTEGER NOT NULL,
-                    FOREIGN KEY(parent_id) REFERENCES emotion_categories(id)
-                )
-            ''')
-
-            # 句子标注表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS sentence_annotations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    annotation_id INTEGER NOT NULL,
-                    poem_id INTEGER NOT NULL,
-                    sentence_uid TEXT NOT NULL,
-                    sentence_text TEXT,
-                    FOREIGN KEY(annotation_id) REFERENCES annotations(id) ON DELETE CASCADE
-                )
-            ''')
-
-            # 句子情感链接表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS sentence_emotion_links (
-                    sentence_annotation_id INTEGER NOT NULL,
-                    emotion_id TEXT NOT NULL,
-                    is_primary BOOLEAN NOT NULL,
-                    PRIMARY KEY (sentence_annotation_id, emotion_id),
-                    FOREIGN KEY(sentence_annotation_id) REFERENCES sentence_annotations(id) ON DELETE CASCADE,
-                    FOREIGN KEY(emotion_id) REFERENCES emotion_categories(id)
-                )
-            ''')
-
-            # 创建索引
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_poem_author ON poems(author)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_annotation_poem_model ON annotations(poem_id, model_identifier)')
-            cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS uidx_poem_model ON annotations(poem_id, model_identifier)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_annotation_status ON annotations(status)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_annotation_created_at ON annotations(created_at)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_poem_created_at ON poems(created_at)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_emotion_parent_id ON emotion_categories(parent_id)')
-            cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS uidx_sentence_ref ON sentence_annotations(annotation_id, sentence_uid)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_link_emotion_id ON sentence_emotion_links(emotion_id)')
-
-            conn.commit()
-            self.logger.info("SQLite数据库初始化完成")
-        except sqlite3.Error as e:
-            raise DatabaseError(f"数据库初始化失败: {e}")
+        """初始化SQLite数据库表结构（已废弃，仅保留用于兼容性）"""
+        self.logger.warning("init_database 方法已废弃，请使用 init_raw_data_database, init_annotation_database 或 init_emotion_database")
+        # 为了保持向后兼容，我们可以调用所有三个初始化方法
+        self.init_raw_data_database()
+        self.init_annotation_database()
+        self.init_emotion_database()
             
     def init_raw_data_database(self):
         """初始化原始数据数据库表结构"""

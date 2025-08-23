@@ -17,6 +17,7 @@ from .llm_factory import llm_factory
 from .config import config_manager
 from .label_parser import get_label_parser
 from .annotation_data_logger import AnnotationDataLogger
+from .prompt_builder import prompt_builder
 from .llm_services.schemas import PoemData, EmotionSchema
 
 logger = logging.getLogger(__name__)
@@ -67,10 +68,6 @@ class Annotator:
         """异步初始化方法，用于创建异步LLM服务"""
         self.llm_service = await llm_factory.get_llm_service_async(self.model_identifier)
         logger.info(f"异步初始化完成: 模型配置='{self.model_identifier}'")
-    
-    def _generate_sentences_with_id(self, paragraphs: List[str]) -> List[Dict[str, str]]:
-        """为句子生成ID并构建JSON格式"""
-        return [{"id": f"S{i+1}", "sentence": sentence} for i, sentence in enumerate(paragraphs)]
     
     def _validate_and_transform_response(
         self, 
@@ -167,7 +164,7 @@ class Annotator:
             # self.model_logger.debug(f"诗词ID {poem_id} LLM原始输出: {llm_output_validated}")  # 已注释：不再使用模型特定日志
             logger.debug(f"诗词ID {poem_id} LLM原始输出: {llm_output_validated}")
             
-            sentences_with_id = self._generate_sentences_with_id(poem['paragraphs'])
+            sentences_with_id = self.llm_service._generate_sentences_with_id(poem['paragraphs'])
             final_results = self._validate_and_transform_response(sentences_with_id, llm_output_validated)
             
             # 记录最终结果到模型特定日志

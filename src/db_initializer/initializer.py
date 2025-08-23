@@ -37,6 +37,14 @@ except ImportError:
     sys.path.append(str(Path(__file__).parent.parent))
     from label_parser import get_label_parser
 
+try:
+    from src.db_initializer.plugin_interface import DatabaseInitPluginManager
+except ImportError:
+    # 当作为独立模块运行时
+    import sys
+    sys.path.append(str(Path(__file__).parent))
+    from plugin_interface import DatabaseInitPluginManager
+
 from src.data.exceptions import DatabaseError
 
 
@@ -46,43 +54,56 @@ class DatabaseInitializer:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.db_configs = self._get_database_configs()
+        # 初始化插件管理器
+        self.plugin_manager = DatabaseInitPluginManager(config_manager)
+        # 分离数据库管理器将在初始化时设置
+        self.separate_db_manager = None
         
     def _get_database_configs(self) -> Dict[str, str]:
-        """获取所有数据库配置"""
+        """获取所有主数据库配置名称"""
         db_config = config_manager.get_effective_database_config()
         
-        # 处理新的多数据库配置
+        # 获取所有配置的主数据库名称
         if 'db_paths' in db_config:
-            db_paths = db_config['db_paths']
-            # 确保使用绝对路径
-            resolved_paths = {}
-            for name, path in db_paths.items():
-                if not Path(path).is_absolute():
-                    resolved_paths[name] = str(Path(path).resolve())
-                else:
-                    resolved_paths[name] = path
-            return resolved_paths
+            return {name: "" for name in db_config['db_paths'].keys()}
         # 回退到旧的单数据库配置
         elif 'db_path' in db_config:
-            path = db_config['db_path']
-            if not Path(path).is_absolute():
-                path = str(Path(path).resolve())
-            return {"default": path}
+            return {"default": ""}
         else:
-            raise ValueError("配置文件中未找到数据库路径配置。")
+            # 如果没有主数据库配置，使用全局配置中的separate_db_paths来获取主数据库名称
+            separate_db_config = db_config.get('separate_db_paths', {})
+            if separate_db_config:
+                # 从分离数据库路径中提取主数据库名称
+                main_db_names = set()
+                for path in separate_db_config.values():
+                    # 查找 {main_db_name} 占位符中的名称
+                    if '{main_db_name}' in path:
+                        # 如果使用占位符，我们需要从配置中获取所有可能的主数据库名称
+                        # 这里我们简单地返回一个默认名称
+                        main_db_names.add("default")
+                    else:
+                        # 从路径中提取主数据库名称
+                        parts = path.split('/')
+                        if len(parts) > 2:
+                            main_db_names.add(parts[1])
+                return {name: "" for name in main_db_names}
+            else:
+                return {"default": ""}
     
     def initialize_all_databases(self, clear_existing: bool = False) -> Dict[str, Dict[str, Any]]:
-        """初始化所有配置的数据库"""
+        """初始化所有配置的分离数据库"""
         results = {}
         
-        for db_name, db_path in self.db_configs.items():
+        # 为每个主数据库初始化分离数据库
+        for db_name in self.db_configs.keys():
             try:
-                self.logger.info(f"开始初始化数据库 {db_name} ({db_path})")
-                result = self.initialize_database(db_name, db_path, clear_existing)
+                self.logger.info(f"开始初始化分离数据库结构 for {db_name}")
+                # 使用初始化分离数据库的方法
+                result = self.initialize_separate_databases(clear_existing)
                 results[db_name] = result
-                self.logger.info(f"数据库 {db_name} 初始化完成")
+                self.logger.info(f"分离数据库 {db_name} 初始化完成")
             except Exception as e:
-                self.logger.error(f"初始化数据库 {db_name} 失败: {e}")
+                self.logger.error(f"初始化分离数据库 {db_name} 失败: {e}")
                 results[db_name] = {"error": str(e)}
                 
         return results
@@ -186,6 +207,12 @@ class DatabaseInitializer:
             # 获取针对特定主数据库的分离数据库管理器
             separate_db_manager = get_separate_db_manager(main_db_name=db_name)
             
+            # 设置分离数据库管理器到插件管理器
+            self.separate_db_manager = separate_db_manager
+            self.plugin_manager.set_separate_db_manager(separate_db_manager)
+            # 加载插件
+            self.plugin_manager.load_plugins_from_config()
+            
             # 初始化该主数据库对应的分离数据库
             db_results = separate_db_manager.initialize_all_databases(clear_existing)
             results[db_name] = db_results
@@ -202,18 +229,21 @@ class DatabaseInitializer:
                 if 'emotion' not in db_results:
                     db_results['emotion'] = {"status": "error", "message": str(e)}
             
-            # 如果需要迁移数据，则执行数据迁移
+            # 执行插件的数据库初始化
+            try:
+                plugin_results = self.plugin_manager.initialize_plugins(db_name, clear_existing)
+                # 将插件初始化结果添加到结果中
+                if 'plugins' not in db_results:
+                    db_results['plugins'] = {}
+                db_results['plugins'].update(plugin_results)
+            except Exception as e:
+                self.logger.error(f"为数据库 {db_name} 初始化插件时出错: {e}")
+                if 'plugins' not in db_results:
+                    db_results['plugins'] = {"status": "error", "message": str(e)}
+            
+            # 如果需要迁移数据，则记录警告信息（因为我们已经完全使用分离数据库）
             if migrate_data:
-                try:
-                    from .migration import get_db_migrator
-                    migrator = get_db_migrator()
-                    migration_result = migrator.migrate_database(db_name, self.db_configs[db_name])
-                    # 将迁移结果添加到返回结果中
-                    db_results['migration'] = migration_result
-                except Exception as e:
-                    self.logger.error(f"为数据库 {db_name} 迁移数据时出错: {e}")
-                    if 'migration' not in db_results:
-                        db_results['migration'] = {"status": "error", "message": str(e)}
+                self.logger.warning("迁移数据功能已禁用，因为我们已经完全使用分离数据库")
         
         return results
     
@@ -296,36 +326,19 @@ class DatabaseInitializer:
         }
     
     def get_database_stats(self) -> Dict[str, Dict[str, Any]]:
-        """获取所有数据库的统计信息，包括主数据库和对应的分离数据库"""
+        """获取所有分离数据库的统计信息"""
         stats = {}
         
-        for db_name, db_path in self.db_configs.items():
+        # 为每个主数据库获取分离数据库统计信息
+        for db_name in self.db_configs.keys():
             try:
-                if not Path(db_path).exists():
-                    stats[db_name] = {
-                        "status": "missing",
-                        "message": "数据库文件不存在"
-                    }
-                    continue
-                    
-                db_adapter = get_database_adapter('sqlite', db_path)
+                from ..data.separate_databases import get_separate_db_manager
+                # 获取针对特定主数据库的分离数据库管理器
+                separate_db_manager = get_separate_db_manager(main_db_name=db_name)
                 
-                # 获取表统计信息
-                tables_stats = {}
-                tables = ['poems', 'annotations', 'authors']
-                
-                for table in tables:
-                    try:
-                        rows = db_adapter.execute_query(f"SELECT COUNT(*) FROM {table}")
-                        tables_stats[table] = rows[0][0] if rows else 0
-                    except Exception:
-                        tables_stats[table] = "N/A"
-                
-                stats[db_name] = {
-                    "status": "ok",
-                    "path": db_path,
-                    "tables": tables_stats
-                }
+                # 获取分离数据库统计信息
+                separate_stats = separate_db_manager.get_database_stats()
+                stats[db_name] = separate_stats
             except Exception as e:
                 stats[db_name] = {
                     "status": "error",

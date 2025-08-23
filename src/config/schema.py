@@ -70,6 +70,21 @@ class GlobalCategoriesConfig:
     md_path: str = ""
 
 @dataclass
+class GlobalPluginConfig:
+    """全局插件配置"""
+    enabled_plugins: List[str] = field(default_factory=list)
+    plugin_paths: List[str] = field(default_factory=lambda: ["src/data/plugins"])
+
+@dataclass
+class PluginConfig:
+    """插件配置"""
+    enabled: bool = True
+    module: str = ""
+    class_name: str = ""
+    # 插件特定配置项将通过字典方式访问
+    settings: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
 class GlobalModelConfigTemplate:
     """全局模型配置模板 (定义可用模型配置的通用字段)"""
     provider: str = ""
@@ -80,9 +95,6 @@ class GlobalModelConfigTemplate:
     temperature: float = 1.0
     max_tokens: int = 1000
     timeout: int = 30
-    system_prompt_instruction_template: str = "config/system_prompt_instruction.txt"
-    system_prompt_example_template: str = "config/system_prompt_example.txt"
-    user_prompt_template: str = "config/user_prompt_template.txt"
     # 可以添加更多通用字段...
 
 # --- 全局规则配置 (Global Rule Configuration) ---
@@ -146,11 +158,6 @@ class ProjectPromptConfig:
     """项目提示词配置"""
     # 指定要使用的提示词配置名称（来自GlobalPromptConfig.available_configs）
     config_name: str = "default"
-    # 或者直接指定提示词模板路径 (可选，优先级高于config_name)
-    template_path: Optional[str] = None
-    system_prompt_instruction_template: Optional[str] = None
-    system_prompt_example_template: Optional[str] = None
-    user_prompt_template: Optional[str] = None
 
 @dataclass
 class ProjectLoggingConfig:
@@ -201,6 +208,8 @@ class GlobalConfig:
     visualizer: GlobalVisualizerConfig = field(default_factory=GlobalVisualizerConfig)
     # 新增 Categories 配置
     categories: GlobalCategoriesConfig = field(default_factory=GlobalCategoriesConfig)
+    # 新增 Plugin 配置
+    plugins: GlobalPluginConfig = field(default_factory=GlobalPluginConfig)
     model_template: GlobalModelConfigTemplate = field(default_factory=GlobalModelConfigTemplate)
     validation: GlobalValidationRuleSet = field(default_factory=GlobalValidationRuleSet)
     preprocessing: GlobalPreprocessingRuleSet = field(default_factory=GlobalPreprocessingRuleSet)

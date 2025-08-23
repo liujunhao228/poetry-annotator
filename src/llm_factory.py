@@ -7,6 +7,7 @@ from .llm_services.siliconflow_service import SiliconFlowService
 from .llm_services.gemini_service import GeminiService
 from .llm_services.openai_service import OpenAIService
 from .llm_services.dashscope_adapter import DashScopeAdapter
+from .llm_response_parser import ILLMResponseParser, LLMResponseParser
 
 from pybreaker import CircuitBreaker
 
@@ -22,6 +23,11 @@ class LLMFactory:
             'openai': OpenAIService,
             'dashscope': DashScopeAdapter,  # 使用适配器
             # 未来可以添加更多提供商
+        }
+        # 可能需要一个解析器类的映射（如果支持多种解析器）
+        self.parser_classes: Dict[str, type[ILLMResponseParser]] = {
+            'default': LLMResponseParser,
+            # 'advanced': MyAdvancedParser, # 示例：未来可添加更多解析器类型
         }
         # --- 熔断器管理 ---
         self.breakers: Dict[str, CircuitBreaker] = {}
@@ -49,6 +55,27 @@ class LLMFactory:
             self.logger.info(f"为模型 '{config_name}' 创建了新的熔断器实例。")
         return self.breakers[config_name]
     
+    def _create_response_parser(self, config_name: str, model_config: Dict[str, Any]) -> ILLMResponseParser:
+        """根据模型配置创建响应解析器实例"""
+        parser_type = model_config.get('response_parser', 'default') # 默认使用 'default'
+        parser_class = self.parser_classes.get(parser_type.lower())
+        
+        if not parser_class:
+            supported_parsers = list(self.parser_classes.keys())
+            self.logger.warning(f"模型配置 '{config_name}' 指定了不支持的解析器类型 '{parser_type}'。支持的类型: {supported_parsers}。将使用默认解析器。")
+            parser_class = LLMResponseParser # 回退到默认解析器
+        
+        try:
+            parser_instance = parser_class()
+            self.logger.info(f"为模型 '{config_name}' 成功创建了解析器实例: {parser_class.__name__}")
+            return parser_instance
+        except Exception as e:
+            self.logger.error(f"为模型 '{config_name}' 创建解析器实例 '{parser_class.__name__}' 失败: {e}")
+            # 回退到默认解析器实例
+            default_parser = LLMResponseParser()
+            self.logger.info("回退到默认解析器实例。")
+            return default_parser
+
     def get_llm_service(self, config_name: str) -> BaseLLMService:
         """
         根据模型配置别名创建LLM服务实例
@@ -66,10 +93,15 @@ class LLMFactory:
                 supported_providers = list(self.providers.keys())
                 raise ValueError(f"不支持的提供商: {provider}。支持的提供商: {supported_providers}")
             
+            # --- 新增: 创建解析器实例 ---
+            response_parser_instance = self._create_response_parser(config_name, model_config)
+            
             service_class = self.providers[provider]
+            # --- 修改: 传递解析器实例 ---
             service = service_class(
                 config=model_config,
-                model_config_name=config_name
+                model_config_name=config_name,
+                response_parser=response_parser_instance # 传递解析器实例
             )
             
             self.logger.info(f"成功创建 {provider} 服务实例, 配置: {config_name}, 模型: {service.model}")
@@ -117,10 +149,15 @@ class LLMFactory:
                 supported_providers = list(self.providers.keys())
                 raise ValueError(f"不支持的提供商: {provider}。支持的提供商: {supported_providers}")
             
+            # --- 新增: 创建解析器实例 ---
+            response_parser_instance = self._create_response_parser(config_name, model_config)
+            
             service_class = self.providers[provider]
+            # --- 修改: 传递解析器实例 ---
             service = service_class(
                 config=model_config,
-                model_config_name=config_name
+                model_config_name=config_name,
+                response_parser=response_parser_instance # 传递解析器实例
             )
             
             self.logger.info(f"成功创建 {provider} 服务实例, 配置: {config_name}, 模型: {service.model}")

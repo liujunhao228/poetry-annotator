@@ -9,13 +9,13 @@ from typing import List, Generator
 
 # 确保能正确导入项目模块
 try:
-    from src.data.manager import DataManager
+    from src.data import get_data_manager
     from src.config import config_manager
     from src.logging_config import setup_default_logging, get_logger
 except ImportError:
     project_root = Path(__file__).resolve().parent.parent
     sys.path.insert(0, str(project_root))
-    from src.data.manager import DataManager
+    from src.data import get_data_manager
     from src.config import config_manager
     from src.logging_config import setup_default_logging, get_logger
 
@@ -57,18 +57,18 @@ def read_ids_in_chunks(file_path: str, chunk_size: int = 5000) -> Generator[List
         raise
 
 
-def proofread_annotations(db_path: str, id_file_path: str, model_identifier: str, 
+def proofread_annotations(db_name: str, id_file_path: str, model_identifier: str, 
                           output_dir: str, chunk_size: int):
     """
     校对诗词标注状态的主函数。
     """
     logger.info("校对任务开始...")
-    logger.info(f"数据库: {db_path}")
+    logger.info(f"数据库: {db_name}")
     logger.info(f"ID文件: {id_file_path}")
     logger.info(f"校对模型: '{model_identifier}'")
     logger.info(f"查询批次大小: {chunk_size}")
 
-    dm = DataManager(db_path)
+    dm = get_data_manager(db_name)
     
     # 初始化集合来存储所有ID
     all_target_ids = set()
@@ -158,15 +158,8 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     
-    # 尝试从配置中获取默认数据库路径
-    default_db_path = None
-    try:
-        default_db_path = config_manager.get_database_config()['db_path']
-    except Exception:
-        pass
-
-    parser.add_argument('--db-path', type=str, default=default_db_path,
-                        help="SQLite数据库文件路径。如果未提供，则尝试从config.ini读取。")
+    parser.add_argument('--db-name', type=str, default="default",
+                        help="数据库名称。")
     parser.add_argument('--id-file', type=str, required=True,
                         help="包含待校对诗词ID的文本文件路径（每行一个ID）。")
     parser.add_argument('--model', type=str, required=True,
@@ -178,11 +171,8 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
-    if not args.db_path:
-        parser.error("未能从config.ini获取数据库路径，请使用 --db-path 手动指定。")
-
     proofread_annotations(
-        db_path=args.db_path,
+        db_name=args.db_name,
         id_file_path=args.id_file,
         model_identifier=args.model,
         output_dir=args.output_dir,

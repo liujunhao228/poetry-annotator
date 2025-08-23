@@ -25,13 +25,12 @@ if str(project_root) not in sys.path:
 
 # 初始化全局变量
 config_manager = None
-DataManager = None
 
 try:
     from src.config import config_manager
-    from src.data.manager import DataManager
+    from src.data import get_data_manager
 except ImportError as e:
-    print(f"警告：无法导入 config_manager 或 DataManager: {e}")
+    print(f"警告：无法导入 config_manager 或 get_data_manager: {e}")
     print("请确保此脚本位于项目根目录，并且 `src` 目录在 python path 中。")
 
 # --- 配置区 ---
@@ -242,7 +241,7 @@ def find_poem_id_for_annotation(cursor: sqlite3.Cursor, annotation_block: List[D
     return None
 
 
-def process_single_log(log_path: Path, dry_run: bool, db_path: str) -> Dict[str, int]:
+def process_single_log(log_path: Path, dry_run: bool, db_name: str) -> Dict[str, int]:
     logging.info("-" * 80)
     logging.info(f"开始处理日志文件: {log_path.name}")
     cache_dir = Path(DEFAULT_CACHE_DIR)
@@ -251,17 +250,15 @@ def process_single_log(log_path: Path, dry_run: bool, db_path: str) -> Dict[str,
     if not valid_log_entries:
         logging.warning("未能从该文件中提取任何有效日志条目。")
         return {'recovered': 0, 'unmatched': 0, 'saved': 0, 'failed_save': 0}
-    if DataManager is None:
-        logging.error("DataManager 模块未成功加载。无法继续执行数据库操作。")
-        return {'recovered': 0, 'unmatched': len(valid_log_entries), 'saved': 0, 'failed_save': 0}
     try:
-        # 从数据库路径推断数据库名称
-        db_name = Path(db_path).stem
-        dm = DataManager(db_name=db_name)
-        conn = sqlite3.connect(db_path)
+        # 获取数据管理器
+        dm = get_data_manager(db_name=db_name)
+        # 使用原始数据数据库适配器查询 poems 表
+        poems_db_adapter = dm.db_adapter
+        conn = poems_db_adapter.connect()
         cursor = conn.cursor()
     except Exception as e:
-        logging.error(f"连接数据库 '{db_path}' 或实例化DataManager失败: {e}")
+        logging.error(f"获取数据管理器 '{db_name}' 或连接数据库失败: {e}")
         return {'recovered': 0, 'unmatched': len(valid_log_entries), 'saved': 0, 'failed_save': 0}
     
     recovered_data: Dict[int, Dict[str, Any]] = {} # poem_id -> log_entry
@@ -314,29 +311,12 @@ def process_single_log(log_path: Path, dry_run: bool, db_path: str) -> Dict[str,
 @click.command(context_settings=dict(help_option_names=['-h', '--help']))
 @click.option('--file', 'log_file_path', type=click.Path(exists=True, dir_okay=False, resolve_path=True), help='要处理的单个日志文件路径。')
 @click.option('--dir', 'log_dir_path', type=click.Path(exists=True, file_okay=False, resolve_path=True), help='包含日志文件 (*.log) 的目录路径。')
-@click.option('--db-path', 'db_path_override', type=click.Path(dir_okay=False), help='手动指定数据库文件路径，覆盖配置文件中的设置。')
+@click.option('--db-name', 'db_name', default="default", help='数据库名称。')
 @click.option('--write', 'dry_run', is_flag=True, default=True, help='使用此标志以实际写入数据库。默认为试运行（不写入）。')
-def cli(log_file_path, log_dir_path, db_path_override, dry_run):
+def cli(log_file_path, log_dir_path, db_name, dry_run):
     """
     从日志文件或目录中恢复标注数据并导入数据库。
     """
-    db_path = db_path_override
-    if not db_path:
-        if config_manager:
-            try:
-                db_path = config_manager.get_database_config()['db_path']
-                logging.info(f"从配置文件加载数据库路径: {db_path}")
-            except Exception:
-                db_path = './poetry.db'
-                logging.warning(f"无法从配置加载，使用默认数据库路径: {db_path}")
-        else:
-            db_path = './poetry.db'
-            logging.warning(f"ConfigManager未加载，使用默认数据库路径: {db_path}")
-
-    if not Path(db_path).is_file():
-        logging.error(f"数据库文件未找到: {db_path}")
-        logging.error("请确保路径正确，或使用 --db-path 指定。如果数据库尚未创建，请先运行主程序进行初始化。")
-        return
         
     if not log_file_path and not log_dir_path:
         raise click.UsageError("错误: 必须提供 '--file' 或 '--dir' 参数之一。")
@@ -353,14 +333,14 @@ def cli(log_file_path, log_dir_path, db_path_override, dry_run):
             return
 
     logging.info(f"将要处理 {len(files_to_process)} 个日志文件。")
-    logging.info(f"数据库路径: '{db_path}'")
+    logging.info(f"数据库名称: '{db_name}'")
     if dry_run:
         logging.warning("!!! 当前为[试运行 DRY RUN]模式，不会向数据库写入任何数据。要实际写入，请使用 --write 标志。!!!")
 
     total_stats = {'recovered': 0, 'unmatched': 0, 'saved': 0, 'failed_save': 0}
 
     for log_path in files_to_process:
-        stats = process_single_log(log_path, dry_run, db_path)
+        stats = process_single_log(log_path, dry_run, db_name)
         for key in total_stats:
             total_stats[key] += stats[key]
 

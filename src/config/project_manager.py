@@ -6,7 +6,7 @@ import os
 import json
 from typing import Dict, Any, List, Optional
 
-from src.config.metadata import load_config_metadata
+from src.config.config_metadata import load_config_metadata
 
 
 class ProjectConfigManager:

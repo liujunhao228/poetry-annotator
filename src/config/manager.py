@@ -6,14 +6,15 @@ import os
 from typing import Dict, Any, Optional, List
 import json
 
-from src.config.schema import GlobalConfig, ProjectConfig
+from src.config.config_schema import GlobalConfig, ProjectConfig, GlobalPluginConfig, PluginConfig
 from src.config.metadata import load_config_metadata
-from src.config.global_loader import GlobalConfigLoader
-from src.config.project_loader import ProjectConfigLoader
+from src.config.global_config_loader import GlobalConfigLoader
+from src.config.project_config_loader import ProjectConfigLoader
 from src.config.project_manager import ProjectConfigManager
 from src.config.rules_loader import RulesLoader
 from src.config.model_manager import ModelManager
 from src.config.validator import ConfigValidator
+from src.config.plugin_loader import PluginConfigLoader
 
 
 class ConfigManager:
@@ -58,6 +59,7 @@ class ConfigManager:
         self.rules_loader = RulesLoader(self.config_metadata)
         self.model_manager = ModelManager(self.global_config_path)
         self.validator = ConfigValidator(self.global_config_path)
+        self.plugin_loader = PluginConfigLoader(self.global_config_path)
 
         # 加载配置
         self._load_global_config()
@@ -200,27 +202,8 @@ class ConfigManager:
 
     def get_effective_prompt_config(self) -> Dict[str, str]:
         """获取生效的提示词配置"""
-        if not self.project_config:
-            # 只有全局配置
-            return self.global_loader._get_global_prompt_config()
-
-        # 优先使用项目配置
-        project_prompt = self.project_config.prompt
-        if (project_prompt.template_path and
-                project_prompt.system_prompt_instruction_template and
-                project_prompt.system_prompt_example_template and
-                project_prompt.user_prompt_template):
-            # 项目配置中直接指定了路径
-            return {
-                'template_path': project_prompt.template_path,
-                'system_prompt_instruction_template': project_prompt.system_prompt_instruction_template,
-                'system_prompt_example_template': project_prompt.system_prompt_example_template,
-                'user_prompt_template': project_prompt.user_prompt_template
-            }
-        else:
-            # 使用项目配置中指定的配置名称，在全局配置中查找
-            config_name = project_prompt.config_name
-            return self._get_global_prompt_config_by_name(config_name)
+        # 不再使用模板文件，返回空配置
+        return {}
 
     def _get_global_prompt_config_by_name(self, config_name: str) -> Dict[str, str]:
         """根据配置名称获取全局提示词配置"""
@@ -311,6 +294,14 @@ class ConfigManager:
             'md_path': config.get('Categories', 'md_path',
                                   fallback='config/中国古典诗词情感分类体系.md')
         }
+        
+    def get_global_plugin_config(self) -> GlobalPluginConfig:
+        """获取全局插件配置"""
+        return self.plugin_loader.load_global_plugin_config()
+    
+    def get_plugin_config(self, plugin_name: str) -> PluginConfig:
+        """获取特定插件配置"""
+        return self.plugin_loader.load_plugin_config(plugin_name)
 
     def get_all_config(self) -> Dict[str, Any]:
         """获取所有配置（用于调试和展示）"""
@@ -485,7 +476,8 @@ class ConfigManager:
 
     def get_prompt_config(self) -> Dict[str, str]:
         """获取提示词配置（旧版本兼容接口）"""
-        return self.get_effective_prompt_config()
+        # 不再使用模板文件，返回空配置
+        return {}
 
     def get_model_prompt_config(self, model_name: str) -> Dict[str, str]:
         """
@@ -497,21 +489,8 @@ class ConfigManager:
         Returns:
             包含模型特定提示词模板配置的字典
         """
-        # 获取全局默认配置
-        global_config = self.get_prompt_config()
-        
-        # 获取模型特定配置
-        model_config = self.get_model_config(model_name)
-        
-        # 合并配置，模型特定配置优先
-        prompt_config = {
-            'template_path': model_config.get('template_path', global_config['template_path']),
-            'system_prompt_instruction_template': model_config.get('system_prompt_instruction_template', global_config['system_prompt_instruction_template']),
-            'system_prompt_example_template': model_config.get('system_prompt_example_template', global_config['system_prompt_example_template']),
-            'user_prompt_template': model_config.get('user_prompt_template', global_config['user_prompt_template'])
-        }
-        
-        return prompt_config
+        # 不再使用模板文件，返回空配置
+        return {}
 
     def get_visualizer_config(self) -> Dict[str, Any]:
         """获取数据可视化配置（旧版本兼容接口）"""

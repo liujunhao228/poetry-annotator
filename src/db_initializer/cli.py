@@ -43,7 +43,7 @@ def main():
     parser.add_argument(
         "--migrate-data",
         action="store_true",
-        help="迁移数据到分离数据库（仅在初始化分离数据库时有效）"
+        help="迁移数据到分离数据库（已废弃，因为我们已经完全使用分离数据库）"
     )
     parser.add_argument(
         "--stats",
@@ -76,7 +76,8 @@ def main():
     if args.init_separate:
         # 初始化分离数据库
         print("\n开始初始化分离数据库...")
-        separate_results = db_initializer.initialize_separate_databases(args.clear_existing, args.migrate_data)
+        # 忽略 migrate_data 参数，因为我们已经完全使用分离数据库
+        separate_results = db_initializer.initialize_separate_databases(args.clear_existing, False)
         
         print("\n分离数据库初始化结果:")
         for db_name, db_results in separate_results.items():
@@ -85,18 +86,6 @@ def main():
                 status = result.get('status', 'unknown') if isinstance(result, dict) else 'unknown'
                 message = result.get('message', '') if isinstance(result, dict) else str(result)
                 print(f"    {sub_db_name}: {status} - {message}")
-                
-                # 如果有迁移结果，也显示出来
-                if sub_db_name == 'migration' and isinstance(result, dict):
-                    print(f"      迁移详情:")
-                    details = result.get('details', {})
-                    for detail_name, detail_result in details.items():
-                        detail_status = detail_result.get('status', 'unknown') if isinstance(detail_result, dict) else 'unknown'
-                        print(f"        {detail_name}: {detail_status}")
-                        if isinstance(detail_result, dict):
-                            for key, value in detail_result.items():
-                                if key != 'status':
-                                    print(f"          {key}: {value}")
                 
     if args.stats:
         # 显示数据库统计信息

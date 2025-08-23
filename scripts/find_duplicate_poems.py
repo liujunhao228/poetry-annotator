@@ -1,4 +1,3 @@
-import sqlite3
 import json
 import logging
 import argparse
@@ -12,29 +11,12 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from src.data import get_data_manager
-from src.config import config_manager
 
 # 配置日志记录
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-def get_db_path_by_name(db_name):
-    """
-    根据数据库名称获取数据库路径
-    """
-    db_config = config_manager.get_database_config()
-    if 'db_paths' in db_config:
-        db_paths = db_config['db_paths']
-        if db_name in db_paths:
-            return db_paths[db_name]
-        else:
-            raise ValueError(f"数据库 '{db_name}' 未在配置中定义。")
-    elif 'db_path' in db_config and db_name == "default":
-        return db_config['db_path']
-    else:
-        raise ValueError(f"无法找到数据库 '{db_name}' 的配置。")
-
-def find_duplicate_full_text_groups(db_path: str) -> List[Dict[str, Any]]:
+def find_duplicate_full_text_groups(db_name: str = "default") -> List[Dict[str, Any]]:
     """
     在数据库中查找 full_text 字段内容相同的诗词ID组。
 
@@ -43,13 +25,18 @@ def find_duplicate_full_text_groups(db_path: str) -> List[Dict[str, Any]]:
     和处理最终的、已经分组好的结果，而不是将整个表加载到内存中。
 
     Args:
-        db_path (str): SQLite 数据库文件的路径。
+        db_name (str): 数据库名称。
 
     Returns:
         List[Dict[str, Any]]: 一个包含重复项信息的列表。每个字典代表一个重复组，
                                包含 'ids' (ID列表) 和 'text_preview' (文本预览)。
     """
-    logging.info(f"开始在数据库 '{db_path}' 中查找重复的 full_text 内容...")
+    logging.info(f"开始在数据库 '{db_name}' 中查找重复的 full_text 内容...")
+    
+    # 获取数据管理器
+    data_manager = get_data_manager(db_name)
+    # 使用原始数据数据库适配器
+    db_adapter = data_manager.db_adapter
     
     # SQL 查询:
     # 1. GROUP BY full_text: 将具有相同 full_text 内容的行分为一组。
@@ -71,17 +58,12 @@ def find_duplicate_full_text_groups(db_path: str) -> List[Dict[str, Any]]:
     """
 
     duplicate_groups = []
-    conn = None
     try:
-        # 连接到数据库
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
         logging.info("正在执行查询，这可能需要一些时间，具体取决于数据库大小...")
-        cursor.execute(query)
+        rows = db_adapter.execute_query(query)
 
         # 逐行处理查询结果，避免一次性加载所有结果到内存
-        for row in cursor:
+        for row in rows:
             ids_str, full_text = row
             
             # 将逗号分隔的ID字符串转换为整数列表
@@ -97,14 +79,10 @@ def find_duplicate_full_text_groups(db_path: str) -> List[Dict[str, Any]]:
             })
             logging.debug(f"发现重复组: IDs {id_list} - 文本: {text_preview_cleaned}")
 
-    except sqlite3.Error as e:
+    except Exception as e:
         logging.error(f"数据库操作失败: {e}")
         # 如果出现问题，返回空列表
         return []
-    finally:
-        if conn:
-            conn.close()
-            logging.info("数据库连接已关闭。")
 
     return duplicate_groups
 
@@ -117,13 +95,9 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
-        '--db-path',
-        type=str,
-        help='数据库文件的路径。'
-    )
-    parser.add_argument(
         '--db-name',
         type=str,
+        default="default",
         help='数据库名称（从配置文件中获取路径）。'
     )
     parser.add_argument(
@@ -135,21 +109,8 @@ def main():
 
     args = parser.parse_args()
     
-    # 处理数据库路径
-    if args.db_name:
-        try:
-            db_path = get_db_path_by_name(args.db_name)
-        except ValueError as e:
-            logging.error(f"数据库设置错误: {e}")
-            return
-    elif args.db_path:
-        db_path = args.db_path
-    else:
-        # 使用默认数据库
-        data_manager = get_data_manager()
-        db_path = data_manager.db_path
-
-    groups = find_duplicate_full_text_groups(db_path)
+    # 查找重复组
+    groups = find_duplicate_full_text_groups(args.db_name)
 
     if groups:
         logging.info(f"查询完成！总共找到 {len(groups)} 个内容重复的组。")

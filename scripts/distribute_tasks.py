@@ -36,30 +36,13 @@ import threading
 
 # [修改] 导入新的日志配置模块
 from src.config import config_manager
-from src.data.manager import DataManager, get_data_manager
+from src.data import get_data_manager
 from src.annotator import Annotator
 from src.logging_config import setup_default_logging, get_logger
 from src.utils.health_checker import health_checker
 from src.llm_factory import llm_factory
 
 logger = get_logger(__name__)
-
-
-def get_db_path_by_name(db_name):
-    """
-    根据数据库名称获取数据库路径
-    """
-    db_config = config_manager.get_effective_database_config()
-    if 'db_paths' in db_config:
-        db_paths = db_config['db_paths']
-        if db_name in db_paths:
-            return db_paths[db_name]
-        else:
-            raise ValueError(f"数据库 '{db_name}' 未在配置中定义。")
-    elif 'db_path' in db_config and db_name == "default":
-        return db_config['db_path']
-    else:
-        raise ValueError(f"无法找到数据库 '{db_name}' 的配置。")
 
 
 class ProgressManager:
@@ -354,7 +337,6 @@ def cli(model, all_models, id_file, id_dir, force_rerun, chunk_size, fresh_start
     # 设置数据库
     if db:
         try:
-            db_path = get_db_path_by_name(db)
             # 更新全局数据管理器实例以使用指定的数据库
             get_data_manager(db_name=db)
         except ValueError as e:

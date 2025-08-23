@@ -2,6 +2,7 @@
 针对不支持JSON输出的模型进行健壮解析
 """
 
+from abc import ABC, abstractmethod
 import json
 import re
 from typing import Any, List, Dict, Optional
@@ -16,6 +17,22 @@ try:
     import json5
 except ImportError:
     json5 = None # 如果未安装，优雅地处理
+
+class ILLMResponseParser(ABC):
+    """LLM响应解析器接口"""
+    
+    @abstractmethod
+    def parse(self, text: str) -> List[Dict[str, Any]]:
+        """
+        从字符串中解析出经过内容验证的JSON数组。
+        Args:
+            text: LLM返回的原始文本。
+        Returns:
+            一个经过完全验证的、包含标注信息的字典列表。
+        Raises:
+            ValueError, TypeError: 如果解析或验证失败。
+        """
+        pass
 
 class LLMResponseParser:
     """

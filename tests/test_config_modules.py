@@ -64,10 +64,6 @@ md_path = config/label/中国古典诗词主题分类体系.md
 xml_path = config/label/emotion_categories.xml
 
 [Prompt]
-template_path = config/prompt/prompt_template.txt
-system_prompt_instruction_template = config/prompt/system_prompt_instruction.txt
-system_prompt_example_template = config/prompt/system_prompt_example.txt
-user_prompt_template = config/prompt/user_prompt_template.txt
 
 [Logging]
 console_log_level = DEBUG
@@ -91,9 +87,6 @@ request_delay = 2.0
 temperature = 0.8
 max_tokens = 2000
 timeout = 60
-system_prompt_instruction_template = config/system_prompt_instruction.txt
-system_prompt_example_template = config/system_prompt_example.txt
-user_prompt_template = config/user_prompt_template.txt
 """
         with open(self.global_config_path, 'w', encoding='utf-8') as f:
             f.write(global_config_content)
@@ -111,10 +104,6 @@ output_dir = data/output
 
 [Prompt]
 config_name = default
-template_path = config/prompt/prompt_template.txt
-system_prompt_instruction_template = config/prompt/system_prompt_instruction.txt
-system_prompt_example_template = config/prompt/system_prompt_example.txt
-user_prompt_template = config/prompt/user_prompt_template.txt
 
 [Model]
 model_names = TestModel

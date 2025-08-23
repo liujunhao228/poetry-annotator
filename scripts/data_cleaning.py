@@ -19,7 +19,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.data.manager import DataManager, get_data_manager
+from src.data import get_data_manager
 from src.config import config_manager
 
 # --- 新增：配置加载函数 ---
@@ -67,6 +67,7 @@ def clean_poems_data(db_name: str = "default", dry_run: bool = False, config_pat
     
     # 获取数据管理器
     data_manager = get_data_manager(db_name)
+    # 使用原始数据数据库适配器
     db_adapter = data_manager.db_adapter
     
     # 统计信息
@@ -279,6 +280,7 @@ def reset_data_status(db_name: str = "default", dry_run: bool = False, config_pa
     
     # 获取数据管理器
     data_manager = get_data_manager(db_name)
+    # 使用原始数据数据库适配器
     db_adapter = data_manager.db_adapter
     
     stats = {
@@ -339,6 +341,7 @@ def get_cleaning_report(db_name: str = "default", config_path: str = None) -> di
     
     # 获取数据管理器
     data_manager = get_data_manager(db_name)
+    # 使用原始数据数据库适配器
     db_adapter = data_manager.db_adapter
     
     report = {

@@ -1,0 +1,36 @@
+# config/projects/tangshi/project_cleaning_rules.yaml
+
+# 项目特定的清洗规则
+rules:
+  # 缺字检查
+  tangshi_missing_char:
+    enabled: true
+    symbols: ["□", "○"]
+    fields: ["title", "author", "full_text"]
+    status: "missing_char"
+
+  # 空内容检查
+  tangshi_empty_content:
+    enabled: true
+    punctuation_to_clean: "，。、；：？！\"'（）【】《》〈〉〔〕［］｛｝…—–·〃々〇〉〈〔〕［］｛｝｟｠〖〗〘〙〚〛.,;:?!\"'()[]{}-_=+*/\\|~`@#$%^&"
+    fields: ["full_text"]
+    status: "empty_content"
+
+  # 可疑符号检查
+  tangshi_suspicious_symbols:
+    enabled: true
+    symbols: ["【】《》〈〉〔〕［］｛｝…—–·〃々〇〉〈〔〕［］｛｝｟｠〖〗〘〙〚〛"]
+    fields: ["title", "full_text"]
+    bracket_patterns:
+      - '（([^）]*)）'  # 中文括号（全角）
+      - '(([^)]*))'   # 英文括号（半角）
+      - '【([^】]*)】'  # 中文方括号
+      - '[([^\\]]*)\\]'  # 英文方括号
+      - '《([^》]*)》'  # 中文书名号
+      - '<([^>]*)>'     # 英文尖括号
+    status: "suspicious"
+
+# 全局设置
+global_settings:
+  # 默认检查的字段（如果规则中未指定 fields）
+  default_check_fields: ["title", "author", "full_text"]

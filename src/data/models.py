@@ -97,6 +97,33 @@ class Author:
 
 
 @dataclass
+class StrategyCategory:
+    """策略分类模型"""
+    id: str
+    name_zh: str
+    name_en: Optional[str]
+    category_type: str  # relationship_action, emotional_strategy, communication_scene, risk_level
+    parent_id: Optional[str]
+    level: int
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'StrategyCategory':
+        """从字典创建StrategyCategory实例"""
+        return cls(**data)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'name_zh': self.name_zh,
+            'name_en': self.name_en,
+            'category_type': self.category_type,
+            'parent_id': self.parent_id,
+            'level': self.level
+        }
+
+
+@dataclass
 class Annotation:
     """标注数据模型"""
     id: Optional[int]
@@ -124,4 +151,29 @@ class Annotation:
             'error_message': self.error_message,
             'created_at': self.created_at,
             'updated_at': self.updated_at
+        }
+
+
+@dataclass
+class SentenceAnnotation:
+    """句子标注模型"""
+    id: Optional[int]
+    annotation_id: int
+    poem_id: int
+    sentence_uid: str
+    sentence_text: str
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'SentenceAnnotation':
+        """从字典创建SentenceAnnotation实例"""
+        return cls(**data)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'annotation_id': self.annotation_id,
+            'poem_id': self.poem_id,
+            'sentence_uid': self.sentence_uid,
+            'sentence_text': self.sentence_text
         }
