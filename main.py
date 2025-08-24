@@ -16,7 +16,7 @@ if str(project_root) not in sys.path:
 
 # 使用绝对导入方式
 from src.main import cli
-from src.data import get_db_initializer
+from src.db_initializer import get_db_initializer
 
 def main():
     # 创建参数解析器
@@ -54,12 +54,17 @@ def main():
     if args.mode == "init-db":
         # 初始化数据库模式
         print("开始初始化数据库...")
+        from src.db_initializer import get_db_initializer
         db_initializer = get_db_initializer()
+        
+        # 初始化主数据库
         results = db_initializer.initialize_all_databases()
         
-        print("\n数据库初始化结果:")
+        print("\n主数据库初始化结果:")
         for db_name, result in results.items():
-            print(f"  {db_name}: {result.get('status', 'unknown')} - {result.get('message', '')}")
+            status = result.get('status', 'unknown') if isinstance(result, dict) else 'unknown'
+            message = result.get('message', '') if isinstance(result, dict) else str(result)
+            print(f"  {db_name}: {status} - {message}")
             
         # 初始化分离的数据库结构
         print("\n开始初始化分离的数据库结构...")
@@ -75,46 +80,35 @@ def main():
             
         # 导入数据
         print("\n开始导入数据...")
-        from src.data import initialize_all_databases_from_source_folders
+        from src.db_initializer.functions import initialize_all_databases_from_source_folders
         import_results = initialize_all_databases_from_source_folders()
         
         print("\n数据导入结果:")
         for db_name, result in import_results.items():
-            print(f"  {db_name}: authors={result.get('authors', 0)}, poems={result.get('poems', 0)}")
+            if 'error' in result:
+                print(f"  {db_name}: 错误 - {result['error']}")
+            else:
+                print(f"  {db_name}: authors={result.get('authors', 0)}, poems={result.get('poems', 0)}")
             
+        # 显示数据库统计信息
         print("\n数据库统计信息:")
         stats = db_initializer.get_database_stats()
         for db_name, stat in stats.items():
-            print(f"  {db_name}:")
-            print(f"    状态: {stat.get('status', 'unknown')}")
-            if stat.get('status') == 'ok':
-                print(f"    路径: {stat.get('path', 'N/A')}")
-                tables = stat.get('tables', {})
-                for table, count in tables.items():
-                    print(f"    {table}: {count} 条记录")
-            else:
-                print(f"    信息: {stat.get('message', 'N/A')}")
-                
-        # 显示分离数据库的统计信息
-        print("\n分离数据库统计信息:")
-        from src.data.initializer import get_db_initializer
-        db_initializer = get_db_initializer()
-        # 为每个主数据库显示对应的分离数据库统计信息
-        for db_name in db_initializer.db_configs.keys():
             print(f"  {db_name} 对应的分离数据库:")
-            from src.data.separate_databases import get_separate_db_manager
-            separate_db_manager = get_separate_db_manager(main_db_name=db_name)
-            separate_stats = separate_db_manager.get_database_stats()
-            for sub_db_name, stat in separate_stats.items():
-                print(f"    {sub_db_name}:")
-                print(f"      状态: {stat.get('status', 'unknown')}")
-                if stat.get('status') == 'ok':
-                    print(f"      路径: {stat.get('path', 'N/A')}")
-                    tables = stat.get('tables', {})
-                    for table, count in tables.items():
-                        print(f"      {table}: {count} 条记录")
-                else:
-                    print(f"      信息: {stat.get('message', 'N/A')}")
+            if isinstance(stat, dict):
+                for sub_db_name, sub_stat in stat.items():
+                    print(f"    {sub_db_name}:")
+                    status = sub_stat.get('status', 'unknown') if isinstance(sub_stat, dict) else 'unknown'
+                    print(f"      状态: {status}")
+                    if status == 'ok' and isinstance(sub_stat, dict):
+                        print(f"      路径: {sub_stat.get('path', 'N/A')}")
+                        tables = sub_stat.get('tables', {})
+                        for table, count in tables.items():
+                            print(f"      {table}: {count} 条记录")
+                    elif isinstance(sub_stat, dict):
+                        print(f"      信息: {sub_stat.get('message', 'N/A')}")
+            else:
+                print(f"信息: {str(stat)}")
     elif args.mode == "gui":
         # 启动GUI模式 (使用scripts/gui_launcher.py)
         gui_script_path = Path(__file__).parent / "scripts" / "gui_launcher.py"

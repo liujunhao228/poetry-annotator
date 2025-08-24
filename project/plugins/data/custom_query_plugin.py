@@ -22,7 +22,10 @@ class CustomQueryPlugin(QueryPlugin):
     """自定义查询插件示例"""
     
     def __init__(self, config: Optional[PluginConfig] = None, 
-                 separate_db_manager: Optional['SeparateDatabaseManager'] = None):
+                 separate_db_manager: Optional['SeparateDatabaseManager'] = None,
+                 **kwargs):  # 添加 **kwargs 以接受额外参数
+        # 忽略可能传入的type参数
+        kwargs.pop('type', None)
         super().__init__(config, separate_db_manager)
         self.name = "custom_query"
         self.description = "自定义查询示例"

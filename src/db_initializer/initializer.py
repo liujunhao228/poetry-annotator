@@ -14,12 +14,14 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 try:
-    from src.config import config_manager
+    from src.config import get_config_manager
+    config_manager = get_config_manager()
 except ImportError:
     # 当作为独立模块运行时
     import sys
     sys.path.append(str(Path(__file__).parent.parent))
-    from config import config_manager
+    from config import get_config_manager
+    config_manager = get_config_manager()
 
 try:
     from src.data.adapter import get_database_adapter
@@ -30,12 +32,12 @@ except ImportError:
     from data.adapter import get_database_adapter
 
 try:
-    from src.label_parser import get_label_parser
+    from src.plugin_label_parser import get_plugin_label_parser
 except ImportError:
     # 当作为独立模块运行时
     import sys
     sys.path.append(str(Path(__file__).parent.parent))
-    from label_parser import get_label_parser
+    from plugin_label_parser import get_plugin_label_parser
 
 try:
     from src.db_initializer.plugin_interface import DatabaseInitPluginManager
@@ -44,6 +46,14 @@ except ImportError:
     import sys
     sys.path.append(str(Path(__file__).parent))
     from plugin_interface import DatabaseInitPluginManager
+
+try:
+    from src.db_initializer.db_config_manager import get_main_database_names
+except ImportError:
+    # 当作为独立模块运行时
+    import sys
+    sys.path.append(str(Path(__file__).parent))
+    from db_config_manager import get_main_database_names
 
 from src.data.exceptions import DatabaseError
 
@@ -61,49 +71,36 @@ class DatabaseInitializer:
         
     def _get_database_configs(self) -> Dict[str, str]:
         """获取所有主数据库配置名称"""
-        db_config = config_manager.get_effective_database_config()
-        
-        # 获取所有配置的主数据库名称
-        if 'db_paths' in db_config:
-            return {name: "" for name in db_config['db_paths'].keys()}
-        # 回退到旧的单数据库配置
-        elif 'db_path' in db_config:
-            return {"default": ""}
-        else:
-            # 如果没有主数据库配置，使用全局配置中的separate_db_paths来获取主数据库名称
-            separate_db_config = db_config.get('separate_db_paths', {})
-            if separate_db_config:
-                # 从分离数据库路径中提取主数据库名称
-                main_db_names = set()
-                for path in separate_db_config.values():
-                    # 查找 {main_db_name} 占位符中的名称
-                    if '{main_db_name}' in path:
-                        # 如果使用占位符，我们需要从配置中获取所有可能的主数据库名称
-                        # 这里我们简单地返回一个默认名称
-                        main_db_names.add("default")
-                    else:
-                        # 从路径中提取主数据库名称
-                        parts = path.split('/')
-                        if len(parts) > 2:
-                            main_db_names.add(parts[1])
-                return {name: "" for name in main_db_names}
-            else:
-                return {"default": ""}
+        # 使用统一的配置管理获取主数据库名称
+        main_db_names = get_main_database_names()
+        return {name: "" for name in main_db_names}
     
     def initialize_all_databases(self, clear_existing: bool = False) -> Dict[str, Dict[str, Any]]:
-        """初始化所有配置的分离数据库"""
+        """初始化所有主数据库"""
         results = {}
         
-        # 为每个主数据库初始化分离数据库
+        # 为每个主数据库初始化
         for db_name in self.db_configs.keys():
             try:
-                self.logger.info(f"开始初始化分离数据库结构 for {db_name}")
-                # 使用初始化分离数据库的方法
-                result = self.initialize_separate_databases(clear_existing)
-                results[db_name] = result
-                self.logger.info(f"分离数据库 {db_name} 初始化完成")
+                self.logger.info(f"开始初始化主数据库 {db_name}")
+                # 获取数据库路径配置
+                db_config = config_manager.get_effective_database_config()
+                db_paths = db_config.get('db_paths', {})
+                
+                # 如果有配置该数据库的路径，则初始化
+                if db_name in db_paths:
+                    db_path = db_paths[db_name]
+                    result = self.initialize_database(db_name, db_path, clear_existing)
+                    results[db_name] = result
+                else:
+                    # 使用默认路径
+                    db_path = f"data/{db_name}.db"
+                    result = self.initialize_database(db_name, db_path, clear_existing)
+                    results[db_name] = result
+                    
+                self.logger.info(f"主数据库 {db_name} 初始化完成")
             except Exception as e:
-                self.logger.error(f"初始化分离数据库 {db_name} 失败: {e}")
+                self.logger.error(f"初始化主数据库 {db_name} 失败: {e}")
                 results[db_name] = {"error": str(e)}
                 
         return results
@@ -118,87 +115,30 @@ class DatabaseInitializer:
         db_adapter = get_database_adapter('sqlite', db_path)
         
         # 初始化数据库表结构
-        db_adapter.init_database()
+        db_adapter.init_emotion_database()
         
-        # 导入情感分类体系
-        imported_count = 0
-        try:
-            label_parser = get_label_parser()
-            # 获取所有分类的详细信息，包括英文名称
-            categories_data = []
-            for primary_id, primary_data in label_parser.categories.items():
-                # 添加一级分类
-                categories_data.append({
-                    'id': primary_data['id'],
-                    'name_zh': primary_data['name_zh'],
-                    'name_en': primary_data.get('name_en', ''),
-                    'parent_id': None,
-                    'level': 1
-                })
-                # 添加二级分类
-                for secondary in primary_data.get('secondaries', []):
-                    categories_data.append({
-                        'id': secondary['id'],
-                        'name_zh': secondary['name_zh'],
-                        'name_en': secondary.get('name_en', ''),
-                        'parent_id': primary_data['id'],
-                        'level': 2
-                    })
-            
-            # 使用批量插入和事务优化性能
-            if categories_data:
-                conn = db_adapter.connect()
-                try:
-                    # 开启事务
-                    conn.execute('BEGIN TRANSACTION')
-                    
-                    # 准备批量插入数据
-                    insert_data = [
-                        (
-                            category['id'],
-                            category['name_zh'],
-                            category['name_en'],
-                            category['parent_id'],
-                            category['level']
-                        )
-                        for category in categories_data
-                    ]
-                    
-                    # 执行批量插入
-                    conn.executemany('''
-                        INSERT OR REPLACE INTO emotion_categories 
-                        (id, name_zh, name_en, parent_id, level)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', insert_data)
-                    
-                    # 提交事务
-                    conn.commit()
-                    imported_count = len(categories_data)
-                    self.logger.info(f"向数据库 {db_name} 批量导入了 {imported_count} 个情感分类")
-                    
-                except Exception as e:
-                    # 回滚事务
-                    conn.rollback()
-                    self.logger.error(f"批量导入情感分类时出错，已回滚事务: {e}")
-                    raise
-                finally:
-                    conn.close()
-                    
-        except Exception as e:
-            self.logger.error(f"向数据库 {db_name} 导入情感分类时出错: {e}")
+        # 注意：情感分类数据导入现在由插件处理，这里不再直接导入
         
         result = {
             "db_name": db_name,
             "db_path": db_path,
             "status": "success",
-            "message": f"数据库 {db_name} 初始化成功，导入了 {imported_count} 个情感分类"
+            "message": f"数据库 {db_name} 初始化成功"
         }
         
         return result
         
-    def initialize_separate_databases(self, clear_existing: bool = False, migrate_data: bool = True) -> Dict[str, Dict[str, Any]]:
+    def initialize_separate_databases(self, clear_existing: bool = False) -> Dict[str, Dict[str, Any]]:
         """初始化分离的数据库结构，为每个主数据库创建独立的分离数据库"""
         results = {}
+        
+        # 获取数据配置
+        data_config = config_manager.get_effective_data_config()
+        source_dir = data_config.get('source_dir')
+        
+        # 获取数据库配置
+        db_config = config_manager.get_effective_database_config()
+        separate_db_paths = db_config.get('separate_db_paths', {})
         
         # 为每个主数据库创建独立的分离数据库
         for db_name in self.db_configs.keys():
@@ -231,6 +171,14 @@ class DatabaseInitializer:
             
             # 执行插件的数据库初始化
             try:
+                # 在调用插件之前，更新插件配置以包含源数据路径和数据库路径
+                for plugin_name, plugin in self.plugin_manager.plugins.items():
+                    # 更新插件配置中的源数据路径和数据库路径
+                    if hasattr(plugin, 'source_dir') and not plugin.source_dir:
+                        plugin.source_dir = source_dir
+                    if hasattr(plugin, 'db_paths') and not plugin.db_paths:
+                        plugin.db_paths = separate_db_paths
+                
                 plugin_results = self.plugin_manager.initialize_plugins(db_name, clear_existing)
                 # 将插件初始化结果添加到结果中
                 if 'plugins' not in db_results:
@@ -240,89 +188,15 @@ class DatabaseInitializer:
                 self.logger.error(f"为数据库 {db_name} 初始化插件时出错: {e}")
                 if 'plugins' not in db_results:
                     db_results['plugins'] = {"status": "error", "message": str(e)}
-            
-            # 如果需要迁移数据，则记录警告信息（因为我们已经完全使用分离数据库）
-            if migrate_data:
-                self.logger.warning("迁移数据功能已禁用，因为我们已经完全使用分离数据库")
         
         return results
     
     def _ensure_emotion_categories_imported(self, separate_db_manager) -> Dict[str, Any]:
         """确保情感分类数据已正确导入到分离的情感数据库中"""
-        # 导入情感分类体系
-        imported_count = 0
-        try:
-            from ..label_parser import get_label_parser
-            label_parser = get_label_parser()
-            # 获取所有分类的详细信息，包括英文名称
-            categories_data = []
-            for primary_id, primary_data in label_parser.categories.items():
-                # 添加一级分类
-                categories_data.append({
-                    'id': primary_data['id'],
-                    'name_zh': primary_data['name_zh'],
-                    'name_en': primary_data.get('name_en', ''),
-                    'parent_id': None,
-                    'level': 1
-                })
-                # 添加二级分类
-                for secondary in primary_data.get('secondaries', []):
-                    categories_data.append({
-                        'id': secondary['id'],
-                        'name_zh': secondary['name_zh'],
-                        'name_en': secondary.get('name_en', ''),
-                        'parent_id': primary_data['id'],
-                        'level': 2
-                    })
-            
-            # 使用批量插入和事务优化性能
-            if categories_data:
-                # 确保数据库连接是打开的
-                conn = separate_db_manager.emotion_db.connect()
-                try:
-                    # 开启事务
-                    conn.execute('BEGIN TRANSACTION')
-                    
-                    # 准备批量插入数据
-                    insert_data = [
-                        (
-                            category['id'],
-                            category['name_zh'],
-                            category['name_en'],
-                            category['parent_id'],
-                            category['level']
-                        )
-                        for category in categories_data
-                    ]
-                    
-                    # 执行批量插入
-                    conn.executemany('''
-                        INSERT OR REPLACE INTO emotion_categories 
-                        (id, name_zh, name_en, parent_id, level)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', insert_data)
-                    
-                    # 提交事务
-                    conn.commit()
-                    imported_count = len(categories_data)
-                    self.logger.info(f"向情感分类数据库批量导入了 {imported_count} 个情感分类")
-                    
-                except Exception as e:
-                    # 回滚事务
-                    conn.rollback()
-                    self.logger.error(f"批量导入情感分类时出错，已回滚事务: {e}")
-                    raise
-                finally:
-                    # 不要在这里关闭连接，因为其他地方可能还需要使用
-                    pass
-                    
-        except Exception as e:
-            self.logger.error(f"向情感分类数据库导入情感分类时出错: {e}")
-            raise
-            
+        # 情感分类数据导入现在由插件处理，这里直接返回成功状态
         return {
             "status": "success",
-            "message": f"情感分类数据库初始化完成，导入了 {imported_count} 个情感分类"
+            "message": "情感分类数据库初始化完成（数据导入由插件处理）"
         }
     
     def get_database_stats(self) -> Dict[str, Dict[str, Any]]:

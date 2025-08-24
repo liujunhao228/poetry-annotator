@@ -87,6 +87,15 @@ class SQLiteAdapter(DatabaseAdapter):
         if self._conn:
             self._conn.close()
             self._conn = None
+            
+    def get_connection(self):
+        """获取数据库连接，用于批量操作"""
+        return self.connect()
+    
+    def close_connection(self, conn):
+        """关闭数据库连接"""
+        if conn:
+            conn.close()
 
     def begin_transaction(self):
         """开始事务"""
@@ -112,14 +121,6 @@ class SQLiteAdapter(DatabaseAdapter):
             except sqlite3.Error as e:
                 raise DatabaseError(f"无法回滚事务: {e}")
 
-    def init_database(self):
-        """初始化SQLite数据库表结构（已废弃，仅保留用于兼容性）"""
-        self.logger.warning("init_database 方法已废弃，请使用 init_raw_data_database, init_annotation_database 或 init_emotion_database")
-        # 为了保持向后兼容，我们可以调用所有三个初始化方法
-        self.init_raw_data_database()
-        self.init_annotation_database()
-        self.init_emotion_database()
-            
     def init_raw_data_database(self):
         """初始化原始数据数据库表结构"""
         self.logger.info("开始初始化原始数据数据库...")
@@ -245,6 +246,7 @@ class SQLiteAdapter(DatabaseAdapter):
     
     def execute_query(self, query: str, params: Optional[tuple] = None):
         """执行查询操作"""
+        conn = None
         try:
             conn = self.connect()
             conn.row_factory = sqlite3.Row
@@ -257,9 +259,16 @@ class SQLiteAdapter(DatabaseAdapter):
             return rows
         except sqlite3.Error as e:
             raise DatabaseError(f"查询执行失败: {e}")
+        finally:
+            # 确保连接在使用完毕后关闭
+            if conn:
+                conn.close()
+                # 重置连接状态
+                self._conn = None
     
     def execute_update(self, query: str, params: Optional[tuple] = None, commit: bool = True):
         """执行更新操作"""
+        conn = None
         try:
             conn = self.connect()
             cursor = conn.cursor()
@@ -272,7 +281,19 @@ class SQLiteAdapter(DatabaseAdapter):
                 conn.commit()
             return rowcount
         except sqlite3.Error as e:
+            # 出现错误时回滚事务
+            if conn:
+                try:
+                    conn.rollback()
+                except:
+                    pass  # 忽略回滚错误
             raise DatabaseError(f"更新操作失败: {e}")
+        finally:
+            # 确保连接在使用完毕后关闭
+            if conn:
+                conn.close()
+                # 重置连接状态
+                self._conn = None
 
 
 def get_database_adapter(db_type: str, db_path: str) -> DatabaseAdapter:

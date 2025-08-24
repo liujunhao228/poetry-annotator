@@ -1,23 +1,24 @@
 """
-数据管理模块入口文件
+数据模块初始化
 """
-from .manager import DataManager, get_data_manager
-from .adapter import get_database_adapter
-from .initializer import get_db_initializer, initialize_all_databases_from_source_folders
-from .models import Poem, Author, Annotation
-from .exceptions import DataError, DatabaseError
-from .visualizer.queries import VisualizationQueries
+from src.data.plugin_manager import PluginManager
+from src.data.models import set_plugin_manager
+from src.data.manager import get_data_manager
 
-__all__ = [
-    "DataManager",
-    "get_data_manager",
-    "get_database_adapter",
-    "get_db_initializer",
-    "initialize_all_databases_from_source_folders",
-    "Poem",
-    "Author",
-    "Annotation",
-    "DataError",
-    "DatabaseError",
-    "VisualizationQueries"
-]
+
+def initialize_data_system():
+    """初始化数据系统"""
+    # 获取插件管理器实例
+    plugin_manager = PluginManager.get_instance()
+    
+    # 初始化插件
+    plugin_manager.initialize_plugins()
+    
+    # 设置模型模块使用的插件管理器
+    set_plugin_manager(plugin_manager)
+    
+    return plugin_manager
+
+
+# 在模块导入时自动初始化
+plugin_manager = initialize_data_system()

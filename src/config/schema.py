@@ -141,8 +141,6 @@ class ProjectDatabaseConfig:
     db_path: Optional[str] = None  # 旧的单数据库模式，用于向后兼容
     # 分离数据库路径配置（可选，优先级高于全局配置中的模板）
     separate_db_paths: Optional[Dict[str, str]] = None  # e.g., {"raw_data": "data/raw_data.db"}
-    # 分离数据库路径配置（可选，优先级高于全局配置中的模板）
-    separate_db_paths: Optional[Dict[str, str]] = None  # e.g., {"raw_data": "data/raw_data.db"}
 
 @dataclass
 class ProjectDataPathConfig:

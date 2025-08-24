@@ -5,7 +5,7 @@
 import configparser
 import os
 from typing import Dict, Any, Optional
-from src.config.config_schema import ProjectConfig, ProjectLLMConfig, ProjectDatabaseConfig, ProjectDataPathConfig, ProjectPromptConfig, ProjectLoggingConfig, ProjectVisualizerConfig,ProjectModelConfig, ProjectValidationConfig, ProjectPreprocessingConfig, ProjectCleaningConfig
+from src.config.schema import ProjectConfig, ProjectLLMConfig, ProjectDatabaseConfig, ProjectDataPathConfig, ProjectPromptConfig, ProjectLoggingConfig, ProjectVisualizerConfig,ProjectModelConfig, ProjectValidationConfig, ProjectPreprocessingConfig, ProjectCleaningConfig
 
 
 class ProjectConfigLoader:
@@ -136,11 +136,17 @@ class ProjectConfigLoader:
             separate_db_paths_str = db.get('separate_db_paths')
             if separate_db_paths_str:
                 separate_db_paths = {}
+                # 处理键值对格式，支持逗号分隔的多个键值对
                 for item in separate_db_paths_str.split(','):
+                    item = item.strip()
                     if '=' in item:
                         key, value = item.split('=', 1)
                         separate_db_paths[key.strip()] = value.strip()
                 db_config.separate_db_paths = separate_db_paths
+            else:
+                # 如果没有separate_db_paths，尝试从全局配置中获取默认值
+                # 这里我们不设置默认值，让配置管理器处理
+                pass
         return db_config
 
     def _save_database_config(self, config: configparser.ConfigParser, db_config: ProjectDatabaseConfig):

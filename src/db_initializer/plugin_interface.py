@@ -15,6 +15,9 @@ class DatabaseInitPlugin(ABC):
                  separate_db_manager: Optional[SeparateDatabaseManager] = None):
         self.config = config or PluginConfig()
         self.separate_db_manager = separate_db_manager
+        # 从配置中提取源数据路径和数据库路径
+        self.source_dir = self.config.settings.get('source_dir')
+        self.db_paths = self.config.settings.get('db_paths', {})
     
     @abstractmethod
     def get_name(self) -> str:

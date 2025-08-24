@@ -10,15 +10,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 import pybreaker
+from pathlib import Path
 
 from .data import get_data_manager
 from .async_data_manager import AsyncDataManager
 from .llm_factory import llm_factory
 from .config import config_manager
-from .label_parser import get_label_parser
 from .annotation_data_logger import AnnotationDataLogger
 from .prompt_builder import prompt_builder
-from .llm_services.schemas import PoemData, EmotionSchema
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +44,11 @@ class Annotator:
         self.save_full_response = llm_config.get('save_full_response', False)
         
         try:
-            label_parser = get_label_parser()
+            # 通过组件系统获取标签解析器
+            from .component_system import get_component_system, ComponentType
+            project_root = Path(__file__).parent.parent
+            component_system = get_component_system(project_root)
+            label_parser = component_system.get_component(ComponentType.LABEL_PARSER)
             self.emotion_schema_text = label_parser.get_categories_text()
             self.emotion_schema = EmotionSchema(text=self.emotion_schema_text)
             # INFO级别：记录对用户有意义的关键流程节点

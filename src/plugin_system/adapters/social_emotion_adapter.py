@@ -1,0 +1,82 @@
+"""
+硬编码社交情感分类插件适配器
+将项目中的HardcodedSocialEmotionCategoriesPlugin适配为新的Plugin系统
+"""
+
+import logging
+from typing import Dict, Any
+from src.plugin_system.interfaces import LabelParserPlugin
+from src.config.schema import PluginConfig
+
+# 配置日志
+logger = logging.getLogger(__name__)
+
+
+class HardcodedSocialEmotionCategoriesPluginAdapter(LabelParserPlugin):
+    """硬编码社交情感分类插件适配器"""
+    
+    def __init__(self, plugin_config: PluginConfig):
+        super().__init__(plugin_config)
+        self.label_parser_plugin = None
+        self._name = None
+        self._description = None
+        
+        # 根据配置动态加载
+        self._load_label_parser_plugin()
+    
+    def _load_label_parser_plugin(self):
+        """根据配置动态加载标签解析插件"""
+        if not self.plugin_config.module or not self.plugin_config.class_name:
+            raise ValueError("标签解析插件配置缺少module或class_name")
+        
+        # 从配置中获取模块名和类名
+        plugin_module_name = self.plugin_config.module
+        plugin_class_name = self.plugin_config.class_name
+        
+        # 动态导入插件模块
+        try:
+            plugin_module = __import__(plugin_module_name, fromlist=[plugin_class_name])
+        except ImportError as e:
+            logger.warning(f"无法导入模块 {plugin_module_name}: {e}")
+            raise
+        
+        plugin_class = getattr(plugin_module, plugin_class_name)
+        
+        # 实例化插件，过滤掉不应该传递给构造函数的参数
+        init_kwargs = self._filter_init_kwargs()
+        
+        self.label_parser_plugin = plugin_class(**init_kwargs)
+        self._name = self.label_parser_plugin.get_name()
+        self._description = self.label_parser_plugin.get_description()
+        
+        logger.info(f"硬编码社交情感分类插件适配器创建成功: {self._name}")
+    
+    def _filter_init_kwargs(self):
+        """过滤初始化参数"""
+        # 定义不应传递给构造函数的参数
+        excluded_keys = {'type', 'module', 'class'}
+        
+        # 过滤插件设置
+        filtered_settings = {k: v for k, v in self.plugin_config.settings.items() if k not in excluded_keys}
+        
+        return filtered_settings
+    
+    def get_name(self) -> str:
+        """获取插件名称"""
+        return self._name
+    
+    def get_description(self) -> str:
+        """获取插件描述"""
+        return self._description
+    
+    def get_categories(self) -> Dict[str, Any]:
+        """获取插件提供的额外分类信息"""
+        if not self.label_parser_plugin:
+            raise RuntimeError("标签解析插件未正确初始化")
+        return self.label_parser_plugin.get_categories()
+    
+    def extend_category_data(self, categories: Dict[str, Any]) -> Dict[str, Any]:
+        """扩展分类数据"""
+        if not self.label_parser_plugin:
+            raise RuntimeError("标签解析插件未正确初始化")
+        return self.label_parser_plugin.extend_category_data(categories)

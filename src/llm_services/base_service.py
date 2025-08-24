@@ -5,8 +5,9 @@ import logging
 import os
 from pathlib import Path
 from src.llm_response_parser import llm_response_parser, ILLMResponseParser
-from src.config.custom_json_validator import CustomJSONValidator, CustomValidationError # 新增导入
-from src.config import config_manager
+from src.validator.custom_json_validator import CustomJSONValidator, CustomValidationError # 新增导入
+from src.config import get_config_manager
+config_manager = get_config_manager()
 from src.utils.rate_limiter import AsyncTokenBucket
 from src.utils.rate_controller import RateLimitConfig as InternalRateLimitConfig, create_rate_controller
 from src.utils.rate_monitor import rate_monitor

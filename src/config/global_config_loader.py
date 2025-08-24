@@ -5,10 +5,7 @@
 import configparser
 import os
 from typing import Dict, Any, List, Optional
-from src.config.config_schema import GlobalConfig, GlobalLLMConfig, GlobalDatabaseConfig, \
-    GlobalDataPathConfig, GlobalPromptConfig, GlobalLoggingConfig, GlobalVisualizerConfig, \
-    GlobalModelConfigTemplate, GlobalCategoriesConfig, GlobalPluginConfig, GlobalValidationRuleSet, \
-    GlobalPreprocessingRuleSet, GlobalCleaningRuleSet
+from src.config.schema import GlobalConfig, GlobalLLMConfig, GlobalDatabaseConfig, GlobalDataPathConfig, GlobalPromptConfig, GlobalLoggingConfig, GlobalVisualizerConfig, GlobalModelConfigTemplate, GlobalCategoriesConfig, GlobalPluginConfig, GlobalValidationRuleSet, GlobalPreprocessingRuleSet, GlobalCleaningRuleSet
 
 
 class GlobalConfigLoader:
@@ -309,10 +306,8 @@ class GlobalConfigLoader:
         """保存清洗规则配置"""
         # 清洗规则配置通常在规则文件中定义，这里不需要保存
 
-    # --- 以下方法为旧版本兼容接口 ---
-
     def _get_global_database_config(self) -> Dict[str, Any]:
-        """获取全局数据库配置（旧版本兼容接口）"""
+        """获取全局数据库配置"""
         config = {}
         if self.config.has_section('Database'):
             db = self.config['Database']
@@ -328,7 +323,7 @@ class GlobalConfigLoader:
         return config
 
     def _get_global_data_config(self) -> Dict[str, str]:
-        """获取全局数据路径配置（旧版本兼容接口）"""
+        """获取全局数据路径配置"""
         config = {}
         if self.config.has_section('Data'):
             data = self.config['Data']
@@ -337,12 +332,12 @@ class GlobalConfigLoader:
         return config
 
     def _get_global_prompt_config(self) -> Dict[str, str]:
-        """获取全局提示词配置（旧版本兼容接口）"""
+        """获取全局提示词配置"""
         # 不再使用模板文件，返回空配置
         return {}
 
     def _get_global_model_config(self, model_name: str) -> Dict[str, Any]:
-        """获取全局模型配置（旧版本兼容接口）"""
+        """获取全局模型配置"""
         section_name = f"Model.{model_name}"
         if not self.config.has_section(section_name):
             return {}
@@ -365,7 +360,7 @@ class GlobalConfigLoader:
         return model_config
 
     def _get_all_global_model_configs(self) -> List[Dict[str, Any]]:
-        """获取所有全局模型配置（旧版本兼容接口）"""
+        """获取所有全局模型配置"""
         model_configs = []
         for section_name in self.config.sections():
             if section_name.startswith('Model.'):

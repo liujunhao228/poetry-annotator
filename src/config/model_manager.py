@@ -129,3 +129,12 @@ class ModelManager:
                 model_config['name'] = model_name
                 model_configs.append(model_config)
         return model_configs
+
+    def _load_config(self) -> configparser.ConfigParser:
+        """加载配置文件（旧版本兼容接口）"""
+        if not os.path.exists(self.global_config_path):
+            return configparser.ConfigParser()
+        
+        config = configparser.ConfigParser(interpolation=None)
+        config.read(self.global_config_path, encoding='utf-8')
+        return config

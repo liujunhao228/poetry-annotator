@@ -12,10 +12,10 @@ import json
 relative_import_failed = False
 try:
     # 当作为包运行时（推荐方式）
-    from .config import config_manager, project_config_manager
+    from .config import config_manager
     from .config.manager import ConfigManager  # 导入 ConfigManager 类
     from .data import get_data_manager
-    from .label_parser import get_label_parser
+    from .plugin_label_parser import get_plugin_label_parser
     from .llm_factory import llm_factory
     from .annotator import Annotator
     from .logging_config import setup_default_logging, get_logger
@@ -34,10 +34,10 @@ if relative_import_failed:
         print(f"已将 {src_dir} 添加到 sys.path")
         
     try:
-        from config import config_manager, project_config_manager
+        from config import config_manager
         from config.manager import ConfigManager  # 导入 ConfigManager 类
         from data import get_data_manager
-        from label_parser import get_label_parser
+        from plugin_label_parser import get_plugin_label_parser
         from llm_factory import llm_factory
         from annotator import Annotator
         from logging_config import setup_default_logging, get_logger
@@ -47,7 +47,7 @@ if relative_import_failed:
         raise # Re-raise the exception to stop execution
 
 # 获取标签解析器实例
-label_parser = get_label_parser()
+label_parser = get_plugin_label_parser()
 
 
 # 获取主日志记录器
@@ -63,26 +63,19 @@ logger = get_logger(__name__)
 @click.option('--enable-file-log', is_flag=True, default=None, 
               help='启用文件日志输出（可选，将覆盖配置文件设置）')
 @click.option('--db-name', type=str, help='数据库名称（从配置文件中获取路径）')
-@click.option('--project', type=str, help='指定项目配置文件（可选，将覆盖当前激活的项目配置）')
+@click.option('--project', type=str, help='指定项目配置文件（可选，将覆盖默认的项目配置）')
 def cli(log_level, log_file, enable_file_log, db_name, project):
     """LLM诗词情感标注工具"""
-    # 如果指定了项目配置文件，更新当前激活的项目
-    if project:
-        try:
-            project_config_manager.set_active_project(project)
-            logger.info(f"已切换到项目配置: {project}")
-        except ValueError as e:
-            logger.error(f"项目配置切换失败: {e}")
-            return
+    # 如果指定了项目配置文件，使用指定的项目配置文件
+    project_config_path = project if project else None
     
-    # 获取当前激活的项目配置文件
-    active_project = project_config_manager.get_active_project()
-    project_config_path = os.path.join("config/project", active_project)
-    
-    # 更新配置管理器实例以使用当前激活的项目配置
-    # 注意：这里我们让 ConfigManager 从 config_metadata.json 读取全局配置路径
+    # 更新配置管理器实例以使用指定的或默认的项目配置
     global config_manager
     config_manager = ConfigManager(project_config_path=project_config_path)
+    
+    # 记录使用的项目配置文件
+    active_project = project if project else "project/project.ini"
+    logger.info(f"使用项目配置文件: {active_project}")
     
     # 设置日志配置 - 优先使用配置文件，CLI参数可覆盖
     try:
@@ -115,14 +108,13 @@ def cli(log_level, log_file, enable_file_log, db_name, project):
 
 
 @cli.command()
-@click.option('--config', default=None, help='配置文件路径 (通过 config_metadata.json 确定)')
+@click.option('--config', default=None, help='配置文件路径')
 def setup(config):
     """初始化项目环境"""
     try:
         logger.info("开始初始化项目环境...")
         
         # 检查配置文件
-        # 注意：现在全局配置路径由 config_metadata.json 确定
         global_config_path = config_manager.global_config_path
         config_path = Path(global_config_path)
         if not config_path.exists():
@@ -163,8 +155,8 @@ def setup(config):
                 if md_file.exists() and (not xml_file.exists() or md_file.stat().st_mtime > xml_file.stat().st_mtime):
                     logger.info(f"检测到Markdown文件更新，正在重新生成XML文件...")
                     # 重新创建label_parser实例以触发解析和生成
-                    from .label_parser import get_label_parser
-                    get_label_parser()  # 初始化时会自动处理Markdown到XML的转换
+                    from .plugin_label_parser import get_plugin_label_parser
+                    get_plugin_label_parser()  # 初始化时会自动处理Markdown到XML的转换
                     logger.info("情感分类体系XML文件已更新")
                 elif xml_file.exists():
                     logger.info("情感分类体系XML文件已是最新")
@@ -442,30 +434,21 @@ def project_command(list_projects, active, set_project):
     """管理项目配置"""
     try:
         if list_projects:
-            # 列出所有可用的项目配置
-            available_projects = project_config_manager.get_available_projects()
+            # 列出所有可用的项目配置（简化为只显示默认项目配置）
             print("\n=== 可用的项目配置 ===")
-            for project in available_projects:
-                marker = " * " if project == project_config_manager.get_active_project() else "   "
-                print(f"{marker}{project}")
+            print(" * project/project.ini (默认)")
             print()
-            logger.info(f"列出 {len(available_projects)} 个可用项目配置")
+            logger.info("列出可用项目配置: project/project.ini")
             
         elif active:
             # 显示当前激活的项目配置
-            active_project = project_config_manager.get_active_project()
-            print(f"\n当前激活的项目配置: {active_project}\n")
-            logger.info(f"当前激活的项目配置: {active_project}")
+            print(f"\n当前激活的项目配置: project/project.ini (默认)\n")
+            logger.info("当前激活的项目配置: project/project.ini")
             
         elif set_project:
-            # 设置当前激活的项目配置
-            try:
-                project_config_manager.set_active_project(set_project)
-                print(f"\n已将项目配置设置为: {set_project}\n")
-                logger.info(f"已将项目配置设置为: {set_project}")
-            except ValueError as e:
-                print(f"\n错误: {e}\n")
-                logger.error(f"设置项目配置失败: {e}")
+            # 设置当前激活的项目配置（提示用户直接使用 --project 参数）
+            print(f"\n提示: 请在运行命令时使用 '--project {set_project}' 参数来指定项目配置文件。\n")
+            logger.info(f"提示用户使用 --project 参数指定项目配置文件: {set_project}")
         else:
             # 显示帮助信息
             ctx = click.get_current_context()
