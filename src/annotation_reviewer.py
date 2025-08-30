@@ -71,16 +71,16 @@ class AnnotationReviewerLogic:
         """
         db_config = config_manager.get_effective_database_config()
         
-        # 处理新的多数据库配置
-        if 'db_paths' in db_config:
-            return db_config['db_paths']
+        # 处理分离数据库配置
+        if 'separate_db_paths' in db_config:
+            return db_config['separate_db_paths']
         
-        # 回退到旧的单数据库配置
-        if 'db_path' in db_config:
-            return {"default": db_config['db_path']}
-        
-        # 如果都没有配置，则返回空字典
-        return {}
+        # 使用默认路径配置
+        return {
+            'raw_data': 'data/default/raw_data.db',
+            'annotation': 'data/default/annotation.db',
+            'emotion': 'data/default/emotion.db'
+        }
         
     @classmethod
     def create_for_database(cls, db_name: str = "default"):
@@ -165,13 +165,22 @@ class AnnotationReviewerLogic:
                  如果未找到或出错，返回空列表。
         """
         try:
-            # 查询特定 poem_id 的所有标注记录
+            # 获取数据库路径
+            db_configs = self.data_manager.separate_db_manager.db_configs if hasattr(self.data_manager, 'separate_db_manager') else {}
+            annotation_db_path = db_configs.get('annotation', f"data/{self.data_manager.db_name}/annotation.db")
+            
+            # 获取数据库连接
+            conn = sqlite3.connect(annotation_db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
             query = """
-                SELECT DISTINCT model_identifier
+                SELECT model_identifier
                 FROM annotations
                 WHERE poem_id = ? AND status = 'completed'
             """
-            rows = self.data_manager.db_adapter.execute_query(query, (poem_id,))
+            cursor.execute(query, (poem_id,))
+            rows = cursor.fetchall()
             models = [row[0] for row in rows]
             logger.debug(f"诗词ID {poem_id} 可用模型: {models}")
             logger.info(f"诗词ID {poem_id} 找到 {len(models)} 个可用模型")
@@ -202,12 +211,22 @@ class AnnotationReviewerLogic:
 
         # 2. 查询对应的标注结果
         try:
+            # 获取数据库路径
+            db_configs = self.data_manager.separate_db_manager.db_configs if hasattr(self.data_manager, 'separate_db_manager') else {}
+            annotation_db_path = db_configs.get('annotation', f"data/{self.data_manager.db_name}/annotation.db")
+            
+            # 获取数据库连接
+            conn = sqlite3.connect(annotation_db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
             query = """
                 SELECT annotation_result
                 FROM annotations
                 WHERE poem_id = ? AND model_identifier = ? AND status = 'completed'
             """
-            rows = self.data_manager.db_adapter.execute_query(query, (poem_id, model_identifier))
+            cursor.execute(query, (poem_id, model_identifier))
+            rows = cursor.fetchall()
             
             if not rows:
                 logger.warning(f"未找到诗词 {poem_id} 由模型 {model_identifier} 生成的 completed 标注。")

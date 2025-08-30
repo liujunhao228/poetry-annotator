@@ -97,8 +97,15 @@ def classify_poems_data(db_name: str = "default", dry_run: bool = False, config_
     
     # 获取数据管理器
     data_manager = get_data_manager(db_name)
-    # 使用原始数据数据库适配器
-    db_adapter = data_manager.db_adapter
+    
+    # 获取数据库路径
+    db_configs = data_manager.separate_db_manager.db_configs if hasattr(data_manager, 'separate_db_manager') else {}
+    raw_data_db_path = db_configs.get('raw_data', f"data/{db_name}/raw_data.db")
+    
+    # 获取数据库连接
+    conn = sqlite3.connect(raw_data_db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
     
     # 统计信息
     stats = {
@@ -123,7 +130,7 @@ def classify_poems_data(db_name: str = "default", dry_run: bool = False, config_
             SELECT id, title, full_text, {classification_field}
             FROM poems
         """
-        rows = db_adapter.execute_query(query)
+        rows = cursor.execute(query).fetchall()
         stats['total_poems_scanned'] = len(rows)
         
         print(f"总共找到 {stats['total_poems_scanned']} 首诗词待处理。")
@@ -202,7 +209,7 @@ def classify_poems_data(db_name: str = "default", dry_run: bool = False, config_
             if poems_to_update:
                 try:
                     # 使用事务来批量更新，显著提高 SQLite 的写入性能
-                    db_adapter.begin_transaction()
+                    # SQLite在执行语句时自动开始事务
                     update_count = 0
                     for poem_id, categories_list in poems_to_update.items():
                         categories_json = json.dumps(categories_list, ensure_ascii=False) if categories_list else None
@@ -213,14 +220,14 @@ def classify_poems_data(db_name: str = "default", dry_run: bool = False, config_
                             WHERE id = ?
                         """
                         # commit=False 表示在循环中不立即提交，而是等待事务结束统一提交
-                        rowcount = db_adapter.execute_update(update_query, (categories_json, poem_id), commit=False)
+                        rowcount = cursor.execute(update_query, (categories_json, poem_id))
                         update_count += rowcount
                         
-                    db_adapter.commit_transaction() # 提交所有待处理的更新
+                    conn.commit()  # 提交所有待处理的更新
                     stats['updated_in_db'] = update_count
                     print(f"成功更新了数据库中 {stats['updated_in_db']} 首诗词的分类信息。")
                 except Exception as e:
-                    db_adapter.rollback_transaction() # 发生错误时回滚事务
+                    conn.rollback() # 发生错误时回滚事务
                     print(f"数据库更新时出错: {e}")
                     stats['errors'] += len(poems_to_update) # 将所有待更新的都计入错误
             else:
@@ -257,8 +264,15 @@ def reset_pre_classification(db_name: str = "default", dry_run: bool = False, co
     classification_field = global_settings.get('classification_field', 'pre_classification')
 
     data_manager = get_data_manager(db_name)
-    # 使用原始数据数据库适配器
-    db_adapter = data_manager.db_adapter
+    
+    # 获取数据库路径
+    db_configs = data_manager.separate_db_manager.db_configs if hasattr(data_manager, 'separate_db_manager') else {}
+    raw_data_db_path = db_configs.get('raw_data', f"data/{db_name}/raw_data.db")
+    
+    # 获取数据库连接
+    conn = sqlite3.connect(raw_data_db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
     
     stats = {
         'total_with_classification': 0, # 当前有分类数据的诗词总数 (非空字符串或非 NULL)
@@ -272,7 +286,7 @@ def reset_pre_classification(db_name: str = "default", dry_run: bool = False, co
             SELECT COUNT(*) FROM poems 
             WHERE {classification_field} IS NOT NULL AND {classification_field} != ''
         """
-        rows = db_adapter.execute_query(count_query)
+        rows = cursor.execute(count_query).fetchall()
         stats['total_with_classification'] = rows[0][0] if rows and rows[0] else 0
         
         print(f"找到 {stats['total_with_classification']} 首具有现有预分类数据的诗词。")
@@ -285,7 +299,7 @@ def reset_pre_classification(db_name: str = "default", dry_run: bool = False, co
                 """
                 
                 try:
-                    rowcount = db_adapter.execute_update(update_query)
+                    rowcount = cursor.execute(update_query)
                     stats['reset_count'] = rowcount
                     print(f"已将 {rowcount} 首诗词的预分类重置为 NULL。")
                 except Exception as e:
@@ -323,8 +337,15 @@ def get_classification_report(db_name: str = "default", config_path: str = None)
     classification_field = global_settings.get('classification_field', 'pre_classification')
 
     data_manager = get_data_manager(db_name)
-    # 使用原始数据数据库适配器
-    db_adapter = data_manager.db_adapter
+    
+    # 获取数据库路径
+    db_configs = data_manager.separate_db_manager.db_configs if hasattr(data_manager, 'separate_db_manager') else {}
+    raw_data_db_path = db_configs.get('raw_data', f"data/{db_name}/raw_data.db")
+    
+    # 获取数据库连接
+    conn = sqlite3.connect(raw_data_db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
     
     report = {
         'total_poems': 0,                # 数据库中的诗词总数
@@ -345,7 +366,7 @@ def get_classification_report(db_name: str = "default", config_path: str = None)
                 COUNT(CASE WHEN {classification_field} = '' THEN 1 END) as empty_string_count
             FROM poems
         """
-        summary_rows = db_adapter.execute_query(summary_query)
+        summary_rows = cursor.execute(summary_query).fetchall()
         if summary_rows and summary_rows[0]:
             report['total_poems'] = summary_rows[0][0]
             report['unclassified_null'] = summary_rows[0][1]
@@ -357,7 +378,7 @@ def get_classification_report(db_name: str = "default", config_path: str = None)
             FROM poems
             WHERE {classification_field} IS NOT NULL AND {classification_field} != ''
         """
-        classified_rows = db_adapter.execute_query(classification_data_query)
+        classified_rows = cursor.execute(classification_data_query).fetchall()
         
         for row in classified_rows:
             classification_json_str = row[0]

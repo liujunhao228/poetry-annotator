@@ -41,8 +41,15 @@ class DataCleaner:
 
         # 获取数据管理器
         data_manager = get_data_manager(db_name)
-        # 使用原始数据数据库适配器
-        db_adapter = data_manager.db_adapter
+        
+        # 获取数据库路径
+        db_configs = data_manager.separate_db_manager.db_configs if hasattr(data_manager, 'separate_db_manager') else {}
+        raw_data_db_path = db_configs.get('raw_data', f"data/{db_name}/raw_data.db")
+        
+        # 获取数据库连接
+        conn = sqlite3.connect(raw_data_db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
         # 统计信息
         stats = {
@@ -63,7 +70,7 @@ class DataCleaner:
                 SELECT id, title, author, full_text, data_status
                 FROM poems
             """
-            rows = db_adapter.execute_query(query)
+            rows = cursor.execute(query).fetchall()
             stats['total'] = len(rows)
 
             print(f"总共找到 {stats['total']} 首诗词")
@@ -147,7 +154,7 @@ class DataCleaner:
                     try:
                         # 传递 target_status 两次，一次用于 SET，一次用于 WHERE 条件
                         params = [target_status] + list(ids_to_update) + [target_status]
-                        rowcount = db_adapter.execute_update(update_query, tuple(params))
+                        rowcount = cursor.execute(update_query, tuple(params))
                         total_updated += rowcount
                         processed_ids.update(ids_to_update)
                         print(f"已将 {rowcount} 首诗词标记为 '{target_status}' 状态 (来自规则: {rule_name})")
@@ -190,8 +197,15 @@ class DataCleaner:
 
         # 获取数据管理器
         data_manager = get_data_manager(db_name)
-        # 使用原始数据数据库适配器
-        db_adapter = data_manager.db_adapter
+        
+        # 获取数据库路径
+        db_configs = data_manager.separate_db_manager.db_configs if hasattr(data_manager, 'separate_db_manager') else {}
+        raw_data_db_path = db_configs.get('raw_data', f"data/{db_name}/raw_data.db")
+        
+        # 获取数据库连接
+        conn = sqlite3.connect(raw_data_db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
         stats = {
             'total': 0,
@@ -206,7 +220,7 @@ class DataCleaner:
                 SELECT COUNT(*) FROM poems 
                 WHERE data_status NOT IN ({placeholders}) OR data_status IS NULL OR data_status = ''
             """
-            rows = db_adapter.execute_query(count_query, tuple(valid_statuses))
+            rows = cursor.execute(count_query, tuple(valid_statuses)).fetchall()
             stats['total'] = rows[0][0] if rows else 0
 
             print(f"找到 {stats['total']} 首状态异常的诗词（包括空状态）")
@@ -215,7 +229,7 @@ class DataCleaner:
                 if not dry_run:
                     update_query = "UPDATE poems SET data_status = ?"
                     try:
-                        rowcount = db_adapter.execute_update(update_query, (reset_to_status,))
+                        rowcount = cursor.execute(update_query, (reset_to_status,))
                         stats['reset'] = rowcount
                         print(f"已将 {rowcount} 首诗词的状态重置为 '{reset_to_status}'")
                     except Exception as e:

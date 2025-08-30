@@ -93,3 +93,11 @@ class PluginManager:
             if config.settings.get('type') == plugin_type:
                 result[name] = plugin
         return result
+        
+    def get_plugin_by_type(self, plugin_type: str) -> Optional[BasePlugin]:
+        """根据类型获取单个插件实例"""
+        plugins = self.get_plugins_by_type(plugin_type)
+        if plugins:
+            # 返回第一个匹配的插件
+            return next(iter(plugins.values()))
+        return None

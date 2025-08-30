@@ -253,9 +253,14 @@ def process_single_log(log_path: Path, dry_run: bool, db_name: str) -> Dict[str,
     try:
         # 获取数据管理器
         dm = get_data_manager(db_name=db_name)
-        # 使用原始数据数据库适配器查询 poems 表
-        poems_db_adapter = dm.db_adapter
-        conn = poems_db_adapter.connect()
+        
+        # 获取数据库路径
+        db_configs = dm.separate_db_manager.db_configs if hasattr(dm, 'separate_db_manager') else {}
+        raw_data_db_path = db_configs.get('raw_data', f"data/{db_name}/raw_data.db")
+        
+        # 获取数据库连接
+        conn = sqlite3.connect(raw_data_db_path)
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
     except Exception as e:
         logging.error(f"获取数据管理器 '{db_name}' 或连接数据库失败: {e}")

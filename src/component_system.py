@@ -109,10 +109,19 @@ class ComponentSystem:
                     project_plugin_config: GlobalPluginConfig = project_plugin_loader.load_project_plugin_config()
                     project_enabled_plugins = project_plugin_config.enabled_plugins
                     
+                    logger.info(f"项目插件配置加载完成，启用的插件: {project_enabled_plugins}")
+                    logger.info(f"插件路径: {project_plugin_config.plugin_paths}")
+                    
                     # 为项目插件添加 plugin_paths 到 sys.path
                     import sys
                     for plugin_path in project_plugin_config.plugin_paths:
-                        full_plugin_path = str(self.project_root / "project" / plugin_path)
+                        # 处理相对路径和绝对路径
+                        if plugin_path.startswith("project/"):
+                            # 如果是project开头的路径，直接使用
+                            full_plugin_path = str(self.project_root / plugin_path)
+                        else:
+                            # 其他路径在project目录下查找
+                            full_plugin_path = str(self.project_root / "project" / plugin_path)
                         if full_plugin_path not in sys.path:
                             sys.path.insert(0, full_plugin_path)
                             logger.debug(f"已将项目插件路径添加到 sys.path: {full_plugin_path}")
@@ -120,9 +129,12 @@ class ComponentSystem:
                     for plugin_name in project_enabled_plugins:
                         try:
                             plugin_config: PluginConfig = project_plugin_loader.load_plugin_config(plugin_name)
+                            logger.info(f"加载插件配置: {plugin_name}, enabled: {plugin_config.enabled}")
                             if plugin_config.enabled:
                                 self._plugin_configs[plugin_name] = plugin_config
                                 logger.info(f"成功加载并启用项目插件配置: {plugin_name}")
+                            else:
+                                logger.info(f"项目插件配置已加载但未启用: {plugin_name}")
                         except Exception as e:
                             logger.error(f"加载项目插件 '{plugin_name}' 的配置时出错: {e}")
                     
@@ -180,6 +192,11 @@ class ComponentSystem:
                 # 过滤掉插件配置中不应该传递给构造函数的参数
                 init_kwargs = ComponentSystem._filter_plugin_init_kwargs(plugin_config.settings, kwargs)
                 
+                # 如果是统一插件，传递组件类型信息
+                # 注意：新的SocialPoemAnalysisPlugin构造函数不再接受component_type参数
+                # if plugin_config.settings.get('type') == 'social_poem_analysis':
+                #     init_kwargs['component_type'] = component_type.value
+                
                 # 创建实例
                 instance = plugin_class(**init_kwargs)
                 logger.info(f"成功创建 {component_type.value} 插件实例: {plugin_config.module}.{plugin_config.class_name}")
@@ -203,10 +220,17 @@ class ComponentSystem:
         Returns:
             匹配的插件配置或None
         """
-        # 遍历所有插件配置，查找type匹配的
+        # 首先检查是否有专门针对该类型的插件
         for plugin_name, plugin_config in self._plugin_configs.items():
             if plugin_config.settings.get('type') == component_type.value:
                 return plugin_config
+        
+        # 如果没有找到专门的插件，检查是否有统一插件可以处理该类型
+        # 统一插件的类型为 'social_poem_analysis'
+        for plugin_name, plugin_config in self._plugin_configs.items():
+            if plugin_config.settings.get('type') == 'social_poem_analysis':
+                return plugin_config
+                
         return None
     
     @staticmethod
@@ -264,6 +288,13 @@ class ComponentSystem:
             global_config_path = config_manager.global_config_path
             project_config_path = config_manager.project_config_path
             return DataCleaningManager(global_config_path, project_config_path)
+        elif component_type in [ComponentType.DATA_STORAGE, ComponentType.DATA_QUERY, 
+                               ComponentType.DATA_PROCESSING, ComponentType.ANNOTATION_MANAGEMENT]:
+            # 对于数据相关的组件类型，如果没有找到插件，应该直接创建DataManager实例
+            # 注意：不能通过get_data_manager函数获取，因为这会导致循环依赖
+            from src.data.manager import DataManager
+            db_name = kwargs.get('db_name', 'default')
+            return DataManager(db_name=db_name)
         else:
             raise ValueError(f"未知的组件类型: {component_type.value}")
 

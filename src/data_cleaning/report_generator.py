@@ -36,8 +36,15 @@ class CleaningReportGenerator:
 
         # 获取数据管理器
         data_manager = get_data_manager(db_name)
-        # 使用原始数据数据库适配器
-        db_adapter = data_manager.db_adapter
+        
+        # 获取数据库路径
+        db_configs = data_manager.separate_db_manager.db_configs if hasattr(data_manager, 'separate_db_manager') else {}
+        raw_data_db_path = db_configs.get('raw_data', f"data/{db_name}/raw_data.db")
+        
+        # 获取数据库连接
+        conn = sqlite3.connect(raw_data_db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
         report = {
             'total': 0,
@@ -69,7 +76,7 @@ class CleaningReportGenerator:
             """
             # 注意：SQLite 的 ? 占位符在字符串拼接中不能直接用于列名或表名，但对于值是安全的。
             # 上面的查询中，列名是硬编码的，值部分用占位符。
-            rows = db_adapter.execute_query(query, tuple(valid_statuses))
+            rows = cursor.execute(query, tuple(valid_statuses)).fetchall()
 
             if rows:
                 row = rows[0]

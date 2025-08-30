@@ -31,19 +31,9 @@ def main():
     """主函数"""
     parser = argparse.ArgumentParser(description="数据库初始化工具")
     parser.add_argument(
-        "--init-all",
-        action="store_true",
-        help="初始化所有数据库"
-    )
-    parser.add_argument(
         "--init-separate",
         action="store_true",
         help="初始化分离数据库"
-    )
-    parser.add_argument(
-        "--migrate-data",
-        action="store_true",
-        help="迁移数据到分离数据库（已废弃，因为我们已经完全使用分离数据库）"
     )
     parser.add_argument(
         "--stats",
@@ -64,20 +54,10 @@ def main():
     # 获取数据库初始化器实例
     db_initializer = get_db_initializer()
     
-    if args.init_all:
-        # 初始化所有数据库
-        print("开始初始化所有数据库...")
-        results = db_initializer.initialize_all_databases(args.clear_existing)
-        
-        print("\n数据库初始化结果:")
-        for db_name, result in results.items():
-            print(f"  {db_name}: {result.get('status', 'unknown')} - {result.get('message', '')}")
-            
     if args.init_separate:
         # 初始化分离数据库
-        print("\n开始初始化分离数据库...")
-        # 忽略 migrate_data 参数，因为我们已经完全使用分离数据库
-        separate_results = db_initializer.initialize_separate_databases(args.clear_existing, False)
+        print("开始初始化分离数据库...")
+        separate_results = db_initializer.initialize_separate_databases(args.clear_existing)
         
         print("\n分离数据库初始化结果:")
         for db_name, db_results in separate_results.items():

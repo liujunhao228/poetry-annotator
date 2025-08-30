@@ -19,7 +19,7 @@ class PluginBasedQueryManager:
         
         # 初始化分离数据库管理器
         # 这里我们假设使用默认的主数据库名称，实际应用中可能需要根据配置确定
-        self.separate_db_manager = get_separate_db_manager("default")
+        self.separate_db_manager = get_separate_db_manager()
         # 为插件管理器设置分离数据库管理器
         self.plugin_manager.set_separate_db_manager(self.separate_db_manager)
         

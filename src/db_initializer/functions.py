@@ -1,6 +1,6 @@
 """
 数据库初始化功能函数
-从src/data/initializer.py迁移过来的函数
+使用新的统一插件系统
 """
 
 import sys
@@ -17,18 +17,17 @@ if str(project_root) not in sys.path:
 
 try:
     from src.config import config_manager
+    from src.component_system import get_component_system, ComponentType
 except ImportError:
     # 当作为独立模块运行时
     import sys
     sys.path.append(str(Path(__file__).parent.parent))
     from src.config import config_manager
+    from src.component_system import get_component_system, ComponentType
 
 
 def initialize_all_databases_from_source_folders(clear_existing: bool = False) -> Dict[str, Dict[str, int]]:
     """根据项目配置初始化数据库"""
-    # 延期导入以避免循环依赖
-    from src.data.manager import DataManager
-    
     # 获取数据配置
     data_config = config_manager.get_effective_data_config()
     source_dir = data_config['source_dir']
@@ -38,25 +37,34 @@ def initialize_all_databases_from_source_folders(clear_existing: bool = False) -
     db_config = config_manager.get_effective_database_config()
     separate_db_paths = db_config.get('separate_db_paths', {})
     
-    # 确定数据库名称
-    # 从source_dir路径中提取数据库名称（例如：data/source_json/TangShi -> TangShi）
-    db_name = source_json_dir.name if source_json_dir.exists() else "default"
+    # 确定源数据名称（用于显示导入结果）
+    # 从source_dir路径中提取源数据名称（例如：data/source_json/TangShi -> TangShi）
+    source_name = source_json_dir.name if source_json_dir.exists() else "default"
     
     results = {}
     
     try:
-        # 创建DataManager实例，使用从路径中提取的数据库名称
-        manager = DataManager(db_name=db_name)
+        # 获取组件系统并创建统一插件实例
+        component_system = get_component_system(project_root)
+        social_poem_plugin = component_system.get_component(
+            ComponentType.DATA_STORAGE, db_name=source_name
+        )
         
-        # 确保manager的source_dir属性指向正确的源数据目录
-        manager.source_dir = str(source_json_dir)
+        # 使用插件加载数据
+        authors = social_poem_plugin.load_author_data(source_dir)
+        poems = social_poem_plugin.load_all_json_files(source_dir)
         
-        # 初始化数据
-        result = manager.initialize_database_from_json(clear_existing=clear_existing)
-        results[db_name] = result
+        # 使用插件保存数据
+        author_count = social_poem_plugin.batch_insert_authors(authors) if authors else 0
+        poem_count = social_poem_plugin.batch_insert_poems(poems, start_id=1) if poems else 0
+        
+        results[source_name] = {
+            'authors': author_count,
+            'poems': poem_count
+        }
     except Exception as e:
-        db_name = db_name if 'db_name' in locals() else "default"
-        print(f"处理数据库 {db_name} 时出错: {e}")
-        results[db_name] = {"error": str(e)}
+        source_name = source_name if 'source_name' in locals() else "default"
+        print(f"处理源数据 {source_name} 时出错: {e}")
+        results[source_name] = {"error": str(e)}
         
     return results

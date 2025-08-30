@@ -23,18 +23,8 @@ def init_database(clear_existing: bool = False):
     # 获取数据库初始化器
     db_initializer = get_db_initializer()
     
-    # 1. 初始化主数据库
-    print("\n1. 初始化主数据库...")
-    main_results = db_initializer.initialize_all_databases(clear_existing)
-    
-    print("\n主数据库初始化结果:")
-    for db_name, result in main_results.items():
-        status = result.get('status', 'unknown') if isinstance(result, dict) else 'unknown'
-        message = result.get('message', '') if isinstance(result, dict) else str(result)
-        print(f"  {db_name}: {status} - {message}")
-    
-    # 2. 初始化分离的数据库结构
-    print("\n2. 初始化分离的数据库结构...")
+    # 1. 初始化分离的数据库结构
+    print("\n1. 初始化分离的数据库结构...")
     separate_results = db_initializer.initialize_separate_databases(clear_existing)
     
     print("\n分离数据库初始化结果:")
@@ -45,8 +35,8 @@ def init_database(clear_existing: bool = False):
             message = result.get('message', '') if isinstance(result, dict) else str(result)
             print(f"    {sub_db_name}: {status} - {message}")
     
-    # 3. 导入数据
-    print("\n3. 开始导入数据...")
+    # 2. 导入数据
+    print("\n2. 开始导入数据...")
     import_results = initialize_all_databases_from_source_folders(clear_existing)
     
     print("\n数据导入结果:")
@@ -56,8 +46,8 @@ def init_database(clear_existing: bool = False):
         else:
             print(f"  {db_name}: authors={result.get('authors', 0)}, poems={result.get('poems', 0)}")
     
-    # 4. 显示数据库统计信息
-    print("\n4. 数据库统计信息:")
+    # 3. 显示数据库统计信息
+    print("\n3. 数据库统计信息:")
     stats = db_initializer.get_database_stats()
     for db_name, stat in stats.items():
         print(f"  {db_name} 对应的分离数据库:")

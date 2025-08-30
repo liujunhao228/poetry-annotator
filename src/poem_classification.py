@@ -111,8 +111,15 @@ class PoemClassificationPlugin(Plugin):
 
         # 获取数据管理器
         data_manager = get_data_manager(db_name)
-        # 使用原始数据数据库适配器
-        db_adapter = data_manager.db_adapter
+        
+        # 获取数据库路径
+        db_configs = data_manager.separate_db_manager.db_configs if hasattr(data_manager, 'separate_db_manager') else {}
+        raw_data_db_path = db_configs.get('raw_data', f"data/{db_name}/raw_data.db")
+        
+        # 获取数据库连接
+        conn = sqlite3.connect(raw_data_db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
         # 统计信息
         stats = {
@@ -139,7 +146,7 @@ class PoemClassificationPlugin(Plugin):
                 SELECT id, title, full_text, {classification_field}
                 FROM poems
             """
-            rows = db_adapter.execute_query(query)
+            rows = cursor.execute(query).fetchall()
             stats["total_poems_scanned"] = len(rows)
 
             logger.info(f"总共找到 {stats['total_poems_scanned']} 首诗词待处理。")
@@ -235,7 +242,7 @@ class PoemClassificationPlugin(Plugin):
                 if poems_to_update:
                     try:
                         # 使用事务来批量更新，显著提高 SQLite 的写入性能
-                        db_adapter.begin_transaction()
+                        # SQLite在执行语句时自动开始事务
                         update_count = 0
                         for (
                             poem_id,
@@ -253,18 +260,16 @@ class PoemClassificationPlugin(Plugin):
                                 WHERE id = ?
                             """
                             # commit=False 表示在循环中不立即提交，而是等待事务结束统一提交
-                            rowcount = db_adapter.execute_update(
-                                update_query, (categories_json, poem_id), commit=False
-                            )
+                            rowcount = cursor.execute(update_query, (categories_json, poem_id))
                             update_count += rowcount
 
-                        db_adapter.commit_transaction()  # 提交所有待处理的更新
+                        conn.commit()  # 提交所有待处理的更新
                         stats["updated_in_db"] = update_count
                         logger.info(
                             f"成功更新了数据库中 {stats['updated_in_db']} 首诗词的分类信息。"
                         )
                     except Exception as e:
-                        db_adapter.rollback_transaction()  # 发生错误时回滚事务
+                        conn.rollback()  # 发生错误时回滚事务
                         logger.error(f"数据库更新时出错: {e}")
                         stats["errors"] += len(
                             poems_to_update
@@ -311,8 +316,15 @@ class PoemClassificationPlugin(Plugin):
         )
 
         data_manager = get_data_manager(db_name)
-        # 使用原始数据数据库适配器
-        db_adapter = data_manager.db_adapter
+        
+        # 获取数据库路径
+        db_configs = data_manager.separate_db_manager.db_configs if hasattr(data_manager, 'separate_db_manager') else {}
+        raw_data_db_path = db_configs.get('raw_data', f"data/{db_name}/raw_data.db")
+        
+        # 获取数据库连接
+        conn = sqlite3.connect(raw_data_db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
         stats = {
             "total_with_classification": 0,  # 当前有分类数据的诗词总数 (非空字符串或非 NULL)
@@ -326,7 +338,7 @@ class PoemClassificationPlugin(Plugin):
                 SELECT COUNT(*) FROM poems 
                 WHERE {classification_field} IS NOT NULL AND {classification_field} != ''
             """
-            rows = db_adapter.execute_query(count_query)
+            rows = cursor.execute(count_query).fetchall()
             stats["total_with_classification"] = (
                 rows[0][0] if rows and rows[0] else 0
             )
@@ -343,7 +355,7 @@ class PoemClassificationPlugin(Plugin):
                     """
 
                     try:
-                        rowcount = db_adapter.execute_update(update_query)
+                        rowcount = cursor.execute(update_query)
                         stats["reset_count"] = rowcount
                         logger.info(
                             f"已将 {rowcount} 首诗词的预分类重置为 NULL。"
@@ -389,8 +401,15 @@ class PoemClassificationPlugin(Plugin):
         )
 
         data_manager = get_data_manager(db_name)
-        # 使用原始数据数据库适配器
-        db_adapter = data_manager.db_adapter
+        
+        # 获取数据库路径
+        db_configs = data_manager.separate_db_manager.db_configs if hasattr(data_manager, 'separate_db_manager') else {}
+        raw_data_db_path = db_configs.get('raw_data', f"data/{db_name}/raw_data.db")
+        
+        # 获取数据库连接
+        conn = sqlite3.connect(raw_data_db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
         report = {
             "total_poems": 0,  # 数据库中的诗词总数
@@ -411,7 +430,7 @@ class PoemClassificationPlugin(Plugin):
                     COUNT(CASE WHEN {classification_field} = '' THEN 1 END) as empty_string_count
                 FROM poems
             """
-            summary_rows = db_adapter.execute_query(summary_query)
+            summary_rows = cursor.execute(summary_query).fetchall()
             if summary_rows and summary_rows[0]:
                 report["total_poems"] = summary_rows[0][0]
                 report["unclassified_null"] = summary_rows[0][1]
@@ -423,9 +442,9 @@ class PoemClassificationPlugin(Plugin):
                 FROM poems
                 WHERE {classification_field} IS NOT NULL AND {classification_field} != ''
             """
-            classified_rows = db_adapter.execute_query(
+            classified_rows = cursor.execute(
                 classification_data_query
-            )
+            ).fetchall()
 
             for row in classified_rows:
                 classification_json_str = row[0]

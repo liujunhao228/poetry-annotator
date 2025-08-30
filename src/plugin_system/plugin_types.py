@@ -14,6 +14,11 @@ class PluginType(Enum):
     LABEL_PARSER = "label_parser"
     DATABASE_INIT = "database_init"
     CUSTOM = "custom"
+    DATA_STORAGE = "data_storage"
+    DATA_QUERY = "data_query"
+    DATA_PROCESSING = "data_processing"
+    ANNOTATION_MANAGEMENT = "annotation_management"
+    DB_INITIALIZER = "db_initializer"
     
     @classmethod
     def from_string(cls, value: str) -> 'PluginType':

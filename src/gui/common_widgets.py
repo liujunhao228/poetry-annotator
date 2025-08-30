@@ -80,18 +80,12 @@ class DatabaseSelector(ttk.Frame):
         try:
             # 使用新的配置管理器API获取数据库配置
             db_config = config_manager.get_effective_database_config()
-            if 'db_paths' in db_config:
-                db_names = list(db_config['db_paths'].keys())
-                if db_names:
-                    self.db_combobox['values'] = db_names
-                    if not self.db_var.get():
-                        self.db_combobox.set(db_names[0])
-                else:
-                    self.db_combobox.set("无可用数据库")
-            elif 'db_path' in db_config:
-                # 单数据库模式，使用默认名称
-                self.db_combobox['values'] = ["default"]
-                self.db_combobox.set("default")
+            if 'separate_db_paths' in db_config:
+                # 对于分离数据库，我们只显示一个默认选项
+                db_names = ["default"]
+                self.db_combobox['values'] = db_names
+                if not self.db_var.get():
+                    self.db_combobox.set(db_names[0])
             else:
                 self.db_combobox.set("无数据库配置")
         except Exception as e:
@@ -117,12 +111,10 @@ class DatabaseSelector(ttk.Frame):
         try:
             # 使用新的配置管理器API获取数据库配置
             db_config = config_manager.get_effective_database_config()
-            if 'db_paths' in db_config and db_name in db_config['db_paths']:
-                return db_config['db_paths'][db_name]
-            elif 'db_path' in db_config and db_name == "default":
-                return db_config['db_path']
+            if 'separate_db_paths' in db_config and 'raw_data' in db_config['separate_db_paths']:
+                return db_config['separate_db_paths']['raw_data']
             else:
-                return None
+                return 'data/default/raw_data.db'
         except Exception as e:
             print(f"警告: 获取数据库 '{db_name}' 路径失败: {e}")
             return None

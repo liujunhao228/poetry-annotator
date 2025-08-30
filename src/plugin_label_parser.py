@@ -79,10 +79,6 @@ class PluginBasedLabelParser(Component):
         # 获取所有标签解析插件
         label_parser_plugins = self._get_label_parser_plugins()
         
-        if not label_parser_plugins:
-            self.logger.warning("未找到任何标签解析插件")
-            return
-        
         # 合并所有插件提供的分类信息
         for plugin_name, plugin in label_parser_plugins.items():
             try:

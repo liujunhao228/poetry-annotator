@@ -77,3 +77,23 @@ class DatabaseInitPlugin(BasePlugin):
     def on_database_initialized(self, db_name: str, result: Dict[str, Any]):
         """数据库初始化完成后的回调方法"""
         pass
+
+
+class DataStoragePlugin(BasePlugin):
+    """数据存储插件接口"""
+    pass
+
+
+class DataQueryPlugin(BasePlugin):
+    """数据查询插件接口"""
+    pass
+
+
+class DataProcessingPlugin(BasePlugin):
+    """数据处理插件接口"""
+    pass
+
+
+class AnnotationManagementPlugin(BasePlugin):
+    """标注管理插件接口"""
+    pass

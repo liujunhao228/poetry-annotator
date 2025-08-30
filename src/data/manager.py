@@ -7,10 +7,9 @@ import sqlite3
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Set
 from src.config import get_config_manager
-from .adapter import get_database_adapter
 from .models import Poem, Author, Annotation
 from .exceptions import DataError, DatabaseError
-from .plugin_based_manager import PluginBasedDataManager
+from src.component_system import get_component_system, ComponentType
 
 
 class DataManager:
@@ -50,17 +49,37 @@ class DataManager:
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"数据管理器初始化 - 数据库: {self.db_path}, 数据源: {self.source_dir}")
         
-        # 初始化插件化数据管理器
+        # 初始化组件系统
         project_root = Path(__file__).parent.parent.parent
-        self.plugin_manager = PluginBasedDataManager(project_root, db_name, self.source_dir)
+        self.component_system = get_component_system(project_root)
+        
+        # 直接导入并创建统一插件实例，避免循环依赖
+        try:
+            from project.plugins.social_poem_analysis_plugin import SocialPoemAnalysisPlugin
+            from src.config.schema import PluginConfig
+            plugin_config = PluginConfig(
+                enabled=True,
+                module="project.plugins.social_poem_analysis_plugin",
+                class_name="SocialPoemAnalysisPlugin",
+                settings={"type": "social_poem_analysis"}
+            )
+            self.social_poem_plugin = SocialPoemAnalysisPlugin(plugin_config)
+            self.logger.info("成功创建统一插件实例")
+        except Exception as e:
+            self.logger.error(f"创建统一插件实例失败: {e}")
+            raise
         
         # 检查数据库文件是否存在，如果不存在则初始化
         if not Path(self.db_path).exists():
             self.logger.info(f"数据库文件 {self.db_path} 不存在，正在初始化...")
             self._initialize_database_if_not_exists()
         
-        # 初始化数据库适配器（仅用于初始化表结构）
-        self.db_adapter = get_database_adapter('sqlite', self.db_path)
+        # 初始化分离数据库管理器
+        from .separate_databases import get_separate_db_manager
+        self.separate_db_manager = get_separate_db_manager()
+        
+        # 为了保持向后兼容性，添加适配器属性
+        self.db_adapter = self.separate_db_manager.raw_data_db
         
         # 为不同数据库设置ID前缀，确保全局唯一性
         self._set_id_prefix()
@@ -94,11 +113,22 @@ class DataManager:
             self.logger.error(f"创建数据库文件失败: {e}")
             raise DatabaseError(f"无法创建数据库文件 {self.db_path}: {e}")
     
-    # 所有业务逻辑都委托给插件管理器
+    # 所有业务逻辑都直接委托给统一插件
     
     def initialize_database_from_json(self, clear_existing: bool = False) -> Dict[str, int]:
         """从JSON文件初始化数据库"""
-        return self.plugin_manager.initialize_database_from_json(clear_existing)
+        # 首先使用数据处理插件加载数据
+        authors = self.social_poem_plugin.load_author_data(self.source_dir)
+        poems = self.social_poem_plugin.load_all_json_files(self.source_dir)
+        
+        # 然后使用数据存储插件保存数据
+        author_count = self.social_poem_plugin.batch_insert_authors(authors) if authors else 0
+        poem_count = self.social_poem_plugin.batch_insert_poems(poems, start_id=1) if poems else 0
+        
+        return {
+            'authors': author_count,
+            'poems': poem_count
+        }
     
     def get_poems_to_annotate(self, model_identifier: str, 
                              limit: Optional[int] = None, 
@@ -106,59 +136,62 @@ class DataManager:
                              end_id: Optional[int] = None,
                              force_rerun: bool = False) -> List[Poem]:
         """获取指定模型待标注的诗词"""
-        return self.plugin_manager.get_poems_to_annotate(
+        return self.social_poem_plugin.get_poems_to_annotate(
             model_identifier, limit, start_id, end_id, force_rerun
         )
     
     def get_poem_by_id(self, poem_id: int) -> Optional[Poem]:
         """根据ID获取单首诗词信息"""
-        return self.plugin_manager.get_poem_by_id(poem_id)
+        return self.social_poem_plugin.get_poem_by_id(poem_id)
     
     def get_poems_by_ids(self, poem_ids: List[int]) -> List[Poem]:
         """根据ID列表获取诗词信息"""
-        return self.plugin_manager.get_poems_by_ids(poem_ids)
+        return self.social_poem_plugin.get_poems_by_ids(poem_ids)
     
     def save_annotation(self, poem_id: int, model_identifier: str, status: str,
                         annotation_result: Optional[str] = None, 
                         error_message: Optional[str] = None) -> bool:
         """保存标注结果"""
-        return self.plugin_manager.save_annotation(
+        return self.social_poem_plugin.save_annotation(
             poem_id, model_identifier, status, annotation_result, error_message
         )
     
     def get_statistics(self) -> Dict[str, Any]:
         """获取数据库统计信息"""
-        return self.plugin_manager.get_statistics()
+        return self.social_poem_plugin.get_statistics()
     
     def get_annotation_statistics(self) -> Dict[str, Any]:
         """获取标注统计信息"""
-        return self.plugin_manager.get_annotation_statistics()
+        return self.social_poem_plugin.get_annotation_statistics()
     
     def get_all_authors(self) -> List[Author]:
         """获取所有作者信息"""
-        return self.plugin_manager.get_all_authors()
+        return self.social_poem_plugin.get_all_authors()
     
     def search_poems(self, author: Optional[str] = None, title: Optional[str] = None, 
                      page: int = 1, per_page: int = 10) -> Dict[str, Any]:
         """根据作者和标题搜索诗词，并支持分页"""
-        return self.plugin_manager.search_poems(author, title, page, per_page)
+        return self.social_poem_plugin.search_poems(author, title, page, per_page)
     
     def get_completed_poem_ids(self, poem_ids: List[int], model_identifier: str) -> Set[int]:
         """高效检查一组 poem_id 是否已被特定模型成功标注"""
-        return self.plugin_manager.get_completed_poem_ids(poem_ids, model_identifier)
+        return self.social_poem_plugin.get_completed_poem_ids(poem_ids, model_identifier)
     
-    # 数据加载方法也委托给插件管理器
+    # 数据加载方法也直接委托给统一插件
     def load_data_from_json(self, json_file: str) -> List[Dict[str, Any]]:
         """从JSON文件加载数据"""
-        return self.plugin_manager.load_data_from_json(json_file)
+        return self.social_poem_plugin.load_data_from_json(self.source_dir, json_file)
     
     def load_all_json_files(self) -> List[Dict[str, Any]]:
         """加载所有JSON文件的数据"""
-        return self.plugin_manager.load_all_json_files()
+        return self.social_poem_plugin.load_all_json_files(self.source_dir)
     
-    def load_author_data(self) -> List[Dict[str, Any]]:
+    def load_author_data(self, source_dir: Optional[str] = None) -> List[Dict[str, Any]]:
         """加载作者数据"""
-        return self.plugin_manager.load_author_data()
+        # 如果没有提供source_dir，则使用实例的source_dir属性
+        if source_dir is None:
+            source_dir = self.source_dir
+        return self.social_poem_plugin.load_author_data(source_dir)
 
 # 全局数据管理器实例
 data_manager = None

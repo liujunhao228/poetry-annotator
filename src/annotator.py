@@ -269,10 +269,10 @@ class Annotator:
 
         # 获取数据库路径
         db_config = config_manager.get_effective_database_config()
-        if 'db_paths' in db_config:
-            db_path = next(iter(db_config['db_paths'].values()))
+        if 'separate_db_paths' in db_config and 'raw_data' in db_config['separate_db_paths']:
+            db_path = db_config['separate_db_paths']['raw_data']
         else:
-            db_path = db_config.get('db_path', 'poetry.db')
+            db_path = 'data/default/raw_data.db'
 
         try:
             async with AsyncDataManager(db_path) as data_manager:
@@ -321,11 +321,10 @@ class Annotator:
         
         # 获取数据库路径
         db_config = config_manager.get_effective_database_config()
-        if 'db_paths' in db_config:
-            # 使用第一个数据库路径
-            db_path = next(iter(db_config['db_paths'].values()))
+        if 'separate_db_paths' in db_config and 'raw_data' in db_config['separate_db_paths']:
+            db_path = db_config['separate_db_paths']['raw_data']
         else:
-            db_path = db_config.get('db_path', 'poetry.db')
+            db_path = 'data/default/raw_data.db'
         
         async with AsyncDataManager(db_path) as data_manager:
             if poem_ids is not None:

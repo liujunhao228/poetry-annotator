@@ -56,7 +56,9 @@ def register_project_plugins(plugin_manager: PluginManager, plugin_configs: dict
                 plugin_manager.register_plugin(adapter_instance)
                 logger.info(f"成功注册项目插件: {plugin_name} (类型: {plugin_type})")
             else:
-                logger.debug(f"未找到插件 '{plugin_name}' 的适配器，跳过注册")
+                # 对于没有适配器的插件，直接注册原始插件
+                # 这适用于新的统一插件实现
+                logger.debug(f"插件 '{plugin_name}' 没有适配器，将直接尝试加载")
                 
         except Exception as e:
             logger.error(f"注册插件 '{plugin_name}' 时出错: {e}")

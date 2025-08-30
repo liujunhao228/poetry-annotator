@@ -47,23 +47,24 @@ def resolve_path(path: str) -> str:
 
 
 def get_database_paths() -> Dict[str, str]:
-    """获取数据库路径配置"""
+    """获取分离数据库路径配置"""
     db_config = config_manager.get_effective_database_config()
     
-    # 处理新的多数据库配置
-    if 'db_paths' in db_config:
-        db_paths = db_config['db_paths']
+    # 处理分离数据库配置
+    if 'separate_db_paths' in db_config:
+        separate_paths = db_config['separate_db_paths']
         # 确保使用绝对路径
         resolved_paths = {}
-        for name, path in db_paths.items():
+        for name, path in separate_paths.items():
             resolved_paths[name] = resolve_path(path)
         return resolved_paths
-    # 回退到旧的单数据库配置
-    elif 'db_path' in db_config:
-        path = db_config['db_path']
-        return {"default": resolve_path(path)}
     else:
-        raise ValueError("配置文件中未找到数据库路径配置。")
+        # 使用默认路径配置
+        return {
+            'raw_data': resolve_path('data/default/raw_data.db'),
+            'annotation': resolve_path('data/default/annotation.db'),
+            'emotion': resolve_path('data/default/emotion.db')
+        }
 
 
 def ensure_directory_exists(path: str) -> None:

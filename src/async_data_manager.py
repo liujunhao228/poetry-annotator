@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional, AsyncIterator
 from .config import config_manager
-from .data.adapter import get_database_adapter, normalize_poem_data
+from .data.separate_databases import get_separate_db_manager
 from datetime import datetime, timezone, timedelta
 
 

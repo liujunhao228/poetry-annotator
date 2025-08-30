@@ -98,13 +98,23 @@ class AnnotationDataExporter:
                 logger.warning(f"未找到ID为 {poem_id} 的诗词。")
                 return pd.DataFrame()
             
+            # 获取数据库路径
+            db_configs = self.data_manager.separate_db_manager.db_configs if hasattr(self.data_manager, 'separate_db_manager') else {}
+            annotation_db_path = db_configs.get('annotation', f"data/{self.data_manager.db_name}/annotation.db")
+            
+            # 获取数据库连接
+            conn = sqlite3.connect(annotation_db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
             # 2. 查询该诗词的所有completed标注记录
             query = """
                 SELECT id, poem_id, model_identifier, annotation_result, created_at
                 FROM annotations
                 WHERE poem_id = ? AND status = 'completed'
             """
-            rows = self.data_manager.db_adapter.execute_query(query, (poem_id,))
+            cursor.execute(query, (poem_id,))
+            rows = cursor.fetchall()
             
             if not rows:
                 logger.info(f"诗词 {poem_id} 没有找到任何completed的标注记录。")

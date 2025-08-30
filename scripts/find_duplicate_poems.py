@@ -1,6 +1,7 @@
 import json
 import logging
 import argparse
+import sqlite3
 from typing import List, Dict, Any
 
 # 添加项目根目录到 Python 路径，确保能正确导入 src 下的模块
@@ -35,8 +36,15 @@ def find_duplicate_full_text_groups(db_name: str = "default") -> List[Dict[str, 
     
     # 获取数据管理器
     data_manager = get_data_manager(db_name)
-    # 使用原始数据数据库适配器
-    db_adapter = data_manager.db_adapter
+    
+    # 获取数据库路径
+    db_configs = data_manager.separate_db_manager.db_configs if hasattr(data_manager, 'separate_db_manager') else {}
+    raw_data_db_path = db_configs.get('raw_data', f"data/{db_name}/raw_data.db")
+    
+    # 获取数据库连接
+    conn = sqlite3.connect(raw_data_db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
     
     # SQL 查询:
     # 1. GROUP BY full_text: 将具有相同 full_text 内容的行分为一组。
@@ -60,7 +68,8 @@ def find_duplicate_full_text_groups(db_name: str = "default") -> List[Dict[str, 
     duplicate_groups = []
     try:
         logging.info("正在执行查询，这可能需要一些时间，具体取决于数据库大小...")
-        rows = db_adapter.execute_query(query)
+        cursor.execute(query)
+        rows = cursor.fetchall()
 
         # 逐行处理查询结果，避免一次性加载所有结果到内存
         for row in rows:
@@ -83,6 +92,8 @@ def find_duplicate_full_text_groups(db_name: str = "default") -> List[Dict[str, 
         logging.error(f"数据库操作失败: {e}")
         # 如果出现问题，返回空列表
         return []
+    finally:
+        conn.close()
 
     return duplicate_groups
 

@@ -57,15 +57,6 @@ def main():
         from src.db_initializer import get_db_initializer
         db_initializer = get_db_initializer()
         
-        # 初始化主数据库
-        results = db_initializer.initialize_all_databases()
-        
-        print("\n主数据库初始化结果:")
-        for db_name, result in results.items():
-            status = result.get('status', 'unknown') if isinstance(result, dict) else 'unknown'
-            message = result.get('message', '') if isinstance(result, dict) else str(result)
-            print(f"  {db_name}: {status} - {message}")
-            
         # 初始化分离的数据库结构
         print("\n开始初始化分离的数据库结构...")
         separate_results = db_initializer.initialize_separate_databases()
@@ -93,6 +84,8 @@ def main():
         # 显示数据库统计信息
         print("\n数据库统计信息:")
         stats = db_initializer.get_database_stats()
+        
+        # 遍历所有数据库统计信息
         for db_name, stat in stats.items():
             print(f"  {db_name} 对应的分离数据库:")
             if isinstance(stat, dict):
