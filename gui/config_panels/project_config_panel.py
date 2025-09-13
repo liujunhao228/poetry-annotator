@@ -329,12 +329,12 @@ class ProjectConfigPanel(QDialog):
                                 if field_type: break
 
                             if field_type is int and not isinstance(value, int):
-                                QMessageBox.warning(self, _("Validation Error"), _("'{}' in '{}' must be an integer.").format(key, section_name))
+                                QMessageBox.warning(self, _("Validation Error"), _("{field_name} in {section_name} must be an integer.").format(field_name=key, section_name=section_name))
                                 return False
                             if field_type is float and not isinstance(value, float):
-                                QMessageBox.warning(self, _("Validation Error"), _("'{}' in '{}' must be a number.").format(key, section_name))
+                                QMessageBox.warning(self, _("Validation Error"), _("{field_name} in {section_name} must be a number.").format(field_name=key, section_name=section_name))
                                 return False
                             if (field_type == Dict[str, str] or field_type == Optional[Dict[str, str]]) and not isinstance(value, dict):
-                                QMessageBox.warning(self, _("Validation Error"), _("'{}' in '{}' must be a valid JSON object.").format(key, section_name))
+                                QMessageBox.warning(self, _("Validation Error"), _("{field_name} in {section_name} must be a valid JSON object.").format(field_name=key, section_name=section_name))
                                 return False
         return True

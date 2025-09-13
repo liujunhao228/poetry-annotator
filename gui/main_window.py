@@ -3,15 +3,13 @@
 # This will be the main application window, managing tabs for different script panels.
 
 import logging
-import gettext
 from PyQt5.QtWidgets import QMainWindow, QTabWidget, QStatusBar, QVBoxLayout, QWidget, QTextEdit, QMenuBar, QAction, QMessageBox
 from PyQt5.QtCore import Qt
 from .utils import LogStreamHandler
 from .config_panels.global_config_panel import GlobalConfigPanel
 from .config_panels.project_config_panel import ProjectConfigPanel
 from .config_manager import ConfigHandler
-
-_ = gettext.gettext
+from .i18n import _
 
 class MainWindow(QMainWindow):
     """

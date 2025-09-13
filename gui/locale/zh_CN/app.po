@@ -563,103 +563,103 @@ msgstr "生成随机样本"
 msgid "Sample Size must be a positive integer."
 msgstr "样本大小必须是正整数。"
 
-#: gui\help_texts.py:10
+#: gui/help_texts.py:10 gui\help_texts.py:10
 msgid "The LLM service to use (e.g., 'openai', 'gemini')."
 msgstr "要使用的 LLM 服务（例如：'openai'、'gemini'）。"
 
-#: gui\help_texts.py:11
+#: gui/help_texts.py:11 gui\help_texts.py:11
 msgid "The specific model name to use for the selected service."
 msgstr "所选服务要使用的特定模型名称。"
 
-#: gui\help_texts.py:12
+#: gui/help_texts.py:12 gui\help_texts.py:12
 msgid "Your API key for the selected LLM service."
 msgstr "您所选 LLM 服务的 API 密钥。"
 
-#: gui\help_texts.py:13
+#: gui/help_texts.py:13 gui\help_texts.py:13
 msgid "The base URL for the API, if not using the default."
 msgstr "API 的基本 URL，如果未使用默认值。"
 
-#: gui\help_texts.py:14
+#: gui/help_texts.py:14 gui\help_texts.py:14
 msgid "The type of database to use (e.g., 'sqlite')."
 msgstr "要使用的数据库类型（例如：'sqlite'）。"
 
-#: gui\help_texts.py:15
+#: gui/help_texts.py:15 gui\help_texts.py:15
 msgid "The file path for the database."
 msgstr "数据库的文件路径。"
 
-#: gui\help_texts.py:16
+#: gui/help_texts.py:16 gui\help_texts.py:16
 msgid "Directory containing the source JSON files."
 msgstr "包含源 JSON 文件的目录。"
 
-#: gui\help_texts.py:17
+#: gui/help_texts.py:17 gui\help_texts.py:17
 msgid "Directory where logs should be stored."
 msgstr "日志应存储的目录。"
 
-#: gui\help_texts.py:18
+#: gui/help_texts.py:18 gui\help_texts.py:18
 msgid "Directory for application output."
 msgstr "应用程序输出目录。"
 
-#: gui\help_texts.py:19
+#: gui/help_texts.py:19 gui\help_texts.py:19
 msgid "Directory containing prompt templates."
 msgstr "包含提示模板的目录。"
 
-#: gui\help_texts.py:20
+#: gui/help_texts.py:20 gui\help_texts.py:20
 msgid "The logging level (e.g., 'INFO', 'DEBUG')."
 msgstr "日志记录级别（例如：'INFO'、'DEBUG'）。"
 
-#: gui\help_texts.py:21
+#: gui/help_texts.py:21 gui\help_texts.py:21
 msgid "The file path for the log file."
 msgstr "日志文件的文件路径。"
 
-#: gui\help_texts.py:24
+#: gui/help_texts.py:24 gui\help_texts.py:24
 msgid "Override the global LLM service for this project."
 msgstr "覆盖此项目的全局 LLM 服务。"
 
-#: gui\help_texts.py:25
+#: gui/help_texts.py:25 gui\help_texts.py:25
 msgid "Override the global LLM model for this project."
 msgstr "覆盖此项目的全局 LLM 模型。"
 
-#: gui\help_texts.py:26
+#: gui/help_texts.py:26 gui\help_texts.py:26
 msgid "Override the global API key for this project."
 msgstr "覆盖此项目的全局 API 密钥。"
 
-#: gui\help_texts.py:27
+#: gui/help_texts.py:27 gui\help_texts.py:27
 msgid "Override the global base URL for this project."
 msgstr "覆盖此项目的全局基本 URL。"
 
-#: gui\help_texts.py:28
+#: gui/help_texts.py:28 gui\help_texts.py:28
 msgid "Override the global database type for this project."
 msgstr "覆盖此项目的全局数据库类型。"
 
-#: gui\help_texts.py:29
+#: gui/help_texts.py:29 gui\help_texts.py:29
 msgid "Override the global database path for this project."
 msgstr "覆盖此项目的全局数据库路径。"
 
-#: gui\help_texts.py:30
+#: gui/help_texts.py:30 gui\help_texts.py:30
 msgid "Override the global source JSON directory for this project."
 msgstr "覆盖此项目的全局源 JSON 目录。"
 
-#: gui\help_texts.py:31
+#: gui/help_texts.py:31 gui\help_texts.py:31
 msgid "Override the global log directory for this project."
 msgstr "覆盖此项目的全局日志目录。"
 
-#: gui\help_texts.py:32
+#: gui/help_texts.py:32 gui\help_texts.py:32
 msgid "Override the global output directory for this project."
 msgstr "覆盖此项目的全局输出目录。"
 
-#: gui\help_texts.py:33
+#: gui/help_texts.py:33 gui\help_texts.py:33
 msgid "Override the global prompt template directory for this project."
 msgstr "覆盖此项目的全局提示模板目录。"
 
-#: gui\help_texts.py:34
+#: gui/help_texts.py:34 gui\help_texts.py:34
 msgid "Override the global logging level for this project."
 msgstr "覆盖此项目的全局日志记录级别。"
 
-#: gui\help_texts.py:35
+#: gui/help_texts.py:35 gui\help_texts.py:35
 msgid "Override the global log file for this project."
 msgstr "覆盖此项目的全局日志文件。"
 
-#: gui\help_texts.py:36
+#: gui/help_texts.py:36 gui\help_texts.py:36
 msgid "List of enabled plugins for this project (comma-separated)."
 msgstr "此项目启用的插件列表（逗号分隔）。"
 

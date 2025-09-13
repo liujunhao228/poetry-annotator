@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2025-09-13 13:08+0800\n"
+"POT-Creation-Date: 2025-09-13 13:48+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -15,28 +15,28 @@ msgstr ""
 "Generated-By: pygettext.py 1.5\n"
 
 
-#: gui/app.py:47 gui\app.py:47
+#: gui/app.py:33 gui\app.py:33
 msgid "Annotation Statistics"
 msgstr ""
 
-#: gui/app.py:48 gui/script_panels\distribute_tasks_panel.py:70 gui\app.py:48
+#: gui/app.py:34 gui/script_panels\distribute_tasks_panel.py:70 gui\app.py:34
 msgid "Distribute Tasks"
 msgstr ""
 
-#: gui/app.py:49 gui\app.py:49
+#: gui/app.py:35 gui\app.py:35
 msgid "Export Poem Annotations"
 msgstr ""
 
-#: gui/app.py:50 gui\app.py:50
+#: gui/app.py:36 gui\app.py:36
 msgid "Find Duplicate Poems"
 msgstr ""
 
-#: gui/app.py:51 gui/script_panels\proofread_annotations_panel.py:52
-#: gui\app.py:51
+#: gui/app.py:37 gui/script_panels\proofread_annotations_panel.py:52
+#: gui\app.py:37
 msgid "Proofread Annotations"
 msgstr ""
 
-#: gui/app.py:52 gui\app.py:52
+#: gui/app.py:38 gui\app.py:38
 msgid "Random Sample"
 msgstr ""
 
@@ -72,12 +72,10 @@ msgid "No suitable widget for field '%s' of type %s"
 msgstr ""
 
 #: gui/config_panels\global_config_panel.py:125
-#: gui/config_panels\project_config_panel.py:141
 msgid "Comma-separated values"
 msgstr ""
 
 #: gui/config_panels\global_config_panel.py:130
-#: gui/config_panels\project_config_panel.py:146
 msgid "JSON string (e.g., {\"key\": \"value\"})"
 msgstr ""
 
@@ -86,7 +84,7 @@ msgid "Global configuration saved."
 msgstr ""
 
 #: gui/config_panels\global_config_panel.py:181
-#: gui/config_panels\project_config_panel.py:226
+#: gui/config_panels\project_config_panel.py:229
 msgid "Save Successful"
 msgstr ""
 
@@ -95,16 +93,20 @@ msgid "Failed to save global configuration. Check logs for details."
 msgstr ""
 
 #: gui/config_panels\global_config_panel.py:185
-#: gui/config_panels\project_config_panel.py:230
+#: gui/config_panels\project_config_panel.py:233
 msgid "Save Error"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:287
+msgid "'{}' in '{}' must be an integer."
 msgstr ""
 
 #: gui/config_panels\global_config_panel.py:287
 #: gui/config_panels\global_config_panel.py:290
 #: gui/config_panels\global_config_panel.py:293
-#: gui/config_panels\project_config_panel.py:332
 #: gui/config_panels\project_config_panel.py:335
 #: gui/config_panels\project_config_panel.py:338
+#: gui/config_panels\project_config_panel.py:341
 #: gui/script_panels\annotation_statistics_panel.py:72
 #: gui/script_panels\annotation_statistics_panel.py:75
 #: gui/script_panels\distribute_tasks_panel.py:99
@@ -124,18 +126,11 @@ msgstr ""
 msgid "Validation Error"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:287
-#: gui/config_panels\project_config_panel.py:332
-msgid "'{}' in '{}' must be an integer."
-msgstr ""
-
 #: gui/config_panels\global_config_panel.py:290
-#: gui/config_panels\project_config_panel.py:335
 msgid "'{}' in '{}' must be a number."
 msgstr ""
 
 #: gui/config_panels\global_config_panel.py:293
-#: gui/config_panels\project_config_panel.py:338
 msgid "'{}' in '{}' must be a valid JSON object."
 msgstr ""
 
@@ -147,122 +142,238 @@ msgstr ""
 msgid "Active Project:"
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:96
-msgid "<b>{} Settings</b>"
-msgstr ""
-
-#: gui/config_panels\project_config_panel.py:101
-msgid "{}:"
-msgstr ""
-
-#: gui/config_panels\project_config_panel.py:112
+#: gui/config_panels\project_config_panel.py:115
 msgid "No suitable widget for field '{}' of type {}"
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:162
+#: gui/config_panels\project_config_panel.py:165
 msgid "Project Switched"
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:162
-#: gui/config_panels\project_config_panel.py:163 gui/main_window.py:133
-#: gui\main_window.py:133
+#: gui/config_panels\project_config_panel.py:165
+#: gui/config_panels\project_config_panel.py:166 gui/main_window.py:131
+#: gui\main_window.py:131
 msgid "Switched to project: {}"
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:165
+#: gui/config_panels\project_config_panel.py:168
 msgid "Project Switch Error"
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:165
-#: gui/config_panels\project_config_panel.py:167
+#: gui/config_panels\project_config_panel.py:168
+#: gui/config_panels\project_config_panel.py:170
 msgid "Failed to switch to project: {}"
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:177
+#: gui/config_panels\project_config_panel.py:180
 msgid "No project configuration found to load."
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:226
+#: gui/config_panels\project_config_panel.py:229
 msgid "Project configuration saved."
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:230
+#: gui/config_panels\project_config_panel.py:233
 msgid "Failed to save project configuration. Check logs for details."
 msgstr ""
 
-#: gui/main_window.py:23 gui\main_window.py:23
+#: gui/config_panels\project_config_panel.py:335
+msgid "{field_name} in {section_name} must be an integer."
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:338
+msgid "{field_name} in {section_name} must be a number."
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:341
+msgid "{field_name} in {section_name} must be a valid JSON object."
+msgstr ""
+
+#: gui/help_texts.py:8 gui\help_texts.py:8
+msgid "The LLM service to use (e.g., 'openai', 'gemini')."
+msgstr ""
+
+#: gui/help_texts.py:9 gui\help_texts.py:9
+msgid "The specific model name to use for the selected service."
+msgstr ""
+
+#: gui/help_texts.py:10 gui\help_texts.py:10
+msgid "Your API key for the selected LLM service."
+msgstr ""
+
+#: gui/help_texts.py:11 gui\help_texts.py:11
+msgid "The base URL for the API, if not using the default."
+msgstr ""
+
+#: gui/help_texts.py:12 gui\help_texts.py:12
+msgid "The type of database to use (e.g., 'sqlite')."
+msgstr ""
+
+#: gui/help_texts.py:13 gui\help_texts.py:13
+msgid "The file path for the database."
+msgstr ""
+
+#: gui/help_texts.py:14 gui\help_texts.py:14
+msgid "Directory containing the source JSON files."
+msgstr ""
+
+#: gui/help_texts.py:15 gui\help_texts.py:15
+msgid "Directory where logs should be stored."
+msgstr ""
+
+#: gui/help_texts.py:16 gui\help_texts.py:16
+msgid "Directory for application output."
+msgstr ""
+
+#: gui/help_texts.py:17 gui\help_texts.py:17
+msgid "Directory containing prompt templates."
+msgstr ""
+
+#: gui/help_texts.py:18 gui\help_texts.py:18
+msgid "The logging level (e.g., 'INFO', 'DEBUG')."
+msgstr ""
+
+#: gui/help_texts.py:19 gui\help_texts.py:19
+msgid "The file path for the log file."
+msgstr ""
+
+#: gui/help_texts.py:22 gui\help_texts.py:22
+msgid "Override the global LLM service for this project."
+msgstr ""
+
+#: gui/help_texts.py:23 gui\help_texts.py:23
+msgid "Override the global LLM model for this project."
+msgstr ""
+
+#: gui/help_texts.py:24 gui\help_texts.py:24
+msgid "Override the global API key for this project."
+msgstr ""
+
+#: gui/help_texts.py:25 gui\help_texts.py:25
+msgid "Override the global base URL for this project."
+msgstr ""
+
+#: gui/help_texts.py:26 gui\help_texts.py:26
+msgid "Override the global database type for this project."
+msgstr ""
+
+#: gui/help_texts.py:27 gui\help_texts.py:27
+msgid "Override the global database path for this project."
+msgstr ""
+
+#: gui/help_texts.py:28 gui\help_texts.py:28
+msgid "Override the global source JSON directory for this project."
+msgstr ""
+
+#: gui/help_texts.py:29 gui\help_texts.py:29
+msgid "Override the global log directory for this project."
+msgstr ""
+
+#: gui/help_texts.py:30 gui\help_texts.py:30
+msgid "Override the global output directory for this project."
+msgstr ""
+
+#: gui/help_texts.py:31 gui\help_texts.py:31
+msgid "Override the global prompt template directory for this project."
+msgstr ""
+
+#: gui/help_texts.py:32 gui\help_texts.py:32
+msgid "Override the global logging level for this project."
+msgstr ""
+
+#: gui/help_texts.py:33 gui\help_texts.py:33
+msgid "Override the global log file for this project."
+msgstr ""
+
+#: gui/help_texts.py:34 gui\help_texts.py:34
+msgid "List of enabled plugins for this project (comma-separated)."
+msgstr ""
+
+#: gui/help_window.py:16 gui\help_window.py:16
+msgid "Configuration Help"
+msgstr ""
+
+#: gui/help_window.py:35 gui\help_window.py:35
+msgid "Close"
+msgstr ""
+
+#: gui/help_window.py:44 gui\help_window.py:44
+msgid "Configuration Options"
+msgstr ""
+
+#: gui/main_window.py:21 gui\main_window.py:21
 msgid "Poetry Annotator GUI"
 msgstr ""
 
-#: gui/main_window.py:45 gui\main_window.py:45
+#: gui/main_window.py:43 gui\main_window.py:43
 msgid "Ready"
 msgstr ""
 
-#: gui/main_window.py:63 gui\main_window.py:63
+#: gui/main_window.py:61 gui\main_window.py:61
 msgid "&File"
 msgstr ""
 
-#: gui/main_window.py:64 gui\main_window.py:64
+#: gui/main_window.py:62 gui\main_window.py:62
 msgid "E&xit"
 msgstr ""
 
-#: gui/main_window.py:66 gui\main_window.py:66
+#: gui/main_window.py:64 gui\main_window.py:64
 msgid "Exit application"
 msgstr ""
 
-#: gui/main_window.py:71 gui\main_window.py:71
+#: gui/main_window.py:69 gui\main_window.py:69
 msgid "&Settings"
 msgstr ""
 
-#: gui/main_window.py:73 gui\main_window.py:73
+#: gui/main_window.py:71 gui\main_window.py:71
 msgid "Edit &Global Configuration"
 msgstr ""
 
-#: gui/main_window.py:77 gui\main_window.py:77
+#: gui/main_window.py:75 gui\main_window.py:75
 msgid "Edit &Project Configuration"
 msgstr ""
 
-#: gui/main_window.py:82 gui\main_window.py:82
+#: gui/main_window.py:80 gui\main_window.py:80
 msgid "&Help"
 msgstr ""
 
-#: gui/main_window.py:83 gui\main_window.py:83
+#: gui/main_window.py:81 gui\main_window.py:81
 msgid "&About"
 msgstr ""
 
-#: gui/main_window.py:96 gui\main_window.py:96
+#: gui/main_window.py:94 gui\main_window.py:94
 msgid "GUI application started."
 msgstr ""
 
-#: gui/main_window.py:109 gui\main_window.py:109
+#: gui/main_window.py:107 gui\main_window.py:107
 msgid "Added script panel: {}"
 msgstr ""
 
-#: gui/main_window.py:116 gui\main_window.py:116
+#: gui/main_window.py:114 gui\main_window.py:114
 msgid "Global configuration panel opened."
 msgstr ""
 
-#: gui/main_window.py:124 gui\main_window.py:124
+#: gui/main_window.py:122 gui\main_window.py:122
 msgid "Project configuration panel opened."
 msgstr ""
 
-#: gui/main_window.py:128 gui\main_window.py:128
+#: gui/main_window.py:126 gui\main_window.py:126
 msgid "Configuration saved successfully!"
 msgstr ""
 
-#: gui/main_window.py:129 gui\main_window.py:129
+#: gui/main_window.py:127 gui\main_window.py:127
 msgid "Configuration saved signal received."
 msgstr ""
 
-#: gui/main_window.py:134 gui\main_window.py:134
+#: gui/main_window.py:132 gui\main_window.py:132
 msgid "Project switched to: {}"
 msgstr ""
 
-#: gui/main_window.py:138 gui\main_window.py:138
+#: gui/main_window.py:136 gui\main_window.py:136
 msgid "About Poetry Annotator GUI"
 msgstr ""
 
-#: gui/main_window.py:139 gui\main_window.py:139
+#: gui/main_window.py:137 gui\main_window.py:137
 msgid ""
 "Poetry Annotator GUI\n"
 "\n"
@@ -271,11 +382,11 @@ msgid ""
 "A graphical user interface for managing poetry annotation tasks."
 msgstr ""
 
-#: gui/main_window.py:141 gui\main_window.py:141
+#: gui/main_window.py:139 gui\main_window.py:139
 msgid "Displayed about dialog."
 msgstr ""
 
-#: gui/main_window.py:147 gui\main_window.py:147
+#: gui/main_window.py:145 gui\main_window.py:145
 msgid "GUI application closing."
 msgstr ""
 
@@ -556,118 +667,6 @@ msgstr ""
 
 #: gui/script_panels\random_sample_panel.py:86
 msgid "Sample Size must be a positive integer."
-msgstr ""
-
-#: gui\help_texts.py:10
-msgid "The LLM service to use (e.g., 'openai', 'gemini')."
-msgstr ""
-
-#: gui\help_texts.py:11
-msgid "The specific model name to use for the selected service."
-msgstr ""
-
-#: gui\help_texts.py:12
-msgid "Your API key for the selected LLM service."
-msgstr ""
-
-#: gui\help_texts.py:13
-msgid "The base URL for the API, if not using the default."
-msgstr ""
-
-#: gui\help_texts.py:14
-msgid "The type of database to use (e.g., 'sqlite')."
-msgstr ""
-
-#: gui\help_texts.py:15
-msgid "The file path for the database."
-msgstr ""
-
-#: gui\help_texts.py:16
-msgid "Directory containing the source JSON files."
-msgstr ""
-
-#: gui\help_texts.py:17
-msgid "Directory where logs should be stored."
-msgstr ""
-
-#: gui\help_texts.py:18
-msgid "Directory for application output."
-msgstr ""
-
-#: gui\help_texts.py:19
-msgid "Directory containing prompt templates."
-msgstr ""
-
-#: gui\help_texts.py:20
-msgid "The logging level (e.g., 'INFO', 'DEBUG')."
-msgstr ""
-
-#: gui\help_texts.py:21
-msgid "The file path for the log file."
-msgstr ""
-
-#: gui\help_texts.py:24
-msgid "Override the global LLM service for this project."
-msgstr ""
-
-#: gui\help_texts.py:25
-msgid "Override the global LLM model for this project."
-msgstr ""
-
-#: gui\help_texts.py:26
-msgid "Override the global API key for this project."
-msgstr ""
-
-#: gui\help_texts.py:27
-msgid "Override the global base URL for this project."
-msgstr ""
-
-#: gui\help_texts.py:28
-msgid "Override the global database type for this project."
-msgstr ""
-
-#: gui\help_texts.py:29
-msgid "Override the global database path for this project."
-msgstr ""
-
-#: gui\help_texts.py:30
-msgid "Override the global source JSON directory for this project."
-msgstr ""
-
-#: gui\help_texts.py:31
-msgid "Override the global log directory for this project."
-msgstr ""
-
-#: gui\help_texts.py:32
-msgid "Override the global output directory for this project."
-msgstr ""
-
-#: gui\help_texts.py:33
-msgid "Override the global prompt template directory for this project."
-msgstr ""
-
-#: gui\help_texts.py:34
-msgid "Override the global logging level for this project."
-msgstr ""
-
-#: gui\help_texts.py:35
-msgid "Override the global log file for this project."
-msgstr ""
-
-#: gui\help_texts.py:36
-msgid "List of enabled plugins for this project (comma-separated)."
-msgstr ""
-
-#: gui\help_window.py:18
-msgid "Configuration Help"
-msgstr ""
-
-#: gui\help_window.py:37
-msgid "Close"
-msgstr ""
-
-#: gui\help_window.py:46
-msgid "Configuration Options"
 msgstr ""
 
 #: gui\script_panel_base.py:61

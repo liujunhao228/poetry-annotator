@@ -1,9 +1,7 @@
 # gui/help_texts.py
 # Centralized help texts for GUI components.
 
-import gettext
-
-_ = gettext.gettext
+from .i18n import _
 
 HELP_TEXTS = {
     # Global Configurations

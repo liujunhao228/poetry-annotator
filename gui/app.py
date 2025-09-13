@@ -8,7 +8,6 @@ mimetypes.read_windows_registry = lambda *args, **kwargs: None
 
 import sys
 import os
-import gettext
 from PyQt5.QtWidgets import QApplication
 # from PyQt5.QtCore import QTranslator, QLocale, QCoreApplication # Removed Qt's i18n imports
 from gui.main_window import MainWindow
@@ -19,11 +18,7 @@ from gui.script_panels.export_poem_annotations_panel import ExportPoemAnnotation
 from gui.script_panels.find_duplicate_poems_panel import FindDuplicatePoemsPanel
 from gui.script_panels.proofread_annotations_panel import ProofreadAnnotationsPanel
 from gui.script_panels.random_sample_panel import RandomSamplePanel
-
-LOCALE_DIR = os.path.join(os.path.dirname(__file__), 'locale')
-gettext.bindtextdomain('app', LOCALE_DIR)
-gettext.textdomain('app')
-_ = gettext.gettext
+from gui.i18n import _
 
 def main():
     """
@@ -31,15 +26,6 @@ def main():
     Creates the QApplication, MainWindow, and starts the event loop.
     """
     app = QApplication(sys.argv)
-
-    # --- i18n Setup (using gettext) ---
-    lang = 'zh_CN' # Default to Chinese as per plan, or detect from config/system
-    try:
-        translator = gettext.translation('app', LOCALE_DIR, languages=[lang])
-        translator.install()
-    except FileNotFoundError:
-        print(f"Warning: Translation file for {lang} not found in {LOCALE_DIR}")
-    # --- End i18n Setup ---
 
     main_window = MainWindow()
 

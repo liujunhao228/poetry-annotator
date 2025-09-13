@@ -1,13 +1,11 @@
 # gui/help_window.py
 # Implements a window to display help information for configuration settings.
 
-import gettext
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QTextBrowser, QPushButton, QHBoxLayout
 )
 from .help_texts import HELP_TEXTS
-
-_ = gettext.gettext
+from .i18n import _
 
 class HelpWindow(QDialog):
     """
