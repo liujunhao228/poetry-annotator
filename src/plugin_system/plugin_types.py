@@ -19,6 +19,9 @@ class PluginType(Enum):
     DATA_PROCESSING = "data_processing"
     ANNOTATION_MANAGEMENT = "annotation_management"
     DB_INITIALIZER = "db_initializer"
+    LLM_SERVICE = "llm_service"
+    RESPONSE_VALIDATION = "response_validation"
+    RESPONSE_PARSING = "response_parsing"
     
     @classmethod
     def from_string(cls, value: str) -> 'PluginType':

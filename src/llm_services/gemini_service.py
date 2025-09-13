@@ -13,7 +13,7 @@ from google.api_core import exceptions as google_exceptions
 from .base_service import BaseLLMService
 from .schemas import PoemData, EmotionSchema
 from .exceptions import LLMServiceAPIError, LLMServiceTimeoutError, LLMServiceRateLimitError
-from ..llm_response_parser import ILLMResponseParser
+from ..response_parsing.llm_response_parser import LLMResponseParser
 
 
 class GeminiService(BaseLLMService):
@@ -30,7 +30,7 @@ class GeminiService(BaseLLMService):
     """
 
 
-    def __init__(self, config: Dict[str, Any], model_config_name: str, response_parser: Optional[ILLMResponseParser] = None):
+    def __init__(self, config: Dict[str, Any], model_config_name: str, response_parser: Optional[LLMResponseParser] = None):
 
         super().__init__(config, model_config_name, response_parser)
         self._parse_and_validate_config()

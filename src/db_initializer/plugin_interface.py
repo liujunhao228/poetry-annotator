@@ -84,10 +84,10 @@ class DatabaseInitPluginManager:
         if not self.config_manager:
             return
         
-        global_plugin_config = self.config_manager.get_global_plugin_config()
+        project_plugins_config = self.config_manager.get_project_plugins_config()
         
         # 遍历启用的插件列表，尝试加载每个插件
-        for plugin_name in global_plugin_config.enabled_plugins:
+        for plugin_name in project_plugins_config.enabled_plugins:
             try:
                 # 获取插件配置
                 plugin_config = self.config_manager.get_plugin_config(plugin_name)

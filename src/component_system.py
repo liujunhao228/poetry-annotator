@@ -16,81 +16,48 @@
 import importlib
 import logging
 from typing import Dict, Any, Optional, Type, Union
-from enum import Enum
 from src.config.plugin_loader import ProjectPluginConfigLoader
-from src.config.schema import GlobalPluginConfig, PluginConfig
+from src.config.schema import PluginConfig
 # 导入新的插件系统
 from src.plugin_system import get_plugin_manager, PluginLoader
 from src.plugin_system.plugin_types import PluginType
+from src.plugin_system.base import ComponentType, Component, BasePlugin # Import from base.py
 
 # 配置日志
 logger = logging.getLogger(__name__)
 
-# 定义严格的组件类型枚举
-class ComponentType(Enum):
-    """组件类型枚举，确保类型安全"""
-    ANNOTATOR = "annotator"
-    DATA_MANAGER = "data_manager"
-    QUERY_BUILDER = "query_builder"
-    PROMPT_BUILDER = "prompt_builder"
-    DB_INITIALIZER = "db_initializer"
-    LABEL_PARSER = "label_parser"
-    CUSTOM_QUERY = "custom_query"
-    PREPROCESSING = "preprocessing"
-    # 数据相关插件类型
-    DATA_STORAGE = "data_storage"
-    DATA_QUERY = "data_query"
-    DATA_PROCESSING = "data_processing"
-    ANNOTATION_MANAGEMENT = "annotation_management"
-    DATA_MODEL_DEFINITION = "data_model_definition"
-    
-    @classmethod
-    def from_string(cls, value: str) -> 'ComponentType':
-        """从字符串创建组件类型"""
-        for member in cls:
-            if member.value == value:
-                return member
-        raise ValueError(f"未知的组件类型: {value}")
 
-# 定义组件接口
-class Component:
-    """组件基类"""
-    def __init__(self, component_type: ComponentType):
-        self.component_type = component_type
-    
-    def get_type(self) -> ComponentType:
-        """获取组件类型"""
-        return self.component_type
-
-
-class Plugin(Component):
+class Plugin(BasePlugin): # Inherit from BasePlugin
     """插件基类"""
     def __init__(self, component_type: ComponentType, plugin_config: PluginConfig):
-        super().__init__(component_type)
-        self.plugin_config = plugin_config
+        super().__init__(plugin_config) # Call BasePlugin's constructor
+        self.component_type = component_type # Add component_type attribute
     
     def get_name(self) -> str:
         """获取插件名称"""
-        raise NotImplementedError("插件必须实现get_name方法")
+        # Assuming plugin_config has a name, or derive it
+        return self.plugin_config.name if self.plugin_config.name else "Unnamed Plugin"
     
     def get_description(self) -> str:
         """获取插件描述"""
-        raise NotImplementedError("插件必须实现get_description方法")
+        return self.plugin_config.description if self.plugin_config.description else "No description provided."
     
     def initialize(self):
         """插件初始化方法"""
-        pass
+        super().initialize() # Call BasePlugin's initialize
     
     def cleanup(self):
         """插件清理方法"""
-        pass
+        super().cleanup() # Call BasePlugin's cleanup
 
 
 class ComponentSystem:
     """组件系统，负责严格管理组件类型和实例化"""
     
     def __init__(self, project_root):
-        self.project_root = project_root
+        # 确保 project_root 是 Path 对象
+        from pathlib import Path
+        self.project_root = Path(project_root) if isinstance(project_root, str) else project_root
         self._plugin_configs: Dict[str, PluginConfig] = {}
         self._component_registry: Dict[ComponentType, Type[Component]] = {}
         # 使用全局插件管理器
@@ -106,7 +73,7 @@ class ComponentSystem:
             if project_plugins_ini_path.exists():
                 try:
                     project_plugin_loader = ProjectPluginConfigLoader(str(project_plugins_ini_path))
-                    project_plugin_config: GlobalPluginConfig = project_plugin_loader.load_project_plugin_config()
+                    project_plugin_config: ProjectPluginsConfig = project_plugin_loader.load_project_plugin_config()
                     project_enabled_plugins = project_plugin_config.enabled_plugins
                     
                     logger.info(f"项目插件配置加载完成，启用的插件: {project_enabled_plugins}")
@@ -139,11 +106,9 @@ class ComponentSystem:
                             logger.error(f"加载项目插件 '{plugin_name}' 的配置时出错: {e}")
                     
                     # 使用新的插件加载器加载所有启用的插件
-                    from src.config.manager import get_config_manager
-                    config_manager = get_config_manager()
-                    PluginLoader.load_plugins_from_config(config_manager, self.plugin_manager)
-                    
-                    # 注册项目插件到新的插件系统
+                    from src.plugin_system.project_config_manager import ProjectPluginConfigManager
+                    config_manager = ProjectPluginConfigManager(self._plugin_configs)
+                    PluginLoader.load_plugins_from_config(config_manager, self.plugin_manager, self.project_root)                    # 注册项目插件到新的插件系统
                     from src.plugin_system.project_plugins import register_project_plugins
                     register_project_plugins(self.plugin_manager, self._plugin_configs)
                 except Exception as e:
@@ -176,7 +141,13 @@ class ComponentSystem:
             except ValueError as e:
                 logger.error(f"无效的组件类型: {component_type}")
                 raise
-                
+        
+        # 首先检查是否已存在缓存实例
+        if component_type in self._component_registry:
+            logger.debug(f"从缓存中获取 {component_type.value} 组件实例。")
+            return self._component_registry[component_type]
+
+        instance = None
         # 查找插件配置
         plugin_config = self._find_plugin_config_by_type(component_type)
         
@@ -192,23 +163,22 @@ class ComponentSystem:
                 # 过滤掉插件配置中不应该传递给构造函数的参数
                 init_kwargs = ComponentSystem._filter_plugin_init_kwargs(plugin_config.settings, kwargs)
                 
-                # 如果是统一插件，传递组件类型信息
-                # 注意：新的SocialPoemAnalysisPlugin构造函数不再接受component_type参数
-                # if plugin_config.settings.get('type') == 'social_poem_analysis':
-                #     init_kwargs['component_type'] = component_type.value
-                
                 # 创建实例
                 instance = plugin_class(**init_kwargs)
                 logger.info(f"成功创建 {component_type.value} 插件实例: {plugin_config.module}.{plugin_config.class_name}")
-                return instance
                 
             except Exception as e:
                 logger.error(f"加载 {component_type.value} 插件 '{plugin_config.module}.{plugin_config.class_name}' 失败: {e}")
                 # 记录错误但不中断，回退到默认实现
         
-        # 回退到默认实现
-        logger.info(f"未找到启用的 {component_type.value} 插件，使用默认实现。")
-        return self._get_default_component(component_type, **kwargs)
+        if instance is None:
+            # 回退到默认实现
+            logger.info(f"未找到启用的 {component_type.value} 插件，使用默认实现。")
+            instance = self._get_default_component(component_type, **kwargs)
+        
+        # 缓存实例
+        self._component_registry[component_type] = instance
+        return instance
     
     def _find_plugin_config_by_type(self, component_type: ComponentType) -> Optional[PluginConfig]:
         """
@@ -295,9 +265,19 @@ class ComponentSystem:
             from src.data.manager import DataManager
             db_name = kwargs.get('db_name', 'default')
             return DataManager(db_name=db_name)
+        elif component_type == ComponentType.RESPONSE_VALIDATOR:
+            # 延迟导入以避免循环依赖
+            from src.response_validation.manager import ResponseValidationManager as ResponseValidator
+            return ResponseValidator()
+        elif component_type == ComponentType.LABEL_PARSER:
+            # 延迟导入以避免循环依赖
+            from src.emotion_classifier import EmotionClassifier
+            project_root = kwargs.get('project_root', self.project_root)
+            if ComponentType.LABEL_PARSER not in self._component_registry:
+                self._component_registry[ComponentType.LABEL_PARSER] = EmotionClassifier(project_root=project_root)
+            return self._component_registry[ComponentType.LABEL_PARSER]
         else:
             raise ValueError(f"未知的组件类型: {component_type.value}")
-
 # 全局组件系统实例
 component_system = None
 

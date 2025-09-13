@@ -1,0 +1,88 @@
+"""
+情感分类插件接口定义
+"""
+
+from abc import abstractmethod
+from typing import Dict, Any, List, Optional
+from src.plugin_system.interfaces import LabelParserPlugin
+
+
+class EmotionClassificationPlugin(LabelParserPlugin):
+    """情感分类插件基类"""
+    
+    @abstractmethod
+    def get_emotion_display_info(self, emotion_id: str) -> Dict[str, str]:
+        """
+        根据情感ID获取用于界面显示的信息。
+
+        :param emotion_id: 情感的唯一ID，例如 "01.05"。
+        :return: 包含 'id' 和 'name' 的字典，例如 {'id': '01.05', 'name': '01.05 愉悦'}。
+                 如果ID无效，则 'name' 为 '未知情感'。
+        """
+        pass
+    
+    @abstractmethod
+    def get_full_emotion_list_for_selection(self, level: int = 2) -> List[Dict[str, str]]:
+        """
+        获取完整的情感分类列表，供GUI下拉选择框使用。
+
+        :param level: 指定要获取的情感分类层级 (1: 一级分类, 2: 二级分类)。默认为2。
+        :return: 一个字典列表，每个字典包含 'id' 和 'name' 键。
+        """
+        pass
+    
+    @abstractmethod
+    def get_all_emotion_categories(self) -> Dict[str, Any]:
+        """
+        获取所有情感分类信息。
+
+        :return: 包含所有情感分类信息的字典
+        """
+        pass
+    
+    @abstractmethod
+    def get_categories_text(self) -> str:
+        """
+        获取格式化的情感分类文本，用于提示词。
+
+        :return: 格式化的情感分类文本
+        """
+        pass
+    
+    @abstractmethod
+    def get_all_categories(self) -> List[str]:
+        """
+        获取所有情感分类名称。
+
+        :return: 所有情感分类名称列表
+        """
+        pass
+    
+    @abstractmethod
+    def get_all_categories_with_ids(self) -> Dict[str, str]:
+        """
+        获取所有情感分类ID和名称的映射。
+
+        :return: 情感分类ID和名称的映射字典
+        """
+        pass
+    
+    @abstractmethod
+    def validate_emotion(self, emotion: str) -> bool:
+        """
+        验证情感标签是否在分类体系中。
+
+        :param emotion: 情感标签名称
+        :return: 是否有效
+        """
+        pass
+    
+    @abstractmethod
+    def get_primary_category(self, secondary_id: str) -> Optional[str]:
+        """
+        根据二级类别ID获取一级类别ID。
+
+        :param secondary_id: 二级类别ID
+        :return: 对应的一级类别ID，如果未找到则返回None
+        """
+        pass

@@ -8,7 +8,7 @@ import asyncio
 from .openai_service import OpenAIService
 from .base_service import BaseLLMService
 from .schemas import PoemData, EmotionSchema
-from ..llm_response_parser import ILLMResponseParser
+from ..response_parsing.llm_response_parser import LLMResponseParser
 
 
 class DashScopeAdapter(BaseLLMService):
@@ -19,7 +19,7 @@ class DashScopeAdapter(BaseLLMService):
     并将通用的 API 调用委托给 OpenAIService。
     """
 
-    def __init__(self, config: Dict[str, Any], model_config_name: str, response_parser: Optional[ILLMResponseParser] = None):
+    def __init__(self, config: Dict[str, Any], model_config_name: str, response_parser: Optional[LLMResponseParser] = None):
         """
         初始化并解析配置字典
         """

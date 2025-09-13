@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Type, Union
 from src.config.plugin_loader import ProjectPluginConfigLoader # 导入新的加载器
-from src.config.schema import GlobalPluginConfig, PluginConfig # 导入配置 Schema
+from src.config.schema import PluginConfig # 导入配置 Schema
 from src.annotator import Annotator
 from src.data import get_data_manager
 from src.component_system import get_component_system, ComponentType

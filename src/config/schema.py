@@ -1,4 +1,4 @@
-"""
+""""
 配置项模式定义模块。
 
 此模块定义了项目中使用的所有配置项的模式，包括：
@@ -69,16 +69,36 @@ class GlobalCategoriesConfig:
     xml_path: str = ""
     md_path: str = ""
 
-@dataclass
-class GlobalPluginConfig:
-    """全局插件配置"""
-    enabled_plugins: List[str] = field(default_factory=list)
-    plugin_paths: List[str] = field(default_factory=lambda: ["src/data/plugins"])
 
 @dataclass
 class PluginConfig:
     """插件配置"""
     enabled: bool = True
+    path: str = ""
+    module: str = ""
+    class_name: str = ""
+    # 插件特定配置项将通过字典方式访问
+    settings: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class PluginConfig:
+    """插件配置"""
+    enabled: bool = True
+    path: str = ""
+    module: str = ""
+    class_name: str = ""
+    # 插件特定配置项将通过字典方式访问
+    settings: Dict[str, Any] = field(default_factory=dict)
+
+
+
+
+@dataclass
+class PluginConfig:
+    """插件配置"""
+    enabled: bool = True
+    path: str = ""
     module: str = ""
     class_name: str = ""
     # 插件特定配置项将通过字典方式访问
@@ -96,32 +116,6 @@ class GlobalModelConfigTemplate:
     max_tokens: int = 1000
     timeout: int = 30
     # 可以添加更多通用字段...
-
-# --- 全局规则配置 (Global Rule Configuration) ---
-
-@dataclass
-class GlobalValidationRuleSet:
-    """全局校验规则集"""
-    # 定义多个校验规则集的名称
-    available_rulesets: List[str] = field(default_factory=lambda: ["default_emotion_annotation"])
-    # 当前激活的规则集名称
-    active_ruleset: str = "default_emotion_annotation"
-
-@dataclass
-class GlobalPreprocessingRuleSet:
-    """全局预处理分类规则集"""
-    # 定义多个预处理规则集的名称
-    available_rulesets: List[str] = field(default_factory=lambda: ["social_emotion"])
-    # 当前激活的规则集名称
-    active_ruleset: str = "social_emotion"
-
-@dataclass
-class GlobalCleaningRuleSet:
-    """全局清洗规则"""
-    # 定义多个清洗规则集的名称 (如果未来支持多种)
-    available_rulesets: List[str] = field(default_factory=lambda: ["default"])
-    # 当前激活的规则集名称
-    active_ruleset: str = "default"
 
 # --- 项目级别配置 (Project Level Configuration) ---
 
@@ -176,22 +170,10 @@ class ProjectModelConfig:
     model_names: List[str] = field(default_factory=lambda: ["qwen-max"])
 
 @dataclass
-class ProjectValidationConfig:
-    """项目校验规则配置"""
-    # 指定要使用的校验规则集名称（来自GlobalValidationRuleSet.available_rulesets）
-    ruleset_name: str = "default_emotion_annotation"
-
-@dataclass
-class ProjectPreprocessingConfig:
-    """项目预处理分类规则配置"""
-    # 指定要使用的预处理规则集名称（来自GlobalPreprocessingRuleSet.available_rulesets）
-    ruleset_name: str = "social_emotion"
-
-@dataclass
-class ProjectCleaningConfig:
-    """项目清洗规则配置"""
-    # 指定要使用的清洗规则集名称（来自GlobalCleaningRuleSet.available_rulesets）
-    ruleset_name: str = "default"
+class ProjectPluginsConfig:
+    """项目插件配置"""
+    enabled_plugins: List[str] = field(default_factory=list)
+    plugin_paths: List[str] = field(default_factory=list)
 
 # --- 主配置类 ---
 
@@ -206,12 +188,7 @@ class GlobalConfig:
     visualizer: GlobalVisualizerConfig = field(default_factory=GlobalVisualizerConfig)
     # 新增 Categories 配置
     categories: GlobalCategoriesConfig = field(default_factory=GlobalCategoriesConfig)
-    # 新增 Plugin 配置
-    plugins: GlobalPluginConfig = field(default_factory=GlobalPluginConfig)
     model_template: GlobalModelConfigTemplate = field(default_factory=GlobalModelConfigTemplate)
-    validation: GlobalValidationRuleSet = field(default_factory=GlobalValidationRuleSet)
-    preprocessing: GlobalPreprocessingRuleSet = field(default_factory=GlobalPreprocessingRuleSet)
-    cleaning: GlobalCleaningRuleSet = field(default_factory=GlobalCleaningRuleSet)
 
 @dataclass
 class ProjectConfig:
@@ -223,6 +200,4 @@ class ProjectConfig:
     logging: ProjectLoggingConfig = field(default_factory=ProjectLoggingConfig)
     visualizer: ProjectVisualizerConfig = field(default_factory=ProjectVisualizerConfig)
     model: ProjectModelConfig = field(default_factory=ProjectModelConfig)
-    validation: ProjectValidationConfig = field(default_factory=ProjectValidationConfig)
-    preprocessing: ProjectPreprocessingConfig = field(default_factory=ProjectPreprocessingConfig)
-    cleaning: ProjectCleaningConfig = field(default_factory=ProjectCleaningConfig)
+    plugins: ProjectPluginsConfig = field(default_factory=ProjectPluginsConfig)

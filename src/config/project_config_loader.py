@@ -5,7 +5,7 @@
 import configparser
 import os
 from typing import Dict, Any, Optional
-from src.config.schema import ProjectConfig, ProjectLLMConfig, ProjectDatabaseConfig, ProjectDataPathConfig, ProjectPromptConfig, ProjectLoggingConfig, ProjectVisualizerConfig,ProjectModelConfig, ProjectValidationConfig, ProjectPreprocessingConfig, ProjectCleaningConfig
+from src.config.schema import ProjectConfig, ProjectLLMConfig, ProjectDatabaseConfig, ProjectDataPathConfig, ProjectPromptConfig, ProjectLoggingConfig, ProjectVisualizerConfig,ProjectModelConfig
 
 
 class ProjectConfigLoader:
@@ -50,15 +50,6 @@ class ProjectConfigLoader:
         # 加载模型配置
         project_config.model = self._load_model_config()
         
-        # 加载校验规则配置
-        project_config.validation = self._load_validation_config()
-        
-        # 加载预处理规则配置
-        project_config.preprocessing = self._load_preprocessing_config()
-        
-        # 加载清洗规则配置
-        project_config.cleaning = self._load_cleaning_config()
-        
         return project_config
 
     def save(self, project_config: ProjectConfig):
@@ -89,15 +80,6 @@ class ProjectConfigLoader:
         
         # 保存模型配置
         self._save_model_config(config, project_config.model)
-        
-        # 保存校验规则配置
-        self._save_validation_config(config, project_config.validation)
-        
-        # 保存预处理规则配置
-        self._save_preprocessing_config(config, project_config.preprocessing)
-        
-        # 保存清洗规则配置
-        self._save_cleaning_config(config, project_config.cleaning)
         
         # 写入文件
         with open(self.config_file, 'w', encoding='utf-8') as f:
@@ -231,42 +213,3 @@ class ProjectConfigLoader:
         """保存模型配置"""
         config.add_section('Model')
         config['Model']['model_names'] = ','.join(model_config.model_names)
-
-    def _load_validation_config(self) -> ProjectValidationConfig:
-        """加载校验规则配置"""
-        validation_config = ProjectValidationConfig()
-        if self.config.has_section('Validation'):
-            validation = self.config['Validation']
-            validation_config.ruleset_name = validation.get('ruleset_name', validation_config.ruleset_name)
-        return validation_config
-
-    def _save_validation_config(self, config: configparser.ConfigParser, validation_config: ProjectValidationConfig):
-        """保存校验规则配置"""
-        config.add_section('Validation')
-        config['Validation']['ruleset_name'] = validation_config.ruleset_name
-
-    def _load_preprocessing_config(self) -> ProjectPreprocessingConfig:
-        """加载预处理规则配置"""
-        preprocessing_config = ProjectPreprocessingConfig()
-        if self.config.has_section('Preprocessing'):
-            preprocessing = self.config['Preprocessing']
-            preprocessing_config.ruleset_name = preprocessing.get('ruleset_name', preprocessing_config.ruleset_name)
-        return preprocessing_config
-
-    def _save_preprocessing_config(self, config: configparser.ConfigParser, preprocessing_config: ProjectPreprocessingConfig):
-        """保存预处理规则配置"""
-        config.add_section('Preprocessing')
-        config['Preprocessing']['ruleset_name'] = preprocessing_config.ruleset_name
-
-    def _load_cleaning_config(self) -> ProjectCleaningConfig:
-        """加载清洗规则配置"""
-        cleaning_config = ProjectCleaningConfig()
-        if self.config.has_section('Cleaning'):
-            cleaning = self.config['Cleaning']
-            cleaning_config.ruleset_name = cleaning.get('ruleset_name', cleaning_config.ruleset_name)
-        return cleaning_config
-
-    def _save_cleaning_config(self, config: configparser.ConfigParser, cleaning_config: ProjectCleaningConfig):
-        """保存清洗规则配置"""
-        config.add_section('Cleaning')
-        config['Cleaning']['ruleset_name'] = cleaning_config.ruleset_name

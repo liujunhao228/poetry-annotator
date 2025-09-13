@@ -10,6 +10,8 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
+logger = logging.getLogger(__name__)
+
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent.parent.absolute()
 if str(project_root) not in sys.path:
@@ -17,13 +19,13 @@ if str(project_root) not in sys.path:
 
 try:
     from src.config import config_manager
-    from src.component_system import get_component_system, ComponentType
+    from src.data.manager import get_data_manager
 except ImportError:
     # 当作为独立模块运行时
     import sys
     sys.path.append(str(Path(__file__).parent.parent))
     from src.config import config_manager
-    from src.component_system import get_component_system, ComponentType
+    from src.data.manager import get_data_manager
 
 
 def initialize_all_databases_from_source_folders(clear_existing: bool = False) -> Dict[str, Dict[str, int]]:
@@ -44,19 +46,17 @@ def initialize_all_databases_from_source_folders(clear_existing: bool = False) -
     results = {}
     
     try:
-        # 获取组件系统并创建统一插件实例
-        component_system = get_component_system(project_root)
-        social_poem_plugin = component_system.get_component(
-            ComponentType.DATA_STORAGE, db_name=source_name
-        )
+        # 获取数据管理器实例
+        data_manager = get_data_manager(db_name=source_name)
         
-        # 使用插件加载数据
-        authors = social_poem_plugin.load_author_data(source_dir)
-        poems = social_poem_plugin.load_all_json_files(source_dir)
+        # 使用数据管理器加载和保存数据
+        authors = data_manager.load_author_data(source_dir)
+        poems = data_manager.load_all_json_files()
         
-        # 使用插件保存数据
-        author_count = social_poem_plugin.batch_insert_authors(authors) if authors else 0
-        poem_count = social_poem_plugin.batch_insert_poems(poems, start_id=1) if poems else 0
+        author_count = data_manager.batch_insert_authors(authors) if authors else 0
+        logger.info(f"从源 '{source_name}' 成功插入 {author_count} 位作者。")
+        poem_count = data_manager.batch_insert_poems(poems, start_id=1) if poems else 0
+        logger.info(f"从源 '{source_name}' 成功插入 {poem_count} 首诗词。")
         
         results[source_name] = {
             'authors': author_count,

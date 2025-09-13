@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "基于大语言模型的中国古典诗词情感分类标注工具"
 readme = "README.md"
 license = { text = "MIT" }
-python_requires='>=3.9'
+requires-python = ">=3.9,<3.12"
 dependencies = [
     "httpx>=0.27.0",
     "tenacity>=8.2.3",
@@ -20,16 +20,14 @@ dependencies = [
     "aiosqlite>=0.21.0",
     "pyyaml>=6.0.2",
     "sqlalchemy>=2.0.43",
+    "PyQt5>=5.15.9",
+    "babel>=2.17.0",
+    "polib>=1.2.0",
 ]
 
-[project.optional-dependencies]
-visualizer = [
-    "streamlit>=1.32.0",
-    "pandas>=2.2.0",
-    "matplotlib>=3.8.0",
-    "seaborn>=0.13.0",
-    "plotly>=5.18.0",
-]
+[tool.uv]
+package = true
+required-environments = ['sys_platform == "win32"']
 
 [project.scripts]
 poetry-annotator = "main:main"

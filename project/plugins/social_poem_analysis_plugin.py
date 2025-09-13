@@ -503,7 +503,7 @@ class SocialPoemAnalysisPlugin(BasePlugin):
         logger.info(f"作者信息插入完成，成功插入 {inserted_count} 位作者")
         return inserted_count
     
-    def batch_insert_poems(self, poems_data: List[Dict[str, Any]], start_id: Optional[int] = None) -> int:
+    def batch_insert_poems(self, poems_data: List[Dict[str, Any]], start_id: Optional[int] = None, id_prefix: int = 0) -> int:
         """批量插入诗词到数据库"""
         # 使用本地定义的标准化函数
         def normalize_poem_data(poem_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -537,14 +537,14 @@ class SocialPoemAnalysisPlugin(BasePlugin):
         tz = timezone(timedelta(hours=8))
         now = datetime.now(tz).isoformat()
 
-        # 获取ID前缀
-        db_prefixes = {
-            "TangShi": 1000000,  # 唐诗ID前缀
-            "SongCi": 2000000,   # 宋词ID前缀
-            "YuanQu": 3000000,   # 元曲ID前缀
-            "default": 0         # 默认数据库前缀
-        }
-        id_prefix = db_prefixes.get("default", 0)
+        # 使用传入的 id_prefix
+        # db_prefixes = {
+        #     "TangShi": 1000000,  # 唐诗ID前缀
+        #     "SongCi": 2000000,   # 宋词ID前缀
+        #     "YuanQu": 3000000,   # 元曲ID前缀
+        #     "default": 0         # 默认数据库前缀
+        # }
+        # id_prefix = db_prefixes.get("default", 0)
         
         # 使用上下文管理器确保连接正确处理
         with self.separate_db_manager.raw_data_db.get_connection() as conn:

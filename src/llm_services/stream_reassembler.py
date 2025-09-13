@@ -3,7 +3,7 @@
 import json
 import logging
 from typing import AsyncGenerator, List, Dict, Any
-from src.llm_response_parser import llm_response_parser
+from src.response_parsing.llm_response_parser import llm_response_parser
 from .exceptions import LLMServiceResponseError
 
 class StreamReassembler:

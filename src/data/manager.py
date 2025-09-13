@@ -10,6 +10,7 @@ from src.config import get_config_manager
 from .models import Poem, Author, Annotation
 from .exceptions import DataError, DatabaseError
 from src.component_system import get_component_system, ComponentType
+from src.data.poem_processing import PoemClassificationCore
 
 
 class DataManager:
@@ -53,6 +54,16 @@ class DataManager:
         project_root = Path(__file__).parent.parent.parent
         self.component_system = get_component_system(project_root)
         
+        # 初始化分离数据库管理器 (提前初始化，以便插件可以使用)
+        from .separate_databases import get_separate_db_manager
+        self.separate_db_manager = get_separate_db_manager()
+        
+        # 为了保持向后兼容性，添加适配器属性
+        self.db_adapter = self.separate_db_manager.raw_data_db
+        
+        # 为不同数据库设置ID前缀，确保全局唯一性
+        self._set_id_prefix()
+
         # 直接导入并创建统一插件实例，避免循环依赖
         try:
             from project.plugins.social_poem_analysis_plugin import SocialPoemAnalysisPlugin
@@ -63,26 +74,22 @@ class DataManager:
                 class_name="SocialPoemAnalysisPlugin",
                 settings={"type": "social_poem_analysis"}
             )
-            self.social_poem_plugin = SocialPoemAnalysisPlugin(plugin_config)
-            self.logger.info("成功创建统一插件实例")
+            # 传递 separate_db_manager 给插件
+            self.social_poem_plugin = SocialPoemAnalysisPlugin(plugin_config, separate_db_manager=self.separate_db_manager)
+            self.logger.info("DataManager: 成功创建统一插件实例")
         except Exception as e:
-            self.logger.error(f"创建统一插件实例失败: {e}")
-            raise
+            self.logger.critical(f"DataManager: 创建统一插件实例失败: {e}", exc_info=True)
+            # Do not re-raise here, allow DataManager to function without the plugin
+            # This will cause subsequent calls to self.social_poem_plugin to fail if not handled
+            self.social_poem_plugin = None # Explicitly set to None if creation fails
         
         # 检查数据库文件是否存在，如果不存在则初始化
         if not Path(self.db_path).exists():
             self.logger.info(f"数据库文件 {self.db_path} 不存在，正在初始化...")
             self._initialize_database_if_not_exists()
         
-        # 初始化分离数据库管理器
-        from .separate_databases import get_separate_db_manager
-        self.separate_db_manager = get_separate_db_manager()
-        
-        # 为了保持向后兼容性，添加适配器属性
-        self.db_adapter = self.separate_db_manager.raw_data_db
-        
-        # 为不同数据库设置ID前缀，确保全局唯一性
-        self._set_id_prefix()
+        # 初始化诗词分类核心处理器
+        self.poem_classification_core = PoemClassificationCore(project_root=str(project_root))
     
     def _set_id_prefix(self):
         """为不同数据库设置ID前缀，确保全局唯一性"""
@@ -114,21 +121,6 @@ class DataManager:
             raise DatabaseError(f"无法创建数据库文件 {self.db_path}: {e}")
     
     # 所有业务逻辑都直接委托给统一插件
-    
-    def initialize_database_from_json(self, clear_existing: bool = False) -> Dict[str, int]:
-        """从JSON文件初始化数据库"""
-        # 首先使用数据处理插件加载数据
-        authors = self.social_poem_plugin.load_author_data(self.source_dir)
-        poems = self.social_poem_plugin.load_all_json_files(self.source_dir)
-        
-        # 然后使用数据存储插件保存数据
-        author_count = self.social_poem_plugin.batch_insert_authors(authors) if authors else 0
-        poem_count = self.social_poem_plugin.batch_insert_poems(poems, start_id=1) if poems else 0
-        
-        return {
-            'authors': author_count,
-            'poems': poem_count
-        }
     
     def get_poems_to_annotate(self, model_identifier: str, 
                              limit: Optional[int] = None, 
@@ -177,7 +169,7 @@ class DataManager:
         """高效检查一组 poem_id 是否已被特定模型成功标注"""
         return self.social_poem_plugin.get_completed_poem_ids(poem_ids, model_identifier)
     
-    # 数据加载方法也直接委托给统一插件
+    # 数据加载和存储方法也直接委托给统一插件
     def load_data_from_json(self, json_file: str) -> List[Dict[str, Any]]:
         """从JSON文件加载数据"""
         return self.social_poem_plugin.load_data_from_json(self.source_dir, json_file)
@@ -192,6 +184,56 @@ class DataManager:
         if source_dir is None:
             source_dir = self.source_dir
         return self.social_poem_plugin.load_author_data(source_dir)
+
+    def batch_insert_authors(self, authors_data: List[Dict[str, Any]]) -> int:
+        """批量插入作者信息"""
+        if not self.social_poem_plugin:
+            raise DataError("SocialPoemAnalysisPlugin 未成功加载，无法执行批量插入作者操作。")
+        return self.social_poem_plugin.batch_insert_authors(authors_data)
+
+    def batch_insert_poems(self, poems_data: List[Dict[str, Any]], start_id: Optional[int] = None) -> int:
+        """批量插入诗词到数据库"""
+        if not self.social_poem_plugin:
+            raise DataError("SocialPoemAnalysisPlugin 未成功加载，无法执行批量插入诗词操作。")
+        return self.social_poem_plugin.batch_insert_poems(poems_data, start_id=start_id, id_prefix=self.id_prefix)
+
+    def classify_data(self, db_name: str = "default", dry_run: bool = False):
+        """
+        对诗词数据进行分类
+        
+        Args:
+            db_name: 数据库名称
+            dry_run: 是否为试运行模式
+            
+        Returns:
+            分类统计信息
+        """
+        return self.poem_classification_core.classify_poems_data(self, db_name, dry_run)
+
+    def reset_data_classification(self, db_name: str = "default", dry_run: bool = False):
+        """
+        重置数据分类
+        
+        Args:
+            db_name: 数据库名称
+            dry_run: 是否为试运行模式
+            
+        Returns:
+            重置统计信息
+        """
+        return self.poem_classification_core.reset_pre_classification(self, db_name, dry_run)
+
+    def generate_classification_report(self, db_name: str = "default"):
+        """
+        生成分类报告
+        
+        Args:
+            db_name: 数据库名称
+            
+        Returns:
+            分类报告
+        """
+        return self.poem_classification_core.get_classification_report(self, db_name)
 
 # 全局数据管理器实例
 data_manager = None

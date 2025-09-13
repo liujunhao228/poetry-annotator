@@ -1,0 +1,704 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR ORGANIZATION
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"POT-Creation-Date: 2025-09-13 13:08+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=cp936\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: pygettext.py 1.5\n"
+
+
+#: gui/app.py:47 gui\app.py:47
+msgid "Annotation Statistics"
+msgstr ""
+
+#: gui/app.py:48 gui/script_panels\distribute_tasks_panel.py:70 gui\app.py:48
+msgid "Distribute Tasks"
+msgstr ""
+
+#: gui/app.py:49 gui\app.py:49
+msgid "Export Poem Annotations"
+msgstr ""
+
+#: gui/app.py:50 gui\app.py:50
+msgid "Find Duplicate Poems"
+msgstr ""
+
+#: gui/app.py:51 gui/script_panels\proofread_annotations_panel.py:52
+#: gui\app.py:51
+msgid "Proofread Annotations"
+msgstr ""
+
+#: gui/app.py:52 gui\app.py:52
+msgid "Random Sample"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:32
+msgid "Edit Global Configuration"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:57
+#: gui/config_panels\project_config_panel.py:72
+msgid "Help"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:61
+#: gui/config_panels\project_config_panel.py:76
+msgid "Save"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:63
+#: gui/config_panels\project_config_panel.py:78
+msgid "Cancel"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:81
+msgid "<b>%s Settings</b>"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:86
+msgid "%s:"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:96
+msgid "No suitable widget for field '%s' of type %s"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:125
+#: gui/config_panels\project_config_panel.py:141
+msgid "Comma-separated values"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:130
+#: gui/config_panels\project_config_panel.py:146
+msgid "JSON string (e.g., {\"key\": \"value\"})"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:181
+msgid "Global configuration saved."
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:181
+#: gui/config_panels\project_config_panel.py:226
+msgid "Save Successful"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:185
+msgid "Failed to save global configuration. Check logs for details."
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:185
+#: gui/config_panels\project_config_panel.py:230
+msgid "Save Error"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:287
+#: gui/config_panels\global_config_panel.py:290
+#: gui/config_panels\global_config_panel.py:293
+#: gui/config_panels\project_config_panel.py:332
+#: gui/config_panels\project_config_panel.py:335
+#: gui/config_panels\project_config_panel.py:338
+#: gui/script_panels\annotation_statistics_panel.py:72
+#: gui/script_panels\annotation_statistics_panel.py:75
+#: gui/script_panels\distribute_tasks_panel.py:99
+#: gui/script_panels\distribute_tasks_panel.py:102
+#: gui/script_panels\distribute_tasks_panel.py:105
+#: gui/script_panels\distribute_tasks_panel.py:108
+#: gui/script_panels\export_poem_annotations_panel.py:89
+#: gui/script_panels\export_poem_annotations_panel.py:92
+#: gui/script_panels\export_poem_annotations_panel.py:95
+#: gui/script_panels\find_duplicate_poems_panel.py:73
+#: gui/script_panels\find_duplicate_poems_panel.py:76
+#: gui/script_panels\proofread_annotations_panel.py:73
+#: gui/script_panels\proofread_annotations_panel.py:76
+#: gui/script_panels\random_sample_panel.py:80
+#: gui/script_panels\random_sample_panel.py:83
+#: gui/script_panels\random_sample_panel.py:86
+msgid "Validation Error"
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:287
+#: gui/config_panels\project_config_panel.py:332
+msgid "'{}' in '{}' must be an integer."
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:290
+#: gui/config_panels\project_config_panel.py:335
+msgid "'{}' in '{}' must be a number."
+msgstr ""
+
+#: gui/config_panels\global_config_panel.py:293
+#: gui/config_panels\project_config_panel.py:338
+msgid "'{}' in '{}' must be a valid JSON object."
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:35
+msgid "Edit Project Configuration"
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:53
+msgid "Active Project:"
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:96
+msgid "<b>{} Settings</b>"
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:101
+msgid "{}:"
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:112
+msgid "No suitable widget for field '{}' of type {}"
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:162
+msgid "Project Switched"
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:162
+#: gui/config_panels\project_config_panel.py:163 gui/main_window.py:133
+#: gui\main_window.py:133
+msgid "Switched to project: {}"
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:165
+msgid "Project Switch Error"
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:165
+#: gui/config_panels\project_config_panel.py:167
+msgid "Failed to switch to project: {}"
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:177
+msgid "No project configuration found to load."
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:226
+msgid "Project configuration saved."
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:230
+msgid "Failed to save project configuration. Check logs for details."
+msgstr ""
+
+#: gui/main_window.py:23 gui\main_window.py:23
+msgid "Poetry Annotator GUI"
+msgstr ""
+
+#: gui/main_window.py:45 gui\main_window.py:45
+msgid "Ready"
+msgstr ""
+
+#: gui/main_window.py:63 gui\main_window.py:63
+msgid "&File"
+msgstr ""
+
+#: gui/main_window.py:64 gui\main_window.py:64
+msgid "E&xit"
+msgstr ""
+
+#: gui/main_window.py:66 gui\main_window.py:66
+msgid "Exit application"
+msgstr ""
+
+#: gui/main_window.py:71 gui\main_window.py:71
+msgid "&Settings"
+msgstr ""
+
+#: gui/main_window.py:73 gui\main_window.py:73
+msgid "Edit &Global Configuration"
+msgstr ""
+
+#: gui/main_window.py:77 gui\main_window.py:77
+msgid "Edit &Project Configuration"
+msgstr ""
+
+#: gui/main_window.py:82 gui\main_window.py:82
+msgid "&Help"
+msgstr ""
+
+#: gui/main_window.py:83 gui\main_window.py:83
+msgid "&About"
+msgstr ""
+
+#: gui/main_window.py:96 gui\main_window.py:96
+msgid "GUI application started."
+msgstr ""
+
+#: gui/main_window.py:109 gui\main_window.py:109
+msgid "Added script panel: {}"
+msgstr ""
+
+#: gui/main_window.py:116 gui\main_window.py:116
+msgid "Global configuration panel opened."
+msgstr ""
+
+#: gui/main_window.py:124 gui\main_window.py:124
+msgid "Project configuration panel opened."
+msgstr ""
+
+#: gui/main_window.py:128 gui\main_window.py:128
+msgid "Configuration saved successfully!"
+msgstr ""
+
+#: gui/main_window.py:129 gui\main_window.py:129
+msgid "Configuration saved signal received."
+msgstr ""
+
+#: gui/main_window.py:134 gui\main_window.py:134
+msgid "Project switched to: {}"
+msgstr ""
+
+#: gui/main_window.py:138 gui\main_window.py:138
+msgid "About Poetry Annotator GUI"
+msgstr ""
+
+#: gui/main_window.py:139 gui\main_window.py:139
+msgid ""
+"Poetry Annotator GUI\n"
+"\n"
+"Version 1.0\n"
+"\n"
+"A graphical user interface for managing poetry annotation tasks."
+msgstr ""
+
+#: gui/main_window.py:141 gui\main_window.py:141
+msgid "Displayed about dialog."
+msgstr ""
+
+#: gui/main_window.py:147 gui\main_window.py:147
+msgid "GUI application closing."
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:27
+#: gui/script_panels\distribute_tasks_panel.py:28
+#: gui/script_panels\export_poem_annotations_panel.py:27
+#: gui/script_panels\find_duplicate_poems_panel.py:27
+#: gui/script_panels\proofread_annotations_panel.py:27
+#: gui/script_panels\random_sample_panel.py:27
+msgid "Script output will appear here..."
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:37
+#: gui/script_panels\distribute_tasks_panel.py:39
+#: gui/script_panels\export_poem_annotations_panel.py:38
+#: gui/script_panels\find_duplicate_poems_panel.py:38
+#: gui/script_panels\proofread_annotations_panel.py:38
+#: gui/script_panels\random_sample_panel.py:38
+msgid "Enter database name (e.g., default)"
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:38
+#: gui/script_panels\distribute_tasks_panel.py:40
+#: gui/script_panels\export_poem_annotations_panel.py:39
+#: gui/script_panels\find_duplicate_poems_panel.py:39
+#: gui/script_panels\proofread_annotations_panel.py:39
+#: gui/script_panels\random_sample_panel.py:39
+msgid "Database Name:"
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:43
+#: gui/script_panels\export_poem_annotations_panel.py:44
+msgid "Select output file path"
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:44
+#: gui/script_panels\distribute_tasks_panel.py:46
+#: gui/script_panels\distribute_tasks_panel.py:56
+#: gui/script_panels\export_poem_annotations_panel.py:45
+#: gui/script_panels\find_duplicate_poems_panel.py:45
+#: gui/script_panels\proofread_annotations_panel.py:45
+#: gui/script_panels\random_sample_panel.py:45
+msgid "Browse..."
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:48
+#: gui/script_panels\export_poem_annotations_panel.py:49
+#: gui/script_panels\find_duplicate_poems_panel.py:49
+#: gui/script_panels\proofread_annotations_panel.py:49
+#: gui/script_panels\random_sample_panel.py:49
+msgid "Output File:"
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:51
+msgid "Run Statistics"
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:56
+#: gui/script_panels\distribute_tasks_panel.py:75
+#: gui/script_panels\export_poem_annotations_panel.py:62
+#: gui/script_panels\find_duplicate_poems_panel.py:57
+#: gui/script_panels\proofread_annotations_panel.py:57
+#: gui/script_panels\random_sample_panel.py:64
+msgid "Script Output:"
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:63
+msgid "Text Files (*.txt);;All Files (*.*)"
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:63
+#: gui/script_panels\export_poem_annotations_panel.py:77
+#: gui/script_panels\find_duplicate_poems_panel.py:64
+#: gui/script_panels\proofread_annotations_panel.py:64
+#: gui/script_panels\random_sample_panel.py:71
+msgid "Select Output File"
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:72
+#: gui/script_panels\distribute_tasks_panel.py:99
+#: gui/script_panels\export_poem_annotations_panel.py:89
+#: gui/script_panels\find_duplicate_poems_panel.py:73
+#: gui/script_panels\proofread_annotations_panel.py:73
+#: gui/script_panels\random_sample_panel.py:80
+msgid "Database Name cannot be empty."
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:75
+#: gui/script_panels\export_poem_annotations_panel.py:92
+#: gui/script_panels\find_duplicate_poems_panel.py:76
+#: gui/script_panels\proofread_annotations_panel.py:76
+#: gui/script_panels\random_sample_panel.py:83
+msgid "Output File path cannot be empty."
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:89
+#: gui/script_panels\distribute_tasks_panel.py:124
+#: gui/script_panels\export_poem_annotations_panel.py:110
+#: gui/script_panels\find_duplicate_poems_panel.py:90
+#: gui/script_panels\proofread_annotations_panel.py:90
+#: gui/script_panels\random_sample_panel.py:101
+msgid "Starting '{}' with parameters: {}"
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:92
+#: gui/script_panels\distribute_tasks_panel.py:127
+#: gui/script_panels\export_poem_annotations_panel.py:113
+#: gui/script_panels\find_duplicate_poems_panel.py:93
+#: gui/script_panels\proofread_annotations_panel.py:93
+#: gui/script_panels\random_sample_panel.py:104
+msgid "Input validation failed for '{}'."
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:105
+#: gui/script_panels\distribute_tasks_panel.py:140
+#: gui/script_panels\export_poem_annotations_panel.py:126
+#: gui/script_panels\find_duplicate_poems_panel.py:106
+#: gui/script_panels\proofread_annotations_panel.py:106
+#: gui/script_panels\random_sample_panel.py:117
+msgid "--- {} Started ---"
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:107
+#: gui/script_panels\distribute_tasks_panel.py:142
+#: gui/script_panels\export_poem_annotations_panel.py:128
+#: gui/script_panels\find_duplicate_poems_panel.py:108
+#: gui/script_panels\proofread_annotations_panel.py:108
+#: gui/script_panels\random_sample_panel.py:119
+msgid "Script '{}' started."
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:113
+#: gui/script_panels\distribute_tasks_panel.py:148
+#: gui/script_panels\export_poem_annotations_panel.py:134
+#: gui/script_panels\find_duplicate_poems_panel.py:114
+#: gui/script_panels\proofread_annotations_panel.py:114
+#: gui/script_panels\random_sample_panel.py:125
+msgid "successfully"
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:113
+#: gui/script_panels\distribute_tasks_panel.py:148
+#: gui/script_panels\export_poem_annotations_panel.py:134
+#: gui/script_panels\find_duplicate_poems_panel.py:114
+#: gui/script_panels\proofread_annotations_panel.py:114
+#: gui/script_panels\random_sample_panel.py:125
+msgid "with errors"
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:114
+#: gui/script_panels\distribute_tasks_panel.py:149
+#: gui/script_panels\export_poem_annotations_panel.py:135
+#: gui/script_panels\find_duplicate_poems_panel.py:115
+#: gui/script_panels\proofread_annotations_panel.py:115
+#: gui/script_panels\random_sample_panel.py:126
+msgid "--- {} Finished {} ---"
+msgstr ""
+
+#: gui/script_panels\annotation_statistics_panel.py:116
+#: gui/script_panels\distribute_tasks_panel.py:151
+#: gui/script_panels\export_poem_annotations_panel.py:137
+#: gui/script_panels\find_duplicate_poems_panel.py:117
+#: gui/script_panels\proofread_annotations_panel.py:117
+#: gui/script_panels\random_sample_panel.py:128
+msgid "Script '{}' finished {}."
+msgstr ""
+
+#: gui/script_panels\distribute_tasks_panel.py:45
+msgid "Select input file (e.g., list of poems)"
+msgstr ""
+
+#: gui/script_panels\distribute_tasks_panel.py:50
+msgid "Input File:"
+msgstr ""
+
+#: gui/script_panels\distribute_tasks_panel.py:55
+msgid "Select output directory for tasks"
+msgstr ""
+
+#: gui/script_panels\distribute_tasks_panel.py:60
+msgid "Output Directory:"
+msgstr ""
+
+#: gui/script_panels\distribute_tasks_panel.py:67
+msgid "Number of Tasks:"
+msgstr ""
+
+#: gui/script_panels\distribute_tasks_panel.py:82
+msgid "Select Input File"
+msgstr ""
+
+#: gui/script_panels\distribute_tasks_panel.py:82
+#: gui/script_panels\find_duplicate_poems_panel.py:64
+#: gui/script_panels\proofread_annotations_panel.py:64
+#: gui/script_panels\random_sample_panel.py:71
+msgid "JSON Files (*.json);;Text Files (*.txt);;All Files (*.*)"
+msgstr ""
+
+#: gui/script_panels\distribute_tasks_panel.py:90
+msgid "Select Output Directory"
+msgstr ""
+
+#: gui/script_panels\distribute_tasks_panel.py:102
+msgid "Input File path cannot be empty."
+msgstr ""
+
+#: gui/script_panels\distribute_tasks_panel.py:105
+msgid "Output Directory path cannot be empty."
+msgstr ""
+
+#: gui/script_panels\distribute_tasks_panel.py:108
+msgid "Number of tasks must be a positive integer."
+msgstr ""
+
+#: gui/script_panels\export_poem_annotations_panel.py:53
+msgid "csv"
+msgstr ""
+
+#: gui/script_panels\export_poem_annotations_panel.py:53
+msgid "json"
+msgstr ""
+
+#: gui/script_panels\export_poem_annotations_panel.py:53
+msgid "markdown"
+msgstr ""
+
+#: gui/script_panels\export_poem_annotations_panel.py:54
+msgid "Output Format:"
+msgstr ""
+
+#: gui/script_panels\export_poem_annotations_panel.py:57
+msgid "Export Annotations"
+msgstr ""
+
+#: gui/script_panels\export_poem_annotations_panel.py:71
+msgid "JSON Files (*.json)"
+msgstr ""
+
+#: gui/script_panels\export_poem_annotations_panel.py:72
+msgid "CSV Files (*.csv)"
+msgstr ""
+
+#: gui/script_panels\export_poem_annotations_panel.py:73
+msgid "Markdown Files (*.md)"
+msgstr ""
+
+#: gui/script_panels\export_poem_annotations_panel.py:74
+msgid "All Files (*.*)"
+msgstr ""
+
+#: gui/script_panels\export_poem_annotations_panel.py:95
+msgid "Output Format cannot be empty."
+msgstr ""
+
+#: gui/script_panels\find_duplicate_poems_panel.py:44
+msgid "Select output file path for duplicates"
+msgstr ""
+
+#: gui/script_panels\find_duplicate_poems_panel.py:52
+msgid "Find Duplicates"
+msgstr ""
+
+#: gui/script_panels\proofread_annotations_panel.py:44
+msgid "Select output file path for proofreading results"
+msgstr ""
+
+#: gui/script_panels\random_sample_panel.py:44
+msgid "Select output file path for random sample"
+msgstr ""
+
+#: gui/script_panels\random_sample_panel.py:56
+msgid "Sample Size:"
+msgstr ""
+
+#: gui/script_panels\random_sample_panel.py:59
+msgid "Generate Random Sample"
+msgstr ""
+
+#: gui/script_panels\random_sample_panel.py:86
+msgid "Sample Size must be a positive integer."
+msgstr ""
+
+#: gui\help_texts.py:10
+msgid "The LLM service to use (e.g., 'openai', 'gemini')."
+msgstr ""
+
+#: gui\help_texts.py:11
+msgid "The specific model name to use for the selected service."
+msgstr ""
+
+#: gui\help_texts.py:12
+msgid "Your API key for the selected LLM service."
+msgstr ""
+
+#: gui\help_texts.py:13
+msgid "The base URL for the API, if not using the default."
+msgstr ""
+
+#: gui\help_texts.py:14
+msgid "The type of database to use (e.g., 'sqlite')."
+msgstr ""
+
+#: gui\help_texts.py:15
+msgid "The file path for the database."
+msgstr ""
+
+#: gui\help_texts.py:16
+msgid "Directory containing the source JSON files."
+msgstr ""
+
+#: gui\help_texts.py:17
+msgid "Directory where logs should be stored."
+msgstr ""
+
+#: gui\help_texts.py:18
+msgid "Directory for application output."
+msgstr ""
+
+#: gui\help_texts.py:19
+msgid "Directory containing prompt templates."
+msgstr ""
+
+#: gui\help_texts.py:20
+msgid "The logging level (e.g., 'INFO', 'DEBUG')."
+msgstr ""
+
+#: gui\help_texts.py:21
+msgid "The file path for the log file."
+msgstr ""
+
+#: gui\help_texts.py:24
+msgid "Override the global LLM service for this project."
+msgstr ""
+
+#: gui\help_texts.py:25
+msgid "Override the global LLM model for this project."
+msgstr ""
+
+#: gui\help_texts.py:26
+msgid "Override the global API key for this project."
+msgstr ""
+
+#: gui\help_texts.py:27
+msgid "Override the global base URL for this project."
+msgstr ""
+
+#: gui\help_texts.py:28
+msgid "Override the global database type for this project."
+msgstr ""
+
+#: gui\help_texts.py:29
+msgid "Override the global database path for this project."
+msgstr ""
+
+#: gui\help_texts.py:30
+msgid "Override the global source JSON directory for this project."
+msgstr ""
+
+#: gui\help_texts.py:31
+msgid "Override the global log directory for this project."
+msgstr ""
+
+#: gui\help_texts.py:32
+msgid "Override the global output directory for this project."
+msgstr ""
+
+#: gui\help_texts.py:33
+msgid "Override the global prompt template directory for this project."
+msgstr ""
+
+#: gui\help_texts.py:34
+msgid "Override the global logging level for this project."
+msgstr ""
+
+#: gui\help_texts.py:35
+msgid "Override the global log file for this project."
+msgstr ""
+
+#: gui\help_texts.py:36
+msgid "List of enabled plugins for this project (comma-separated)."
+msgstr ""
+
+#: gui\help_window.py:18
+msgid "Configuration Help"
+msgstr ""
+
+#: gui\help_window.py:37
+msgid "Close"
+msgstr ""
+
+#: gui\help_window.py:46
+msgid "Configuration Options"
+msgstr ""
+
+#: gui\script_panel_base.py:61
+msgid "A script is already running. Please wait for it to finish."
+msgstr ""
+
+#: gui\script_panel_base.py:61
+msgid "Script Running"
+msgstr ""
+
+#: gui\script_panel_base.py:77
+msgid "Script Finished"
+msgstr ""
+
+#: gui\script_panel_base.py:77
+msgid "{} executed successfully."
+msgstr ""
+
+#: gui\script_panel_base.py:82
+msgid "Script Error"
+msgstr ""
+
+#: gui\script_panel_base.py:82
+msgid "{} failed: {}"
+msgstr ""
+
+#: gui\script_panel_base.py:95
+msgid "Select File"
+msgstr ""
+
+#: gui\script_panel_base.py:102
+msgid "Select Directory"
+msgstr ""
+

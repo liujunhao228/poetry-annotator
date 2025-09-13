@@ -13,6 +13,8 @@
 3. **Prompt构建插件 (PromptBuilderPlugin)**: 用于构建LLM提示词
 4. **标签解析插件 (LabelParserPlugin)**: 用于解析和扩展标签分类
 5. **数据库初始化插件 (DatabaseInitPlugin)**: 用于数据库初始化操作
+6. **响应验证器插件 (ResponseValidatorPlugin)**: 用于验证LLM响应结果
+7. **LLM服务插件 (LLMServicePlugin)**: 用于提供LLM服务功能，包括模拟服务
 
 ## 3. 插件接口
 
@@ -69,6 +71,23 @@ class PreprocessingPlugin(BasePlugin):
         pass
 ```
 
+#### 响应验证器插件
+```python
+class ResponseValidatorPlugin(BasePlugin):
+    @abstractmethod
+    def validate(self, result_list: list) -> List[Dict[str, Any]]:
+        """
+        验证标注列表的内容。
+        Args:
+            result_list: 解析后的标注列表。
+        Returns:
+            一个经过验证的、包含标注信息的字典列表。
+        Raises:
+            ValueError, TypeError: 如果验证失败。
+        """
+        pass
+```
+
 ## 4. 插件管理器
 
 插件管理器 (`PluginManager`) 负责插件的注册、获取、初始化和清理。
@@ -84,19 +103,47 @@ class PreprocessingPlugin(BasePlugin):
 
 ## 5. 插件配置
 
-插件通过配置文件进行管理，配置文件采用INI格式：
+插件通过配置文件 `project/plugins.ini` 进行管理，该文件采用INI格式。系统会自动加载所有 `enabled = true` 的插件。
+
+每个插件都在一个独立的 `[Plugin.插件名称]` 部分中进行配置。
 
 ```ini
-[GlobalPlugins]
-enabled_plugins = plugin1,plugin2
-plugin_paths = project/plugins
-
 [Plugin.plugin1]
 enabled = true
+path = src/data/plugins
 type = query
-module = src.data.plugins.custom_query
+module = custom_query
 class = CustomQueryPlugin
-description = 自定义查询插件
+```
+
+### 配置项说明
+
+- `enabled`: (必需) `true` 或 `false`，决定是否加载此插件。
+- `path`: (必需) 插件源代码所在的根目录路径（相对于项目根目录）。加载器会自动将此路径添加到 `sys.path`。
+- `type`: (必需) 插件的类型，必须是 `ComponentType` 枚举中定义的值之一（例如 `query`, `preprocessing`, `response_validator` 等）。
+- `module`: (必需) 包含插件类的Python模块路径。
+- `class`: (必需) 插件的主类名。
+- 其他自定义字段：插件可以包含任意数量的自定义配置项，这些配置项会作为 `settings` 字典传递给插件的构造函数。
+
+### 示例：同时启用多个插件
+
+```ini
+# 默认响应验证插件
+[Plugin.default_response_validation]
+enabled = true
+path = src/response_validation
+type = response_validator
+module = src.response_validation.plugin_impl
+class = DefaultResponseValidationPlugin
+
+# 自定义查询插件
+[Plugin.custom_query]
+enabled = true
+path = project/plugins/custom_query_plugin
+type = query
+module = custom_query_logic
+class = CustomQueryPlugin
+table_name = "poems" # 自定义配置项
 ```
 
 ## 6. 插件开发指南
@@ -110,6 +157,7 @@ description = 自定义查询插件
 
 ### 6.2 示例插件实现
 
+#### 查询插件示例
 ```python
 from src.plugin_system.interfaces import QueryPlugin
 from src.config.schema import PluginConfig
@@ -130,11 +178,65 @@ class CustomQueryPlugin(QueryPlugin):
         return ["table_name"]
 ```
 
-## 7. 插件适配器
+#### 响应验证器插件
+```python
+from src.plugin_system.interfaces import ResponseValidatorPlugin
+from src.config.schema import PluginConfig
 
-为了保持向后兼容，系统提供了插件适配器，可以将旧的插件实现适配到新的插件系统。
+class CustomResponseValidatorPlugin(ResponseValidatorPlugin):
+    def __init__(self, plugin_config: PluginConfig):
+        super().__init__(plugin_config)
+        
+    def get_name(self) -> str:
+        return "custom_response_validator"
+    
+    def get_description(self) -> str:
+        return "自定义响应验证器插件"
+    
+    def validate(self, result_list: list) -> List[Dict[str, Any]]:
+        # 实现自定义验证逻辑
+        if not result_list:
+            raise ValueError("结果列表不能为空")
+        
+        # 添加自定义验证规则
+        for i, item in enumerate(result_list):
+            # 示例：检查ID是否为数字字符串
+            if 'id' in item and not item['id'].isdigit():
+                raise ValueError(f"第{i+1}项的ID必须是数字字符串")
+                
+        return result_list
+```
 
-## 8. 最佳实践
+#### LLM服务插件
+```python
+from src.plugin_system.interfaces import LLMServicePlugin
+from src.config.schema import PluginConfig
+from src.llm_services.schemas import PoemData, EmotionSchema
+
+class CustomLLMServicePlugin(LLMServicePlugin):
+    def __init__(self, plugin_config: PluginConfig):
+        super().__init__(plugin_config)
+        
+    def get_name(self) -> str:
+        return "custom_llm_service"
+    
+    def get_description(self) -> str:
+        return "自定义LLM服务插件"
+    
+    async def annotate_poem(self, poem: PoemData, emotion_schema: EmotionSchema) -> List[Dict[str, Any]]:
+        # 实现诗词标注逻辑
+        pass
+    
+    async def annotate_poem_stream(self, poem: PoemData, emotion_schema: EmotionSchema) -> str:
+        # 实现流式诗词标注逻辑
+        pass
+    
+    async def health_check(self) -> Tuple[bool, str]:
+        # 实现健康检查逻辑
+        return True, "Service is healthy"
+```
+
+## 7. 最佳实践
 
 1. **插件命名**: 使用清晰、描述性的名称
 2. **错误处理**: 在插件中实现适当的错误处理

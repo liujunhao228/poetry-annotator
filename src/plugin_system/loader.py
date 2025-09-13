@@ -5,10 +5,10 @@
 import importlib
 import logging
 import os
+import sys
 from typing import Dict, Any
 from src.plugin_system.base import BasePlugin
 from src.plugin_system.manager import PluginManager
-from src.plugin_system.direct_loader import DirectPluginLoader
 from src.plugin_system.project_config_manager import ProjectPluginConfigManager
 from src.config.schema import PluginConfig
 
@@ -20,13 +20,21 @@ class PluginLoader:
     """插件加载器"""
     
     @staticmethod
-    def load_plugin(plugin_config: PluginConfig) -> BasePlugin:
+    def load_plugin(plugin_config: PluginConfig, project_root: str) -> BasePlugin:
         """根据配置加载插件"""
         module_name = plugin_config.module
         class_name = plugin_config.class_name
+        plugin_path = plugin_config.path
         
         if not module_name or not class_name:
             raise ValueError("Plugin configuration missing module or class name")
+            
+        # 将插件路径添加到sys.path
+        if plugin_path:
+            full_plugin_path = os.path.join(project_root, plugin_path)
+            if full_plugin_path not in sys.path:
+                sys.path.insert(0, full_plugin_path)
+                logger.debug(f"Added plugin path to sys.path: {full_plugin_path}")
         
         try:
             # 动态导入模块
@@ -46,26 +54,15 @@ class PluginLoader:
             raise
     
     @staticmethod
-    def load_plugins_from_config(config_manager, plugin_manager: PluginManager):
+    def load_plugins_from_config(config_manager: ProjectPluginConfigManager, plugin_manager: PluginManager, project_root: str):
         """根据配置管理器加载所有启用的插件"""
-        # 首先尝试加载标准配置管理器中的插件
         try:
-            # 获取全局插件配置
-            global_plugin_config = config_manager.get_global_plugin_config()
+            plugin_configs = config_manager.get_all_plugin_configs()
             
-            # 遍历启用的插件列表
-            for plugin_name in global_plugin_config.enabled_plugins:
+            for plugin_name, plugin_config in plugin_configs.items():
                 try:
-                    # 获取插件配置
-                    plugin_config = config_manager.get_plugin_config(plugin_name)
-                    
-                    # 如果插件被禁用，跳过
-                    if not plugin_config.enabled:
-                        logger.debug(f"Plugin '{plugin_name}' is disabled, skipping")
-                        continue
-                    
                     # 加载插件
-                    plugin = PluginLoader.load_plugin(plugin_config)
+                    plugin = PluginLoader.load_plugin(plugin_config, project_root)
                     
                     # 注册插件
                     plugin_manager.register_plugin(plugin)
@@ -73,16 +70,4 @@ class PluginLoader:
                 except Exception as e:
                     logger.error(f"Warning: Failed to load plugin '{plugin_name}': {e}")
         except Exception as e:
-            logger.warning(f"Failed to load plugins from standard config: {e}")
-        
-        # 然后尝试加载项目插件配置
-        project_config_path = os.path.join("project", "plugins.ini")
-        if os.path.exists(project_config_path):
-            try:
-                logger.info("Loading plugins from project configuration")
-                project_config_manager = ProjectPluginConfigManager(project_config_path)
-                DirectPluginLoader.load_plugins_from_config(project_config_manager, plugin_manager)
-            except Exception as e:
-                logger.error(f"Failed to load plugins from project config: {e}")
-        else:
-            logger.debug("Project plugin config file not found, skipping")
+            logger.warning(f"Failed to load plugins from config: {e}")

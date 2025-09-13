@@ -5,7 +5,11 @@
 import configparser
 import os
 from typing import Dict, Any, List, Optional
-from src.config.schema import GlobalConfig, GlobalLLMConfig, GlobalDatabaseConfig, GlobalDataPathConfig, GlobalPromptConfig, GlobalLoggingConfig, GlobalVisualizerConfig, GlobalModelConfigTemplate, GlobalCategoriesConfig, GlobalPluginConfig, GlobalValidationRuleSet, GlobalPreprocessingRuleSet, GlobalCleaningRuleSet
+from src.config.schema import (
+    GlobalConfig, GlobalLLMConfig, GlobalDatabaseConfig, GlobalDataPathConfig, 
+    GlobalPromptConfig, GlobalLoggingConfig, GlobalVisualizerConfig, 
+    GlobalModelConfigTemplate, GlobalCategoriesConfig
+)
 
 
 class GlobalConfigLoader:
@@ -51,19 +55,10 @@ class GlobalConfigLoader:
         global_config.categories = self._load_categories_config()
         
         # 加载插件配置
-        global_config.plugins = self._load_plugin_config()
+        # global_config.plugins = self._load_plugin_config()
         
         # 加载模型模板配置
         global_config.model_template = self._load_model_template_config()
-        
-        # 加载校验规则配置
-        global_config.validation = self._load_validation_rule_config()
-        
-        # 加载预处理规则配置
-        global_config.preprocessing = self._load_preprocessing_rule_config()
-        
-        # 加载清洗规则配置
-        global_config.cleaning = self._load_cleaning_rule_config()
         
         return global_config
 
@@ -97,19 +92,10 @@ class GlobalConfigLoader:
         self._save_categories_config(config, global_config.categories)
         
         # 保存插件配置
-        self._save_plugin_config(config, global_config.plugins)
+        # self._save_plugin_config(config, global_config.plugins)
         
         # 保存模型模板配置
         self._save_model_template_config(config, global_config.model_template)
-        
-        # 保存校验规则配置
-        self._save_validation_rule_config(config, global_config.validation)
-        
-        # 保存预处理规则配置
-        self._save_preprocessing_rule_config(config, global_config.preprocessing)
-        
-        # 保存清洗规则配置
-        self._save_cleaning_rule_config(config, global_config.cleaning)
         
         # 写入文件
         with open(self.config_file, 'w', encoding='utf-8') as f:
@@ -245,26 +231,13 @@ class GlobalConfigLoader:
         config['Categories']['xml_path'] = categories_config.xml_path
         config['Categories']['md_path'] = categories_config.md_path
 
-    def _load_plugin_config(self) -> GlobalPluginConfig:
+    def _load_plugin_config(self):
         """加载插件配置"""
-        plugin_config = GlobalPluginConfig()
-        if self.config.has_section('Plugins'):
-            plugins = self.config['Plugins']
-            enabled_plugins_str = plugins.get('enabled_plugins', '')
-            if enabled_plugins_str:
-                plugin_config.enabled_plugins = [name.strip() for name in enabled_plugins_str.split(',') if name.strip()]
-            
-            plugin_paths_str = plugins.get('plugin_paths', '')
-            if plugin_paths_str:
-                plugin_config.plugin_paths = [path.strip() for path in plugin_paths_str.split(',') if path.strip()]
-        return plugin_config
+        pass
 
-    def _save_plugin_config(self, config: configparser.ConfigParser, plugin_config: GlobalPluginConfig):
+    def _save_plugin_config(self, config: configparser.ConfigParser, plugin_config):
         """保存插件配置"""
-        if not config.has_section('Plugins'):
-            config.add_section('Plugins')
-        config['Plugins']['enabled_plugins'] = ','.join(plugin_config.enabled_plugins)
-        config['Plugins']['plugin_paths'] = ','.join(plugin_config.plugin_paths)
+        pass
 
     def _load_model_template_config(self) -> GlobalModelConfigTemplate:
         """加载模型模板配置"""
@@ -275,36 +248,6 @@ class GlobalConfigLoader:
     def _save_model_template_config(self, config: configparser.ConfigParser, model_template_config: GlobalModelConfigTemplate):
         """保存模型模板配置"""
         # 模型模板配置通常在具体的模型配置节中定义，这里不需要保存
-
-    def _load_validation_rule_config(self) -> GlobalValidationRuleSet:
-        """加载校验规则配置"""
-        validation_config = GlobalValidationRuleSet()
-        # 校验规则配置通常在规则文件中定义，这里只保留默认配置
-        return validation_config
-
-    def _save_validation_rule_config(self, config: configparser.ConfigParser, validation_config: GlobalValidationRuleSet):
-        """保存校验规则配置"""
-        # 校验规则配置通常在规则文件中定义，这里不需要保存
-
-    def _load_preprocessing_rule_config(self) -> GlobalPreprocessingRuleSet:
-        """加载预处理规则配置"""
-        preprocessing_config = GlobalPreprocessingRuleSet()
-        # 预处理规则配置通常在规则文件中定义，这里只保留默认配置
-        return preprocessing_config
-
-    def _save_preprocessing_rule_config(self, config: configparser.ConfigParser, preprocessing_config: GlobalPreprocessingRuleSet):
-        """保存预处理规则配置"""
-        # 预处理规则配置通常在规则文件中定义，这里不需要保存
-
-    def _load_cleaning_rule_config(self) -> GlobalCleaningRuleSet:
-        """加载清洗规则配置"""
-        cleaning_config = GlobalCleaningRuleSet()
-        # 清洗规则配置通常在规则文件中定义，这里只保留默认配置
-        return cleaning_config
-
-    def _save_cleaning_rule_config(self, config: configparser.ConfigParser, cleaning_config: GlobalCleaningRuleSet):
-        """保存清洗规则配置"""
-        # 清洗规则配置通常在规则文件中定义，这里不需要保存
 
     def _get_global_database_config(self) -> Dict[str, Any]:
         """获取全局数据库配置"""

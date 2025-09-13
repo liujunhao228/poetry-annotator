@@ -111,7 +111,7 @@ class ConfigValidator:
             return False
         
         # 验证必需的节
-        required_sections = ['Database', 'Data', 'Prompt', 'Model', 'Validation', 'Preprocessing', 'Cleaning']
+        required_sections = ['Database', 'Data', 'Prompt', 'Model']
         for section in required_sections:
             if not config.has_section(section):
                 print(f"错误: 项目配置文件缺少必需的节: [{section}]")
@@ -138,24 +138,6 @@ class ConfigValidator:
         model = config['Model']
         if not model.get('model_names'):
             print("错误: 项目配置文件Model节缺少必需的字段: model_names")
-            return False
-        
-        # Validation节
-        validation = config['Validation']
-        if not validation.get('ruleset_name'):
-            print("错误: 项目配置文件Validation节缺少必需的字段: ruleset_name")
-            return False
-        
-        # Preprocessing节
-        preprocessing = config['Preprocessing']
-        if not preprocessing.get('ruleset_name'):
-            print("错误: 项目配置文件Preprocessing节缺少必需的字段: ruleset_name")
-            return False
-        
-        # Cleaning节
-        cleaning = config['Cleaning']
-        if not cleaning.get('ruleset_name'):
-            print("错误: 项目配置文件Cleaning节缺少必需的字段: ruleset_name")
             return False
         
         return True

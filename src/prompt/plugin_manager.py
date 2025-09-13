@@ -18,11 +18,11 @@ class PluginBasedPromptManager:
     def _load_plugins_from_config(self):
         """根据配置动态加载插件"""
         try:
-            # 获取全局插件配置
-            global_plugin_config = config_manager.get_global_plugin_config()
+            # 获取项目插件配置
+            project_plugin_config = config_manager.get_project_plugins_config()
             
             # 遍历启用的Prompt插件列表，尝试加载每个插件
-            for plugin_name in global_plugin_config.enabled_plugins:
+            for plugin_name in project_plugin_config.enabled_plugins:
                 try:
                     # 获取插件配置
                     plugin_config = config_manager.get_plugin_config(plugin_name)

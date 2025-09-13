@@ -4,8 +4,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from src.llm_response_parser import llm_response_parser, ILLMResponseParser
-from src.validator.custom_json_validator import CustomJSONValidator, CustomValidationError # 新增导入
+from src.response_parsing.llm_response_parser import llm_response_parser, LLMResponseParser
 from src.config import get_config_manager
 config_manager = get_config_manager()
 from src.utils.rate_limiter import AsyncTokenBucket
@@ -20,7 +19,7 @@ from .exceptions import LLMServiceConfigError, LLMServiceResponseError
 
 class BaseLLMService(ABC):
     """LLM服务抽象基类 (已重构)"""
-    def __init__(self, config: Dict[str, Any], model_config_name: str, response_parser: Optional[ILLMResponseParser] = None):
+    def __init__(self, config: Dict[str, Any], model_config_name: str, response_parser: Optional[LLMResponseParser] = None):
         """
         构造函数现在接收完整的配置字典
         """
@@ -33,7 +32,7 @@ class BaseLLMService(ABC):
         # --- 初始化响应解析器 ---
         # 如果传入了 response_parser 实例，则使用它；否则使用默认的全局实例
         # 这为未来通过工厂或配置注入不同的解析器提供了可能
-        self.response_parser: ILLMResponseParser = response_parser or llm_response_parser
+        self.response_parser: LLMResponseParser = response_parser or llm_response_parser
         self.base_url = self.config.get('base_url')
         if not self.model or not self.api_key:
             raise LLMServiceConfigError(f"模型配置 '{model_config_name}' 必须包含 'model_name' 和 'api_key' 字段。")
@@ -102,10 +101,6 @@ class BaseLLMService(ABC):
         
         # --- 初始化流式响应重组器 ---
         self.stream_reassembler = StreamReassembler(self.provider)
-        
-        # --- 初始化自定义校验器 ---
-        config_root = Path(__file__).parent.parent / "config"
-        self.custom_validator = CustomJSONValidator(config_root / "custom_validation_rules.yaml")
 
     async def __aenter__(self):
         """异步上下文管理器入口"""
@@ -340,7 +335,6 @@ class BaseLLMService(ABC):
         此方法现在完全委托 `self.response_parser` 来完成所有工作。
         解析器会尝试多种策略从文本中提取一个JSON数组，并立即验证其内容
         是否符合业务规范（包含'id', 'primary', 'secondary'等字段和正确类型）。
-        在基础验证通过后，再使用自定义校验器根据配置文件进行二次校验。
         只有完全通过所有验证的结果才会被返回。
         Args:
             response_text: LLM的原始响应文本。
@@ -355,20 +349,11 @@ class BaseLLMService(ABC):
             # 使用实例变量 self.response_parser 而不是全局变量
             validated_list = self.response_parser.parse(response_text)
             
-            # [新增] 在基础验证通过后，进行自定义规则的二次校验
-            try:
-                # 使用自定义校验器进行二次校验
-                custom_validated_list = self.custom_validator.validate(validated_list)
-                self.logger.info(f"响应解析、内容验证及自定义规则校验均成功，共 {len(custom_validated_list)} 条标注记录。规则集: '{self.custom_validator.active_ruleset_name}'")
-            except CustomValidationError as custom_e:
-                self.logger.error(f"响应通过基础解析验证，但自定义规则校验失败: {custom_e}")
-                raise LLMServiceResponseError(f"响应自定义规则校验失败: {custom_e}") from custom_e
-
             # [新增] 如果配置要求保存完整响应，则记录完整响应内容
             if save_full_response:
                 self.logger.debug(f"完整响应内容(前500字符): {response_text[:500]}{'...' if len(response_text) > 500 else ''}")
             
-            return validated_list # 返回原始列表，其内容已被自定义校验器确认
+            return validated_list
         except (ValueError, TypeError) as e:
             # 捕获解析器抛出的最终错误
             self.logger.error(f"响应统一解析验证失败: {e}", exc_info=True)

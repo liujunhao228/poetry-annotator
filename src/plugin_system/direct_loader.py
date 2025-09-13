@@ -44,17 +44,17 @@ class DirectPluginLoader:
             raise
     
     @staticmethod
-    def load_plugins_from_config(config_manager, plugin_manager: PluginManager):
+    def load_plugins_from_config(config_manager, plugin_manager: PluginManager, project_root: str):
         """根据配置管理器直接加载所有启用的插件"""
         try:
-            # 获取全局插件配置
-            global_plugin_config = config_manager.get_global_plugin_config()
+            # 获取项目插件配置
+            project_plugins_config = config_manager.get_project_plugins_config()
         except Exception as e:
-            logger.warning(f"Failed to get global plugin config: {e}")
+            logger.warning(f"Failed to get project plugin config: {e}")
             return
         
         # 遍历启用的插件列表
-        for plugin_name in global_plugin_config.enabled_plugins:
+        for plugin_name in project_plugins_config.enabled_plugins:
             try:
                 # 获取插件配置
                 plugin_config = config_manager.get_plugin_config(plugin_name)

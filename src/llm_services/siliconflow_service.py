@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List, Union, Tuple, AsyncGenerator
 import httpx
 from .base_service import BaseLLMService
 from .schemas import PoemData, EmotionSchema
-from ..llm_response_parser import ILLMResponseParser
+from ..response_parsing.llm_response_parser import LLMResponseParser
 
 
 class SiliconFlowService(BaseLLMService):
@@ -20,7 +20,7 @@ class SiliconFlowService(BaseLLMService):
     兼容不同源（如Ollama）的响应格式。
     """
     
-    def __init__(self, config: Dict[str, Any], model_config_name: str, response_parser: Optional[ILLMResponseParser] = None):
+    def __init__(self, config: Dict[str, Any], model_config_name: str, response_parser: Optional[LLMResponseParser] = None):
         """
         初始化并解析配置字典
         """

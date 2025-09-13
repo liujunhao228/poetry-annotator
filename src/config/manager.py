@@ -5,14 +5,13 @@
 import os
 from typing import Dict, Any, Optional, List
 
-from src.config.schema import GlobalConfig, ProjectConfig, GlobalPluginConfig, PluginConfig
+from src.config.schema import GlobalConfig, ProjectConfig, PluginConfig, ProjectPluginsConfig, ProjectPluginsConfig, ProjectPluginsConfig, ProjectPluginsConfig, ProjectPluginsConfig
 from src.config.global_config_loader import GlobalConfigLoader
 from src.config.project_config_loader import ProjectConfigLoader
 from src.config.project_manager import ProjectConfigManager
-from src.config.rules_loader import RulesLoader
 from src.config.model_manager import ModelManager
 from src.config.validator import ConfigValidator
-from src.config.plugin_loader import PluginConfigLoader, ProjectPluginConfigLoader
+from src.config.plugin_loader import ProjectPluginConfigLoader
 
 
 # 全局配置实例
@@ -61,10 +60,8 @@ class ConfigManager:
         self.global_loader = GlobalConfigLoader(self.global_config_path)
         self.project_loader = ProjectConfigLoader(self.project_config_path) if self.project_config_path else None
         self.project_plugin_loader = ProjectPluginConfigLoader("project/plugins.ini") if self.project_config_path else None
-        self.rules_loader = RulesLoader()
         self.model_manager = ModelManager(self.global_config_path)
         self.validator = ConfigValidator(self.global_config_path)
-        self.plugin_loader = PluginConfigLoader(self.global_config_path)
         self.project_manager = ProjectConfigManager()
 
         # 加载配置
@@ -202,29 +199,13 @@ class ConfigManager:
         model_names = self.project_config.model.model_names
         return self.model_manager.get_effective_model_configs(model_names)
 
-    def get_effective_validation_ruleset_name(self) -> str:
-        """获取生效的校验规则集名称"""
-        if self.project_config:
-            return self.project_config.validation.ruleset_name
-        return self.global_config.validation.active_ruleset
 
-    def get_effective_preprocessing_ruleset_name(self) -> str:
-        """获取生效的预处理规则集名称"""
-        if self.project_config:
-            return self.project_config.preprocessing.ruleset_name
-        return self.global_config.preprocessing.active_ruleset
-
-    def get_effective_cleaning_ruleset_name(self) -> str:
-        """获取生效的清洗规则集名称"""
-        if self.project_config:
-            return self.project_config.cleaning.ruleset_name
-        return self.global_config.cleaning.active_ruleset
-
-    def get_global_plugin_config(self) -> GlobalPluginConfig:
-        """获取全局插件配置"""
+    def get_project_plugins_config(self) -> ProjectPluginsConfig:
+        """获取项目插件配置"""
         if self.project_plugin_loader:
             return self.project_plugin_loader.load_project_plugin_config()
-        return GlobalPluginConfig()
+        return ProjectPluginsConfig()
+
 
     def get_plugin_config(self, plugin_name: str) -> PluginConfig:
         """获取特定插件配置"""
@@ -276,19 +257,7 @@ class ConfigManager:
                 'prompt': self.global_loader._get_global_prompt_config(),
                 'logging': self.get_effective_logging_config(),
                 'visualizer': self.get_effective_visualizer_config(),
-                'models': self.model_manager._get_all_global_model_configs(),
-                'validation': {
-                    'available_rulesets': self.global_config.validation.available_rulesets,
-                    'active_ruleset': self.global_config.validation.active_ruleset
-                },
-                'preprocessing': {
-                    'available_rulesets': self.global_config.preprocessing.available_rulesets,
-                    'active_ruleset': self.global_config.preprocessing.active_ruleset
-                },
-                'cleaning': {
-                    'available_rulesets': self.global_config.cleaning.available_rulesets,
-                    'active_ruleset': self.global_config.cleaning.active_ruleset
-                }
+                'models': self.model_manager._get_all_global_model_configs()
             },
             'project_management': {
                 'active_project': self.get_active_project_config(),
@@ -301,16 +270,7 @@ class ConfigManager:
                 'database': self.get_effective_database_config(),
                 'data': self.get_effective_data_config(),
                 'prompt': self.get_effective_prompt_config(),
-                'models': self.get_effective_model_configs(),
-                'validation': {
-                    'ruleset_name': self.project_config.validation.ruleset_name
-                },
-                'preprocessing': {
-                    'ruleset_name': self.project_config.preprocessing.ruleset_name
-                },
-                'cleaning': {
-                    'ruleset_name': self.project_config.cleaning.ruleset_name
-                }
+                'models': self.get_effective_model_configs()
             }
 
         return all_configs

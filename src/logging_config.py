@@ -11,6 +11,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
 
+from src.config import config_manager
+
 
 class LoggingConfig:
     """日志配置管理器"""
@@ -164,33 +166,31 @@ def setup_default_logging(console_level: Optional[str] = None,
         enable_file_log: 是否启用文件日志（可选，用于覆盖配置文件）
         log_file: 日志文件路径（可选，用于覆盖配置文件）
     """
+    log_config = {}
     try:
-        from .config import config_manager
-        config = config_manager.get_logging_config()
-        # 使用配置文件中的值，除非显式通过参数覆盖
-        final_console_level = console_level or config['console_log_level']
-        # 关键修改：如果命令行传入了 file_level，则使用它，否则使用配置中的
-        final_file_level = file_level or config['file_log_level']
-        final_enable_file_log = enable_file_log if enable_file_log is not None else config['enable_file_log']
-        final_log_file = log_file or config.get('log_file')
-        final_enable_console_log = config['enable_console_log']
-        final_max_file_size = config['max_file_size'] * 1024 * 1024  # 转换为字节
-        final_backup_count = config['backup_count']
-        final_quiet_third_party = config['quiet_third_party']
+        # [修改] 修正方法名称
+        log_config = config_manager.get_effective_logging_config()
     except Exception as e:
-        # 如果配置文件读取失败，使用安全的默认值
+        import traceback
         print(f"警告: 读取日志配置失败，使用默认值: {e}")
-        final_console_level = console_level or 'INFO'
-        final_file_level = file_level or 'DEBUG'  # 也要处理默认值的情况
-        final_enable_file_log = enable_file_log if enable_file_log is not None else True
-        final_log_file = log_file
-        final_enable_console_log = True
-        final_max_file_size = 10 * 1024 * 1024
-        final_backup_count = 5
-        final_quiet_third_party = True
+        print(f"类型 of config_manager: {type(config_manager)}")
+        traceback.print_exc()
+    # 决定最终的配置值，命令行参数 > 配置文件 > 默认值
+    final_console_level = console_level if console_level is not None else log_config.get('console_level', 'INFO')
+    final_file_level = file_level if file_level is not None else log_config.get('file_level', 'DEBUG')
+    final_enable_file_log = enable_file_log if enable_file_log is not None else log_config.get('enable_file_log', False)
+    final_log_file = log_file if log_file is not None else log_config.get('log_file')
+
+    # 其他配置从 log_config 或默认值获取
+    final_enable_console_log = log_config.get('enable_console_log', True)
+    # 将从配置文件读取的max_file_size（MB）转换为字节
+    final_max_file_size = log_config.get('max_file_size', 10) * 1024 * 1024
+    final_backup_count = log_config.get('backup_count', 5)
+    final_quiet_third_party = log_config.get('quiet_third_party', True)
+
     logging_config.setup_logging(
         console_level=final_console_level,
-        file_level=final_file_level,  # 确保这里传递的是新的 final_file_level
+        file_level=final_file_level,
         enable_file_log=final_enable_file_log,
         log_file=final_log_file,
         enable_console_log=final_enable_console_log,
@@ -202,6 +202,29 @@ def setup_default_logging(console_level: Optional[str] = None,
 def get_logger(name: str) -> logging.Logger:
     """获取日志记录器"""
     return logging_config.get_logger(name)
+
+def get_log_directory() -> Path:
+    """
+    获取当前配置的日志文件目录。
+    如果未配置日志文件，则返回默认的 logs/ 目录。
+    """
+    log_config = {}
+    try:
+        log_config = config_manager.get_effective_logging_config()
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"获取日志配置失败，使用默认日志目录: {e}")
+
+    configured_log_file = log_config.get('log_file')
+
+    if configured_log_file:
+        # 如果配置了具体的日志文件，返回其父目录
+        return Path(configured_log_file).parent
+    else:
+        # 如果没有配置日志文件，返回默认的 logs/ 目录
+        project_root = Path(__file__).parent.parent.parent # src/logging_config.py -> src -> project_root
+        logs_dir = project_root / "logs"
+        logs_dir.mkdir(exist_ok=True) # 确保目录存在
+        return logs_dir
 
 
 def log_performance_metrics(operation: str, 
@@ -246,4 +269,4 @@ def log_error_with_context(error: Exception,
         context_str = ', '.join([f"{k}: {v}" for k, v in context.items()])
         error_msg += f" | 上下文: {context_str}"
     
-    logger.error(error_msg, exc_info=True) 
+    logger.error(error_msg, exc_info=True)

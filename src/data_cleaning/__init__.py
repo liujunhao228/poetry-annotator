@@ -3,7 +3,7 @@
 """
 
 from .manager import DataCleaningManager
-from .exceptions import CleaningError, CleaningRuleError, DataCleaningError
+from .exceptions import CleaningError, DataCleaningError
 from .preprocessing_plugin_adapter import PreprocessingPlugin, PreprocessingPluginAdapter
 
 __all__ = [
@@ -11,6 +11,5 @@ __all__ = [
     "PreprocessingPlugin",
     "PreprocessingPluginAdapter",
     "CleaningError",
-    "CleaningRuleError",
     "DataCleaningError"
 ]

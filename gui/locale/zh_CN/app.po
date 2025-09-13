@@ -1,0 +1,708 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR ORGANIZATION
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"POT-Creation-Date: 2025-09-13 13:08+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: pygettext.py 1.5\n"
+
+
+#: gui/app.py:47 gui\app.py:47
+msgid "Annotation Statistics"
+msgstr "标注统计"
+
+#: gui/app.py:48 gui/script_panels\distribute_tasks_panel.py:70 gui\app.py:48
+msgid "Distribute Tasks"
+msgstr "分配任务"
+
+#: gui/app.py:49 gui\app.py:49
+msgid "Export Poem Annotations"
+msgstr "导出诗歌标注"
+
+#: gui/app.py:50 gui\app.py:50
+msgid "Find Duplicate Poems"
+msgstr "查找重复诗歌"
+
+#: gui/app.py:51 gui/script_panels\proofread_annotations_panel.py:52
+#: gui\app.py:51
+msgid "Proofread Annotations"
+msgstr "校对标注"
+
+#: gui/app.py:52 gui\app.py:52
+msgid "Random Sample"
+msgstr "随机抽样"
+
+#: gui/config_panels\global_config_panel.py:32
+msgid "Edit Global Configuration"
+msgstr "编辑全局配置"
+
+#: gui/config_panels\global_config_panel.py:57
+#: gui/config_panels\project_config_panel.py:72
+msgid "Help"
+msgstr "帮助"
+
+#: gui/config_panels\global_config_panel.py:61
+#: gui/config_panels\project_config_panel.py:76
+msgid "Save"
+msgstr "保存"
+
+#: gui/config_panels\global_config_panel.py:63
+#: gui/config_panels\project_config_panel.py:78
+msgid "Cancel"
+msgstr "取消"
+
+#: gui/config_panels\global_config_panel.py:81
+msgid "<b>%s Settings</b>"
+msgstr "<b>%s 设置</b>"
+
+#: gui/config_panels\global_config_panel.py:86
+msgid "%s:"
+msgstr "%s："
+
+#: gui/config_panels\global_config_panel.py:96
+msgid "No suitable widget for field '%s' of type %s"
+msgstr "没有适用于类型 %s 字段 '%s' 的小部件"
+
+#: gui/config_panels\global_config_panel.py:125
+#: gui/config_panels\project_config_panel.py:141
+msgid "Comma-separated values"
+msgstr "逗号分隔值"
+
+#: gui/config_panels\global_config_panel.py:130
+#: gui/config_panels\project_config_panel.py:146
+msgid "JSON string (e.g., {\"key\": \"value\"})"
+msgstr "JSON 字符串（例如：{\"key\": \"value\"}）"
+
+#: gui/config_panels\global_config_panel.py:181
+msgid "Global configuration saved."
+msgstr "全局配置已保存。"
+
+#: gui/config_panels\global_config_panel.py:181
+#: gui/config_panels\project_config_panel.py:226
+msgid "Save Successful"
+msgstr "保存成功"
+
+#: gui/config_panels\global_config_panel.py:185
+msgid "Failed to save global configuration. Check logs for details."
+msgstr "保存全局配置失败。请查看日志获取详细信息。"
+
+#: gui/config_panels\global_config_panel.py:185
+#: gui/config_panels\project_config_panel.py:230
+msgid "Save Error"
+msgstr "保存错误"
+
+#: gui/config_panels\global_config_panel.py:287
+#: gui/config_panels\global_config_panel.py:290
+#: gui/config_panels\global_config_panel.py:293
+#: gui/config_panels\project_config_panel.py:332
+#: gui/config_panels\project_config_panel.py:335
+#: gui/config_panels\project_config_panel.py:338
+#: gui/script_panels\annotation_statistics_panel.py:72
+#: gui/script_panels\annotation_statistics_panel.py:75
+#: gui/script_panels\distribute_tasks_panel.py:99
+#: gui/script_panels\distribute_tasks_panel.py:102
+#: gui/script_panels\distribute_tasks_panel.py:105
+#: gui/script_panels\distribute_tasks_panel.py:108
+#: gui/script_panels\export_poem_annotations_panel.py:89
+#: gui/script_panels\export_poem_annotations_panel.py:92
+#: gui/script_panels\export_poem_annotations_panel.py:95
+#: gui/script_panels\find_duplicate_poems_panel.py:73
+#: gui/script_panels\find_duplicate_poems_panel.py:76
+#: gui/script_panels\proofread_annotations_panel.py:73
+#: gui/script_panels\proofread_annotations_panel.py:76
+#: gui/script_panels\random_sample_panel.py:80
+#: gui/script_panels\random_sample_panel.py:83
+#: gui/script_panels\random_sample_panel.py:86
+msgid "Validation Error"
+msgstr "验证错误"
+
+#: gui/config_panels\global_config_panel.py:287
+#: gui/config_panels\project_config_panel.py:332
+msgid "'{}' in '{}' must be an integer."
+msgstr "'{}' 在 '{}' 中必须是整数。"
+
+#: gui/config_panels\global_config_panel.py:290
+#: gui/config_panels\project_config_panel.py:335
+msgid "'{}' in '{}' must be a number."
+msgstr "'{}' 在 '{}' 中必须是数字。"
+
+#: gui/config_panels\global_config_panel.py:293
+#: gui/config_panels\project_config_panel.py:338
+msgid "'{}' in '{}' must be a valid JSON object."
+msgstr "'{}' 在 '{}' 中必须是有效的 JSON 对象。"
+
+#: gui/config_panels\project_config_panel.py:35
+msgid "Edit Project Configuration"
+msgstr "编辑项目配置"
+
+#: gui/config_panels\project_config_panel.py:53
+msgid "Active Project:"
+msgstr "当前项目："
+
+#: gui/config_panels\project_config_panel.py:96
+msgid "<b>{} Settings</b>"
+msgstr "<b>{} 设置</b>"
+
+#: gui/config_panels\project_config_panel.py:101
+msgid "{}:"
+msgstr "{}:"
+
+#: gui/config_panels\project_config_panel.py:112
+msgid "No suitable widget for field '{}' of type {}"
+msgstr "没有适用于类型 {} 字段 '{}' 的小部件"
+
+#: gui/config_panels\project_config_panel.py:162
+msgid "Project Switched"
+msgstr "项目已切换"
+
+#: gui/config_panels\project_config_panel.py:162
+#: gui/config_panels\project_config_panel.py:163 gui/main_window.py:133
+#: gui\main_window.py:133
+msgid "Switched to project: {}"
+msgstr "已切换到项目：{}"
+
+#: gui/config_panels\project_config_panel.py:165
+msgid "Project Switch Error"
+msgstr "项目切换错误"
+
+#: gui/config_panels\project_config_panel.py:165
+#: gui/config_panels\project_config_panel.py:167
+msgid "Failed to switch to project: {}"
+msgstr "切换到项目失败：{}"
+
+#: gui/config_panels\project_config_panel.py:177
+msgid "No project configuration found to load."
+msgstr "未找到要加载的项目配置。"
+
+#: gui/config_panels\project_config_panel.py:226
+msgid "Project configuration saved."
+msgstr "项目配置已保存。"
+
+#: gui/config_panels\project_config_panel.py:230
+msgid "Failed to save project configuration. Check logs for details."
+msgstr "保存项目配置失败。请查看日志获取详细信息。"
+
+#: gui/main_window.py:23 gui\main_window.py:23
+msgid "Poetry Annotator GUI"
+msgstr "诗歌标注器 GUI"
+
+#: gui/main_window.py:45 gui\main_window.py:45
+msgid "Ready"
+msgstr "就绪"
+
+#: gui/main_window.py:63 gui\main_window.py:63
+msgid "&File"
+msgstr "文件(&F)"
+
+#: gui/main_window.py:64 gui\main_window.py:64
+msgid "E&xit"
+msgstr "退出(&X)"
+
+#: gui/main_window.py:66 gui\main_window.py:66
+msgid "Exit application"
+msgstr "退出应用程序"
+
+#: gui/main_window.py:71 gui\main_window.py:71
+msgid "&Settings"
+msgstr "设置(&S)"
+
+#: gui/main_window.py:73 gui\main_window.py:73
+msgid "Edit &Global Configuration"
+msgstr "编辑全局配置(&G)"
+
+#: gui/main_window.py:77 gui\main_window.py:77
+msgid "Edit &Project Configuration"
+msgstr "编辑项目配置(&P)"
+
+#: gui/main_window.py:82 gui\main_window.py:82
+msgid "&Help"
+msgstr "帮助(&H)"
+
+#: gui/main_window.py:83 gui\main_window.py:83
+msgid "&About"
+msgstr "关于(&A)"
+
+#: gui/main_window.py:96 gui\main_window.py:96
+msgid "GUI application started."
+msgstr "GUI 应用程序已启动。"
+
+#: gui/main_window.py:109 gui\main_window.py:109
+msgid "Added script panel: {}"
+msgstr "已添加脚本面板：{}"
+
+#: gui/main_window.py:116 gui\main_window.py:116
+msgid "Global configuration panel opened."
+msgstr "全局配置面板已打开。"
+
+#: gui/main_window.py:124 gui\main_window.py:124
+msgid "Project configuration panel opened."
+msgstr "项目配置面板已打开。"
+
+#: gui/main_window.py:128 gui\main_window.py:128
+msgid "Configuration saved successfully!"
+msgstr "配置保存成功！"
+
+#: gui/main_window.py:129 gui\main_window.py:129
+msgid "Configuration saved signal received."
+msgstr "已收到配置保存信号。"
+
+#: gui/main_window.py:134 gui\main_window.py:134
+msgid "Project switched to: {}"
+msgstr "项目已切换到：{}"
+
+#: gui/main_window.py:138 gui\main_window.py:138
+msgid "About Poetry Annotator GUI"
+msgstr "关于诗歌标注器 GUI"
+
+#: gui/main_window.py:139 gui\main_window.py:139
+msgid ""
+"Poetry Annotator GUI\n"
+"\n"
+"Version 1.0\n"
+"\n"
+"A graphical user interface for managing poetry annotation tasks."
+msgstr ""
+"诗歌标注器 GUI\n"
+"\n"
+"版本 1.0\n"
+"\n"
+"一个用于管理诗歌标注任务的图形用户界面。"
+
+#: gui/main_window.py:141 gui\main_window.py:141
+msgid "Displayed about dialog."
+msgstr "已显示关于对话框。"
+
+#: gui/main_window.py:147 gui\main_window.py:147
+msgid "GUI application closing."
+msgstr "GUI 应用程序正在关闭。"
+
+#: gui/script_panels\annotation_statistics_panel.py:27
+#: gui/script_panels\distribute_tasks_panel.py:28
+#: gui/script_panels\export_poem_annotations_panel.py:27
+#: gui/script_panels\find_duplicate_poems_panel.py:27
+#: gui/script_panels\proofread_annotations_panel.py:27
+#: gui/script_panels\random_sample_panel.py:27
+msgid "Script output will appear here..."
+msgstr "脚本输出将显示在此处..."
+
+#: gui/script_panels\annotation_statistics_panel.py:37
+#: gui/script_panels\distribute_tasks_panel.py:39
+#: gui/script_panels\export_poem_annotations_panel.py:38
+#: gui/script_panels\find_duplicate_poems_panel.py:38
+#: gui/script_panels\proofread_annotations_panel.py:38
+#: gui/script_panels\random_sample_panel.py:38
+msgid "Enter database name (e.g., default)"
+msgstr "输入数据库名称（例如：default）"
+
+#: gui/script_panels\annotation_statistics_panel.py:38
+#: gui/script_panels\distribute_tasks_panel.py:40
+#: gui/script_panels\export_poem_annotations_panel.py:39
+#: gui/script_panels\find_duplicate_poems_panel.py:39
+#: gui/script_panels\proofread_annotations_panel.py:39
+#: gui/script_panels\random_sample_panel.py:39
+msgid "Database Name:"
+msgstr "数据库名称："
+
+#: gui/script_panels\annotation_statistics_panel.py:43
+#: gui/script_panels\export_poem_annotations_panel.py:44
+msgid "Select output file path"
+msgstr "选择输出文件路径"
+
+#: gui/script_panels\annotation_statistics_panel.py:44
+#: gui/script_panels\distribute_tasks_panel.py:46
+#: gui/script_panels\distribute_tasks_panel.py:56
+#: gui/script_panels\export_poem_annotations_panel.py:45
+#: gui/script_panels\find_duplicate_poems_panel.py:45
+#: gui/script_panels\proofread_annotations_panel.py:45
+#: gui/script_panels\random_sample_panel.py:45
+msgid "Browse..."
+msgstr "浏览..."
+
+#: gui/script_panels\annotation_statistics_panel.py:48
+#: gui/script_panels\export_poem_annotations_panel.py:49
+#: gui/script_panels\find_duplicate_poems_panel.py:49
+#: gui/script_panels\proofread_annotations_panel.py:49
+#: gui/script_panels\random_sample_panel.py:49
+msgid "Output File:"
+msgstr "输出文件："
+
+#: gui/script_panels\annotation_statistics_panel.py:51
+msgid "Run Statistics"
+msgstr "运行统计"
+
+#: gui/script_panels\annotation_statistics_panel.py:56
+#: gui/script_panels\distribute_tasks_panel.py:75
+#: gui/script_panels\export_poem_annotations_panel.py:62
+#: gui/script_panels\find_duplicate_poems_panel.py:57
+#: gui/script_panels\proofread_annotations_panel.py:57
+#: gui/script_panels\random_sample_panel.py:64
+msgid "Script Output:"
+msgstr "脚本输出："
+
+#: gui/script_panels\annotation_statistics_panel.py:63
+msgid "Text Files (*.txt);;All Files (*.*)"
+msgstr "文本文件 (*.txt);;所有文件 (*.*)"
+
+#: gui/script_panels\annotation_statistics_panel.py:63
+#: gui/script_panels\export_poem_annotations_panel.py:77
+#: gui/script_panels\find_duplicate_poems_panel.py:64
+#: gui/script_panels\proofread_annotations_panel.py:64
+#: gui/script_panels\random_sample_panel.py:71
+msgid "Select Output File"
+msgstr "选择输出文件"
+
+#: gui/script_panels\annotation_statistics_panel.py:72
+#: gui/script_panels\distribute_tasks_panel.py:99
+#: gui/script_panels\export_poem_annotations_panel.py:89
+#: gui/script_panels\find_duplicate_poems_panel.py:73
+#: gui/script_panels\proofread_annotations_panel.py:73
+#: gui/script_panels\random_sample_panel.py:80
+msgid "Database Name cannot be empty."
+msgstr "数据库名称不能为空。"
+
+#: gui/script_panels\annotation_statistics_panel.py:75
+#: gui/script_panels\export_poem_annotations_panel.py:92
+#: gui/script_panels\find_duplicate_poems_panel.py:76
+#: gui/script_panels\proofread_annotations_panel.py:76
+#: gui/script_panels\random_sample_panel.py:83
+msgid "Output File path cannot be empty."
+msgstr "输出文件路径不能为空。"
+
+#: gui/script_panels\annotation_statistics_panel.py:89
+#: gui/script_panels\distribute_tasks_panel.py:124
+#: gui/script_panels\export_poem_annotations_panel.py:110
+#: gui/script_panels\find_duplicate_poems_panel.py:90
+#: gui/script_panels\proofread_annotations_panel.py:90
+#: gui/script_panels\random_sample_panel.py:101
+msgid "Starting '{}' with parameters: {}"
+msgstr "正在启动 '{}'，参数为：{}"
+
+#: gui/script_panels\annotation_statistics_panel.py:92
+#: gui/script_panels\distribute_tasks_panel.py:127
+#: gui/script_panels\export_poem_annotations_panel.py:113
+#: gui/script_panels\find_duplicate_poems_panel.py:93
+#: gui/script_panels\proofread_annotations_panel.py:93
+#: gui/script_panels\random_sample_panel.py:104
+msgid "Input validation failed for '{}'."
+msgstr "输入验证失败：'{}'。"
+
+#: gui/script_panels\annotation_statistics_panel.py:105
+#: gui/script_panels\distribute_tasks_panel.py:140
+#: gui/script_panels\export_poem_annotations_panel.py:126
+#: gui/script_panels\find_duplicate_poems_panel.py:106
+#: gui/script_panels\proofread_annotations_panel.py:106
+#: gui/script_panels\random_sample_panel.py:117
+msgid "--- {} Started ---"
+msgstr "--- {} 已启动 ---"
+
+#: gui/script_panels\annotation_statistics_panel.py:107
+#: gui/script_panels\distribute_tasks_panel.py:142
+#: gui/script_panels\export_poem_annotations_panel.py:128
+#: gui/script_panels\find_duplicate_poems_panel.py:108
+#: gui/script_panels\proofread_annotations_panel.py:108
+#: gui/script_panels\random_sample_panel.py:119
+msgid "Script '{}' started."
+msgstr "脚本 '{}' 已启动。"
+
+#: gui/script_panels\annotation_statistics_panel.py:113
+#: gui/script_panels\distribute_tasks_panel.py:148
+#: gui/script_panels\export_poem_annotations_panel.py:134
+#: gui/script_panels\find_duplicate_poems_panel.py:114
+#: gui/script_panels\proofread_annotations_panel.py:114
+#: gui/script_panels\random_sample_panel.py:125
+msgid "successfully"
+msgstr "成功"
+
+#: gui/script_panels\annotation_statistics_panel.py:113
+#: gui/script_panels\distribute_tasks_panel.py:148
+#: gui/script_panels\export_poem_annotations_panel.py:134
+#: gui/script_panels\find_duplicate_poems_panel.py:114
+#: gui/script_panels\proofread_annotations_panel.py:114
+#: gui/script_panels\random_sample_panel.py:125
+msgid "with errors"
+msgstr "出现错误"
+
+#: gui/script_panels\annotation_statistics_panel.py:114
+#: gui/script_panels\distribute_tasks_panel.py:149
+#: gui/script_panels\export_poem_annotations_panel.py:135
+#: gui/script_panels\find_duplicate_poems_panel.py:115
+#: gui/script_panels\proofread_annotations_panel.py:115
+#: gui/script_panels\random_sample_panel.py:126
+msgid "--- {} Finished {} ---"
+msgstr "--- {} 已完成 {} ---"
+
+#: gui/script_panels\annotation_statistics_panel.py:116
+#: gui/script_panels\distribute_tasks_panel.py:151
+#: gui/script_panels\export_poem_annotations_panel.py:137
+#: gui/script_panels\find_duplicate_poems_panel.py:117
+#: gui/script_panels\proofread_annotations_panel.py:117
+#: gui/script_panels\random_sample_panel.py:128
+msgid "Script '{}' finished {}."
+msgstr "脚本 '{}' 已完成 {}。"
+
+#: gui/script_panels\distribute_tasks_panel.py:45
+msgid "Select input file (e.g., list of poems)"
+msgstr "选择输入文件（例如：诗歌列表）"
+
+#: gui/script_panels\distribute_tasks_panel.py:50
+msgid "Input File:"
+msgstr "输入文件："
+
+#: gui/script_panels\distribute_tasks_panel.py:55
+msgid "Select output directory for tasks"
+msgstr "选择任务输出目录"
+
+#: gui/script_panels\distribute_tasks_panel.py:60
+msgid "Output Directory:"
+msgstr "输出目录："
+
+#: gui/script_panels\distribute_tasks_panel.py:67
+msgid "Number of Tasks:"
+msgstr "任务数量："
+
+#: gui/script_panels\distribute_tasks_panel.py:82
+msgid "Select Input File"
+msgstr "选择输入文件"
+
+#: gui/script_panels\distribute_tasks_panel.py:82
+#: gui/script_panels\find_duplicate_poems_panel.py:64
+#: gui/script_panels\proofread_annotations_panel.py:64
+#: gui/script_panels\random_sample_panel.py:71
+msgid "JSON Files (*.json);;Text Files (*.txt);;All Files (*.*)"
+msgstr "JSON 文件 (*.json);;文本文件 (*.txt);;所有文件 (*.*)"
+
+#: gui/script_panels\distribute_tasks_panel.py:90
+msgid "Select Output Directory"
+msgstr "选择输出目录"
+
+#: gui/script_panels\distribute_tasks_panel.py:102
+msgid "Input File path cannot be empty."
+msgstr "输入文件路径不能为空。"
+
+#: gui/script_panels\distribute_tasks_panel.py:105
+msgid "Output Directory path cannot be empty."
+msgstr "输出目录路径不能为空。"
+
+#: gui/script_panels\distribute_tasks_panel.py:108
+msgid "Number of tasks must be a positive integer."
+msgstr "任务数量必须是正整数。"
+
+#: gui/script_panels\export_poem_annotations_panel.py:53
+msgid "csv"
+msgstr "csv"
+
+#: gui/script_panels\export_poem_annotations_panel.py:53
+msgid "json"
+msgstr "json"
+
+#: gui/script_panels\export_poem_annotations_panel.py:53
+msgid "markdown"
+msgstr "markdown"
+
+#: gui/script_panels\export_poem_annotations_panel.py:54
+msgid "Output Format:"
+msgstr "输出格式："
+
+#: gui/script_panels\export_poem_annotations_panel.py:57
+msgid "Export Annotations"
+msgstr "导出标注"
+
+#: gui/script_panels\export_poem_annotations_panel.py:71
+msgid "JSON Files (*.json)"
+msgstr "JSON 文件 (*.json)"
+
+#: gui/script_panels\export_poem_annotations_panel.py:72
+msgid "CSV Files (*.csv)"
+msgstr "CSV 文件 (*.csv)"
+
+#: gui/script_panels\export_poem_annotations_panel.py:73
+msgid "Markdown Files (*.md)"
+msgstr "Markdown 文件 (*.md)"
+
+#: gui/script_panels\export_poem_annotations_panel.py:74
+msgid "All Files (*.*)"
+msgstr "所有文件 (*.*)"
+
+#: gui/script_panels\export_poem_annotations_panel.py:95
+msgid "Output Format cannot be empty."
+msgstr "输出格式不能为空。"
+
+#: gui/script_panels\find_duplicate_poems_panel.py:44
+msgid "Select output file path for duplicates"
+msgstr "选择重复项的输出文件路径"
+
+#: gui/script_panels\find_duplicate_poems_panel.py:52
+msgid "Find Duplicates"
+msgstr "查找重复项"
+
+#: gui/script_panels\proofread_annotations_panel.py:44
+msgid "Select output file path for proofreading results"
+msgstr "选择校对结果的输出文件路径"
+
+#: gui/script_panels\random_sample_panel.py:44
+msgid "Select output file path for random sample"
+msgstr "选择随机样本的输出文件路径"
+
+#: gui/script_panels\random_sample_panel.py:56
+msgid "Sample Size:"
+msgstr "样本大小："
+
+#: gui/script_panels\random_sample_panel.py:59
+msgid "Generate Random Sample"
+msgstr "生成随机样本"
+
+#: gui/script_panels\random_sample_panel.py:86
+msgid "Sample Size must be a positive integer."
+msgstr "样本大小必须是正整数。"
+
+#: gui\help_texts.py:10
+msgid "The LLM service to use (e.g., 'openai', 'gemini')."
+msgstr "要使用的 LLM 服务（例如：'openai'、'gemini'）。"
+
+#: gui\help_texts.py:11
+msgid "The specific model name to use for the selected service."
+msgstr "所选服务要使用的特定模型名称。"
+
+#: gui\help_texts.py:12
+msgid "Your API key for the selected LLM service."
+msgstr "您所选 LLM 服务的 API 密钥。"
+
+#: gui\help_texts.py:13
+msgid "The base URL for the API, if not using the default."
+msgstr "API 的基本 URL，如果未使用默认值。"
+
+#: gui\help_texts.py:14
+msgid "The type of database to use (e.g., 'sqlite')."
+msgstr "要使用的数据库类型（例如：'sqlite'）。"
+
+#: gui\help_texts.py:15
+msgid "The file path for the database."
+msgstr "数据库的文件路径。"
+
+#: gui\help_texts.py:16
+msgid "Directory containing the source JSON files."
+msgstr "包含源 JSON 文件的目录。"
+
+#: gui\help_texts.py:17
+msgid "Directory where logs should be stored."
+msgstr "日志应存储的目录。"
+
+#: gui\help_texts.py:18
+msgid "Directory for application output."
+msgstr "应用程序输出目录。"
+
+#: gui\help_texts.py:19
+msgid "Directory containing prompt templates."
+msgstr "包含提示模板的目录。"
+
+#: gui\help_texts.py:20
+msgid "The logging level (e.g., 'INFO', 'DEBUG')."
+msgstr "日志记录级别（例如：'INFO'、'DEBUG'）。"
+
+#: gui\help_texts.py:21
+msgid "The file path for the log file."
+msgstr "日志文件的文件路径。"
+
+#: gui\help_texts.py:24
+msgid "Override the global LLM service for this project."
+msgstr "覆盖此项目的全局 LLM 服务。"
+
+#: gui\help_texts.py:25
+msgid "Override the global LLM model for this project."
+msgstr "覆盖此项目的全局 LLM 模型。"
+
+#: gui\help_texts.py:26
+msgid "Override the global API key for this project."
+msgstr "覆盖此项目的全局 API 密钥。"
+
+#: gui\help_texts.py:27
+msgid "Override the global base URL for this project."
+msgstr "覆盖此项目的全局基本 URL。"
+
+#: gui\help_texts.py:28
+msgid "Override the global database type for this project."
+msgstr "覆盖此项目的全局数据库类型。"
+
+#: gui\help_texts.py:29
+msgid "Override the global database path for this project."
+msgstr "覆盖此项目的全局数据库路径。"
+
+#: gui\help_texts.py:30
+msgid "Override the global source JSON directory for this project."
+msgstr "覆盖此项目的全局源 JSON 目录。"
+
+#: gui\help_texts.py:31
+msgid "Override the global log directory for this project."
+msgstr "覆盖此项目的全局日志目录。"
+
+#: gui\help_texts.py:32
+msgid "Override the global output directory for this project."
+msgstr "覆盖此项目的全局输出目录。"
+
+#: gui\help_texts.py:33
+msgid "Override the global prompt template directory for this project."
+msgstr "覆盖此项目的全局提示模板目录。"
+
+#: gui\help_texts.py:34
+msgid "Override the global logging level for this project."
+msgstr "覆盖此项目的全局日志记录级别。"
+
+#: gui\help_texts.py:35
+msgid "Override the global log file for this project."
+msgstr "覆盖此项目的全局日志文件。"
+
+#: gui\help_texts.py:36
+msgid "List of enabled plugins for this project (comma-separated)."
+msgstr "此项目启用的插件列表（逗号分隔）。"
+
+#: gui\help_window.py:18
+msgid "Configuration Help"
+msgstr "配置帮助"
+
+#: gui\help_window.py:37
+msgid "Close"
+msgstr "关闭"
+
+#: gui\help_window.py:46
+msgid "Configuration Options"
+msgstr "配置选项"
+
+#: gui\script_panel_base.py:61
+msgid "A script is already running. Please wait for it to finish."
+msgstr "脚本正在运行中。请等待其完成。"
+
+#: gui\script_panel_base.py:61
+msgid "Script Running"
+msgstr "脚本正在运行"
+
+#: gui\script_panel_base.py:77
+msgid "Script Finished"
+msgstr "脚本已完成"
+
+#: gui\script_panel_base.py:77
+msgid "{} executed successfully."
+msgstr "{} 执行成功。"
+
+#: gui\script_panel_base.py:82
+msgid "Script Error"
+msgstr "脚本错误"
+
+#: gui\script_panel_base.py:82
+msgid "{} failed: {}"
+msgstr "{} 失败：{}"
+
+#: gui\script_panel_base.py:95
+msgid "Select File"
+msgstr "选择文件"
+
+#: gui\script_panel_base.py:102
+msgid "Select Directory"
+msgstr "选择目录"

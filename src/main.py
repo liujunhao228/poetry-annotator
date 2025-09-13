@@ -64,7 +64,8 @@ logger = get_logger(__name__)
               help='启用文件日志输出（可选，将覆盖配置文件设置）')
 @click.option('--db-name', type=str, help='数据库名称（从配置文件中获取路径）')
 @click.option('--project', type=str, help='指定项目配置文件（可选，将覆盖默认的项目配置）')
-def cli(log_level, log_file, enable_file_log, db_name, project):
+@click.option('--dry-run', is_flag=True, help='使用假数据运行，不调用实际API')
+def cli(log_level, log_file, enable_file_log, db_name, project, dry_run):
     """LLM诗词情感标注工具"""
     # 如果指定了项目配置文件，使用指定的项目配置文件
     project_config_path = project if project else None
@@ -75,13 +76,19 @@ def cli(log_level, log_file, enable_file_log, db_name, project):
     
     # 记录使用的项目配置文件
     active_project = project if project else "project/project.ini"
-    logger.info(f"使用项目配置文件: {active_project}")
     
     # 设置日志配置 - 优先使用配置文件，CLI参数可覆盖
     try:
         config = config_manager.get_logging_config()
+        # 如果是 dry_run 模式，强制日志级别为 INFO
+        if dry_run:
+            log_level_to_use = 'INFO'
+            logger.info("Dry-run mode: Forcing log level to INFO.")
+        else:
+            log_level_to_use = log_level or config['console_log_level']
+
         setup_default_logging(
-            log_level=log_level or config['console_log_level'],  # 注意这里字段名的变更
+            log_level=log_level_to_use,
             enable_file_log=enable_file_log if enable_file_log is not None else config['enable_file_log'],
             log_file=log_file or config['log_file']
         )
@@ -89,6 +96,8 @@ def cli(log_level, log_file, enable_file_log, db_name, project):
         # 如果配置文件有问题，使用CLI参数或默认值
         setup_default_logging(log_level, enable_file_log, log_file)
     
+    logger.info(f"使用项目配置文件: {active_project}")
+
     # 设置数据库
     if db_name:
         try:
@@ -104,6 +113,8 @@ def cli(log_level, log_file, enable_file_log, db_name, project):
     logger.info(f"工作目录: {Path.cwd()}")
     logger.info(f"当前项目配置: {active_project}")
     logger.info(f"日志级别: {logging.getLevelName(logger.level)}")
+    if dry_run:
+        logger.info("DRY RUN模式: 使用假数据，不调用实际API")
     logger.info("=" * 60)
 
 
@@ -173,7 +184,7 @@ def setup(config):
         logger.error(f"初始化失败: {e}", exc_info=True)
 
 
-async def run_multi_model_annotation(models: Tuple[str], limit: Optional[int], id_range: Optional[str], force_rerun: bool):
+async def run_multi_model_annotation(models: Tuple[str], limit: Optional[int], id_range: Optional[str], force_rerun: bool, dry_run: bool = False, full_dry_run: bool = False):
     """异步调度器，用于运行多模型标注任务"""
     start_id, end_id = None, None
     if id_range:
@@ -204,7 +215,7 @@ async def run_multi_model_annotation(models: Tuple[str], limit: Optional[int], i
             try:
                 logger.info(f"创建模型配置 '{model_alias}' 的标注器...")
                 # 不再设置环境变量用于批次日志
-                annotator = Annotator(config_name=model_alias)
+                annotator = Annotator(config_name=model_alias, dry_run=dry_run, full_dry_run=full_dry_run)
                 # 异步初始化标注器
                 await annotator.async_init()
                 task = await task_manager.submit_task(
@@ -271,15 +282,17 @@ async def run_multi_model_annotation(models: Tuple[str], limit: Optional[int], i
 @click.option('--limit', type=int, help='限制每个模型本次标注的数量')
 @click.option('--range', 'id_range', help='按ID范围进行标注 (例如: 1:100)')
 @click.option('--force-rerun', is_flag=True, help='强制重新标注已完成的条目')
-def annotate(models, limit, id_range, force_rerun):
+@click.option('--dry-run', is_flag=True, help='使用假数据运行，不调用实际API')
+@click.option('--full-dry-run', is_flag=True, help='在dry-run模式下，执行完整流程测试（包括响应解析、内容验证、数据保存到JSON文件），而非跳过这些流程。')
+def annotate(models, limit, id_range, force_rerun, dry_run, full_dry_run):
     """启动一个或多个模型的并发标注任务"""
     try:
         logger.info("启动多模型并发标注任务...")
         
         # 记录任务参数
-        logger.info(f"任务参数 - 模型: {models or '未指定'}, 限制: {limit or '无'}, 范围: {id_range or '全部'}, 强制重跑: {force_rerun}")
+        logger.info(f"任务参数 - 模型: {models or '未指定'}, 限制: {limit or '无'}, 范围: {id_range or '全部'}, 强制重跑: {force_rerun}, DRY RUN: {dry_run}, FULL DRY RUN: {full_dry_run}")
         
-        asyncio.run(run_multi_model_annotation(models, limit, id_range, force_rerun))
+        asyncio.run(run_multi_model_annotation(models, limit, id_range, force_rerun, dry_run, full_dry_run))
         
         logger.info("标注任务执行完成")
     except Exception as e:
@@ -461,7 +474,7 @@ def project_command(list_projects, active, set_project):
 @cli.command(name="recover-from-logs")
 @click.option('--log-path', required=True, help='日志文件或目录路径')
 @click.option('--model', 'model_identifier', required=True, help='保存标注到数据库时使用的模型标识符, 例如 "gemini-2.5-flash"。')
-@click.option('--dry-run', is_flag=True, default=False, help='试运行模式，仅分析日志，不写入数据库')
+@click.option('--dry-run', is_flag=True, default=True, help='试运行模式，仅分析日志，不写入数据库')
 def recover_from_logs(log_path, model_identifier, dry_run):
     """从日志文件中恢复因意外中断而未保存的标注数据"""
     try:

@@ -9,8 +9,7 @@ from typing import Dict, Any, Optional, List
 from src.config.schema import (
     GlobalConfig, GlobalLLMConfig, GlobalDatabaseConfig, GlobalDataPathConfig,
     GlobalPromptConfig, GlobalLoggingConfig, GlobalVisualizerConfig,
-    GlobalModelConfigTemplate, GlobalValidationRuleSet, GlobalPreprocessingRuleSet,
-    GlobalCleaningRuleSet, GlobalPluginConfig
+    GlobalModelConfigTemplate
 )
 
 
@@ -102,12 +101,6 @@ class GlobalConfigLoader:
         # 模型配置模板（模型特定配置在_model_configs中处理）
         global_config.model_template = GlobalModelConfigTemplate()
         
-        # 插件配置（在plugin_loader中处理）
-        global_config.plugins = GlobalPluginConfig()
-
-        # 校验规则配置在单独的YAML文件中处理
-        # 预处理规则配置在单独的YAML文件中处理
-        # 清洗规则配置在单独的YAML文件中处理
         # 插件配置在plugin_loader中处理
 
         return global_config

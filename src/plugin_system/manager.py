@@ -101,3 +101,14 @@ class PluginManager:
             # 返回第一个匹配的插件
             return next(iter(plugins.values()))
         return None
+        
+    def get_llm_service_plugins(self) -> Dict[str, BasePlugin]:
+        """获取所有LLM服务插件"""
+        return self.get_plugins_by_type('llm_service')
+        
+    def get_llm_service_plugin(self, plugin_name: str) -> Optional[BasePlugin]:
+        """根据名称获取LLM服务插件"""
+        plugin = self.get_plugin(plugin_name)
+        if plugin and plugin.get_config().settings.get('type') == 'llm_service':
+            return plugin
+        return None

@@ -10,7 +10,7 @@ from openai import AsyncOpenAI
 from .base_service import BaseLLMService
 from .schemas import PoemData, EmotionSchema
 from .exceptions import LLMServiceAPIError, LLMServiceRateLimitError, LLMServiceTimeoutError
-from ..llm_response_parser import ILLMResponseParser
+from ..response_parsing.llm_response_parser import LLMResponseParser
 
 
 class OpenAIService(BaseLLMService):
@@ -27,7 +27,7 @@ class OpenAIService(BaseLLMService):
     此类负责解析和验证其自身的配置，并实现 BaseLLMService 定义的统一接口。
     """
 
-    def __init__(self, config: Dict[str, Any], model_config_name: str, response_parser: Optional[ILLMResponseParser] = None):
+    def __init__(self, config: Dict[str, Any], model_config_name: str, response_parser: Optional[LLMResponseParser] = None):
         """
         初始化并解析配置字典
         """

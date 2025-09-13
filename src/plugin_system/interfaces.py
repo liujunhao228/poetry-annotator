@@ -1,12 +1,9 @@
-"""
-特定类型插件接口定义
-"""
+"""特定类型插件接口定义"""
 
 import pandas as pd
 from typing import Dict, Any, List, Tuple, Optional
 from abc import abstractmethod
 from src.plugin_system.base import BasePlugin
-from src.llm_services.schemas import PoemData, EmotionSchema
 
 
 class QueryPlugin(BasePlugin):
@@ -36,9 +33,14 @@ class PromptBuilderPlugin(BasePlugin):
     """Prompt构建插件接口"""
     
     @abstractmethod
-    def build_prompts(self, poem_data: PoemData, emotion_schema: EmotionSchema, 
+    def build_prompts(self, poem_data, emotion_schema, 
                      model_config: Dict[str, Any]) -> Tuple[str, str]:
         """构建系统提示词和用户提示词"""
+        # 在函数内部导入，避免循环导入
+        from src.llm_services.schemas import PoemData, EmotionSchema
+        # 类型检查
+        assert isinstance(poem_data, PoemData)
+        assert isinstance(emotion_schema, EmotionSchema)
         pass
 
 
@@ -97,3 +99,69 @@ class DataProcessingPlugin(BasePlugin):
 class AnnotationManagementPlugin(BasePlugin):
     """标注管理插件接口"""
     pass
+
+
+class ResponseParsingAndValidationPlugin(BasePlugin):
+    """响应解析和验证插件接口"""
+    
+    def parse_and_validate(self, text: str) -> List[Dict[str, Any]]:
+        """
+        从字符串中解析并验证JSON数组。
+        
+        Args:
+            text: LLM返回的原始文本。
+            
+        Returns:
+            一个经过完全验证的、包含标注信息的字典列表。
+            
+        Raises:
+            ValueError, TypeError: 如果解析或验证失败。
+        """
+        pass
+
+class ResponseValidatorPlugin(BasePlugin):
+    """响应验证器插件接口"""
+    
+    def validate(self, result_list: list) -> List[Dict[str, Any]]:
+        """
+        验证标注列表的内容。
+        
+        Args:
+            result_list: 解析后的标注列表。
+            
+        Returns:
+            一个经过验证的、包含标注信息的字典列表。
+            
+        Raises:
+            ValueError, TypeError: 如果验证失败。
+        """
+        pass
+
+
+class LLMServicePlugin(BasePlugin):
+    """LLM服务插件接口"""
+    
+    @abstractmethod
+    async def annotate_poem(self, poem, emotion_schema) -> List[Dict[str, Any]]:
+        """处理诗词标注请求"""
+        # 在函数内部导入，避免循环导入
+        from src.llm_services.schemas import PoemData, EmotionSchema
+        # 类型检查
+        assert isinstance(poem, PoemData)
+        assert isinstance(emotion_schema, EmotionSchema)
+        pass
+    
+    @abstractmethod
+    async def annotate_poem_stream(self, poem, emotion_schema) -> str:
+        """处理流式诗词标注请求"""
+        # 在函数内部导入，避免循环导入
+        from src.llm_services.schemas import PoemData, EmotionSchema
+        # 类型检查
+        assert isinstance(poem, PoemData)
+        assert isinstance(emotion_schema, EmotionSchema)
+        pass
+    
+    @abstractmethod
+    async def health_check(self) -> Tuple[bool, str]:
+        """健康检查"""
+        pass

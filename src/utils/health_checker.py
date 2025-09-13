@@ -69,7 +69,7 @@ class HealthChecker:
             
         # 检查数据路径
         try:
-            data_config = config_manager.get_data_config()
+            data_config = config_manager.get_effective_data_config()
             source_dir = Path(data_config['source_dir'])
             output_dir = Path(data_config['output_dir'])
             if not source_dir.exists() or not source_dir.is_dir():

@@ -15,6 +15,8 @@
 
 import sys
 import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from pathlib import Path
 
 # 获取当前脚本的绝对路径
@@ -41,6 +43,9 @@ from src.annotator import Annotator
 from src.logging_config import setup_default_logging, get_logger
 from src.utils.health_checker import health_checker
 from src.llm_factory import llm_factory
+from src.plugin_system.manager import get_plugin_manager
+from src.plugin_system.project_config_manager import ProjectPluginConfigManager
+from src.plugin_system.loader import PluginLoader
 
 logger = get_logger(__name__)
 
@@ -170,15 +175,32 @@ def read_poem_ids_in_chunks(file_path: str, chunk_size: int):
             yield chunk
 
 
-def process_chunk(args: Tuple[str, List[int], bool]) -> Dict[str, Any]:
+def process_chunk(args: Tuple[str, List[int], bool, bool, bool]) -> Dict[str, Any]:
     """
     【内层并发单元】工作线程执行的函数，处理一个批次的ID。
     """
-    model_name, poem_ids_chunk, force_rerun = args
+    model_name, poem_ids_chunk, force_rerun, dry_run, full_dry_run = args
     thread_ident = threading.get_ident()
     logger.debug(f"线程 {thread_ident} 开始为模型 '{model_name}' 处理 {len(poem_ids_chunk)} 个ID的批次。")
+
+    # 如果是 dry_run 模式但不是 full_dry_run，则执行模拟处理并返回
+    if dry_run and not full_dry_run:
+        logger.info(f"[Dry Run - Simulated] 模拟处理模型 '{model_name}' 的 {len(poem_ids_chunk)} 个ID。")
+        time.sleep(0.1)  # 模拟少量I/O延迟
+        # 模拟成功和失败的情况
+        num_failed = len(poem_ids_chunk) // 10  # 模拟10%的失败率
+        num_completed = len(poem_ids_chunk) - num_failed
+        return {
+            'total': len(poem_ids_chunk),
+            'completed': num_completed,
+            'failed': num_failed,
+            'skipped': 0,
+            'dry_run': True
+        }
+
+    # 否则（非 dry_run 或 full_dry_run 模式），实例化 Annotator 并运行
     try:
-        annotator = Annotator(model_name)
+        annotator = Annotator(model_name, dry_run=dry_run, full_dry_run=full_dry_run)
         results = asyncio.run(annotator.run(poem_ids=poem_ids_chunk, force_rerun=force_rerun))
         # logger.debug(f"线程 {thread_ident} 完成为模型 '{model_name}' 处理批次。")
         return results
@@ -192,7 +214,7 @@ def process_chunk(args: Tuple[str, List[int], bool]) -> Dict[str, Any]:
         }
 
 
-def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_size: int, fresh_start: bool, max_workers: int):
+def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_size: int, fresh_start: bool, max_workers: int, dry_run: bool = False, full_dry_run: bool = False):
     """
     【外层并发单元】为单个指定模型和单个ID文件运行完整的并行标注流程。
     """
@@ -205,6 +227,10 @@ def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_
     # 直接使用全局日志记录器记录批次任务信息
     logger.info(f"开始新的批次任务 - 模型: {model}, ID文件: {Path(id_file).name}")
     
+    if dry_run:
+        logger.info("********** DRY RUN 模式已激活 **********")
+        logger.info("将跳过实际的LLM标注调用，仅测试流程。")
+
     logger.info("=" * 60)
     logger.info(f"启动任务流水线 -> 模型: [{model}], ID文件: [{Path(id_file).name}]")
     logger.info(f"任务将使用 {max_workers} 个内部工作线程处理数据块。")
@@ -240,7 +266,7 @@ def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_
           
         logger.info(f"总共有 {len(id_chunks)} 个批次，将从批次 {last_completed_chunk_index + 2} 开始处理 {len(chunks_to_process)} 个批次。")
       
-        task_args = [(model, chunk, force_rerun) for chunk in chunks_to_process]
+        task_args = [(model, chunk, force_rerun, dry_run, full_dry_run) for chunk in chunks_to_process]
       
         with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix=f"{model[:10]}_worker") as executor:
             results_iterator = executor.map(process_chunk, task_args)
@@ -306,7 +332,166 @@ def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_
     logger.info("-" * 60)
 
 
-# [修改] 为脚本添加入口参数，使其可被GUI调用和控制
+def run_distribution_task(
+    model: Optional[str] = None,
+    all_models: bool = False,
+    id_file: Optional[str] = None,
+    id_dir: Optional[str] = None,
+    force_rerun: bool = False,
+    chunk_size: int = 1000,
+    fresh_start: bool = False,
+    db: Optional[str] = None,
+    console_log_level: Optional[str] = None,
+    file_log_level: Optional[str] = None,
+    enable_file_log: Optional[bool] = None,
+    dry_run: bool = False,
+    full_dry_run: bool = False # 新增参数
+) -> Dict[str, Any]:
+    """
+    【模块化入口函数】执行诗词标注任务分发。
+    此函数不依赖Click，可被其他Python模块（如GUI）直接导入和调用。
+
+    :param model: 指定模型别名。
+    :param all_models: 是否对所有模型执行。
+    :param id_file: 单个ID文件路径。
+    :param id_dir: 包含ID文件的目录路径。
+    :param force_rerun: 强制重新标注。
+    :param chunk_size: 批次大小。
+    :param fresh_start: 清除进度从头开始。
+    :param db: 数据库名称。
+    :param console_log_level: 控制台日志级别。
+    :param file_log_level: 文件日志级别。
+    :param enable_file_log: 是否启用文件日志。
+    :param dry_run: 空运行模式，测试流程而不调用LLM。
+    :return: 一个包含执行结果摘要的字典。
+    :raises ValueError: 如果参数组合无效。
+    """
+    # 1. 日志和数据库设置
+    setup_default_logging(
+        console_level=console_log_level,
+        file_level=file_log_level,
+        enable_file_log=enable_file_log
+    )
+    
+    if db:
+        try:
+            get_data_manager(db_name=db)
+        except ValueError as e:
+            logger.error(f"数据库设置错误: {e}")
+            raise  # 向上抛出异常
+
+    # 2. 初始化插件系统
+    logger.info("初始化插件系统...")
+    global_plugin_manager = get_plugin_manager()
+    project_plugin_config_manager = ProjectPluginConfigManager(project_root)
+    PluginLoader.load_plugins_from_config(project_plugin_config_manager, global_plugin_manager, str(project_root))
+    global_plugin_manager.initialize_all_plugins()
+    logger.info("插件系统初始化完成。")
+
+    script_start_time = time.time()
+
+    # 3. 参数校验
+    if not model and not all_models:
+        raise ValueError("错误: 必须提供 'model' 或 'all_models' 参数之一。")
+    if model and all_models:
+        raise ValueError("错误: 'model' 和 'all_models' 参数是互斥的。")
+    if not id_file and not id_dir:
+        raise ValueError("错误: 必须提供 'id_file' 或 'id_dir' 参数之一。")
+    if id_file and id_dir:
+        raise ValueError("错误: 'id_file' 和 'id_dir' 参数是互斥的。")
+
+    available_models = llm_factory.list_configured_models().keys()
+    if not available_models:
+        raise ValueError("错误: 配置文件中没有找到任何 [Model.*] 配置。")
+
+    models_to_run = list(available_models) if all_models else [model]
+    if not all(m in available_models for m in models_to_run):
+        raise ValueError(f"错误: 指定模型不在配置中。请求: {models_to_run}, 可用: {list(available_models)}")
+
+    # 3. 健康检查
+    if not asyncio.run(health_checker.run_all_checks(models_to_run)):
+        msg = "任务因健康检查失败而中止。"
+        logger.critical(msg)
+        raise RuntimeError(msg)
+
+    # 4. 确定任务列表
+    tasks_to_distribute: List[Tuple[str, str]] = []
+    if id_file:
+        tasks_to_distribute = [(model_name, id_file) for model_name in models_to_run]
+    elif id_dir:
+        id_files_in_dir = sorted([str(p.resolve()) for p in Path(id_dir).glob('*.txt') if p.is_file()])
+        if not id_files_in_dir:
+            raise FileNotFoundError(f"错误: 目录 '{id_dir}' 中没有找到任何 .txt 文件。")
+        if len(models_to_run) > 1 and len(models_to_run) != len(id_files_in_dir):
+            raise ValueError(f"错误: 当指定多个模型时，模型数量 ({len(models_to_run)}) 与 .txt 文件数量 ({len(id_files_in_dir)}) 必须匹配。")
+        
+        if len(models_to_run) == 1 and len(id_files_in_dir) > 1:
+             # 一个模型对一个目录，处理目录下所有文件
+            tasks_to_distribute = [(models_to_run[0], f) for f in id_files_in_dir]
+        else: # 模型和文件一对一匹配
+            tasks_to_distribute = list(zip(models_to_run, id_files_in_dir))
+
+
+    # 5. 获取并发设置
+    try:
+        llm_config = config_manager.get_llm_config()
+        max_workers = llm_config.get('max_workers', 1)
+        max_model_pipelines = llm_config.get('max_model_pipelines', 1)
+    except Exception as e:
+        logger.warning(f"从配置加载并发设置失败: {e}。将使用默认值 1。")
+        max_workers = 1
+        max_model_pipelines = 1
+
+    # 6. 记录启动信息
+    logger.info("=" * 80)
+    logger.info("诗词ID分发标注任务启动")
+    logger.info(f"目标任务总数: {len(tasks_to_distribute)}")
+    logger.info(f"强制重跑: {force_rerun}, 全新开始: {fresh_start}, 批次大小: {chunk_size}")
+    if dry_run:
+        logger.info("模式: Dry Run (空运行)")
+    logger.info(f"模型间最大并发数: {max_model_pipelines}, 模型内最大并发数: {max_workers}")
+    logger.info("将要执行的任务对:")
+    for model_name, current_id_file in tasks_to_distribute:
+        logger.info(f"  - 模型: [{model_name}] <---> 文件: [{Path(current_id_file).name}]")
+    logger.info("=" * 80)
+
+    if not tasks_to_distribute:
+        logger.warning("没有要执行的任务。程序退出。")
+        return {"status": "skipped", "message": "没有要执行的任务。"}
+
+    # 7. 执行任务
+    total_success = True
+    errors = []
+    with ThreadPoolExecutor(max_workers=max_model_pipelines, thread_name_prefix="ModelPipeline") as executor:
+        future_to_task = {
+            executor.submit(run_annotation_for_model, model=m, id_file=f, force_rerun=force_rerun, chunk_size=chunk_size, fresh_start=fresh_start, max_workers=max_workers, dry_run=dry_run, full_dry_run=full_dry_run): (m, Path(f).name)
+            for m, f in tasks_to_distribute
+        }
+        for future in as_completed(future_to_task):
+            task_info = future_to_task[future]
+            try:
+                future.result()
+                logger.info(f"主线程监控到任务 [{task_info[0]}]-[{task_info[1]}] 已成功结束。")
+            except Exception as e:
+                total_success = False
+                error_msg = f"任务 [{task_info[0]}]-[{task_info[1]}] 执行期间发生严重错误: {e}"
+                errors.append(error_msg)
+                logger.error(error_msg, exc_info=True)
+
+    # 8. 总结和返回
+    total_runtime = time.time() - script_start_time
+    logger.info("=" * 80)
+    logger.info(f"所有指定的模型任务均已执行完毕。总耗时: {total_runtime:.2f} 秒。")
+    logger.info("=" * 80)
+
+    return {
+        "status": "completed" if total_success else "completed_with_errors",
+        "total_duration": total_runtime,
+        "tasks_count": len(tasks_to_distribute),
+        "errors": errors
+    }
+
+
 @click.command()
 @click.option('--model', '-m', help="指定要使用的模型配置别名 (与 --all-models 互斥)")
 @click.option('--all-models', '-a', is_flag=True, default=False, help="对所有已配置的模型执行标注任务 (与 --model 互斥)")
@@ -322,146 +507,43 @@ def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_
 @click.option('--console-log-level', type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR']), default=None, help='设置控制台的日志级别 (覆盖配置文件)')
 @click.option('--file-log-level', type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR']), default=None, help='设置文件日志的级别 (覆盖配置文件)')
 @click.option('--enable-file-log', is_flag=True, default=None, help='强制启用文件日志 (覆盖配置文件)')
-def cli(model, all_models, id_file, id_dir, force_rerun, chunk_size, fresh_start, db, console_log_level, file_log_level, enable_file_log):
+@click.option('--dry-run', is_flag=True, default=False, help="空运行模式，测试流程而不实际调用LLM")
+@click.option('--full-dry-run', is_flag=True, default=False, help="在dry-run模式下，执行完整流程测试（包括响应解析、内容验证、数据保存到JSON文件），而非跳过这些流程。") # 新增参数
+def cli(model, all_models, id_file, id_dir, force_rerun, chunk_size, fresh_start, db, console_log_level, file_log_level, enable_file_log, dry_run, full_dry_run):
     """
     【主控制函数】从文件分批读取诗词ID并以多模型并发方式分发标注任务。
     """
-    # [修改] 使用新的日志设置函数，并传入命令行参数
-    # 这允许GUI或命令行用户动态调整日志级别
-    setup_default_logging(
-        console_level=console_log_level,
-        file_level=file_log_level,
-        enable_file_log=enable_file_log
-    )
-    
-    # 设置数据库
-    if db:
-        try:
-            # 更新全局数据管理器实例以使用指定的数据库
-            get_data_manager(db_name=db)
-        except ValueError as e:
-            logger.error(f"数据库设置错误: {e}")
-            return
-    
-    script_start_time = time.time()
-
-    # --- 1. 参数校验和模型选择 ---
-    if not model and not all_models:
-        logger.error("错误: 必须提供 '-m/--model <name>' 或 '-a/--all-models' 参数之一。")
-        click.echo(click.get_current_context().get_help())
-        return
-    if model and all_models:
-        logger.error("错误: '--model' 和 '--all-models' 参数是互斥的，请只使用一个。")
-        return
-    if not id_file and not id_dir:
-        logger.error("错误: 必须提供 '-f/--id-file' 或 '-d/--id-dir' 参数之一。")
-        click.echo(click.get_current_context().get_help())
-        return
-    if id_file and id_dir:
-        logger.error("错误: '--id-file' 和 '--id-dir' 参数是互斥的，请只使用一个。")
-        return
-
-    available_models = llm_factory.list_configured_models().keys()
-    if not available_models:
-        logger.error("错误: 配置文件中没有找到任何 [Model.*] 配置。")
-        return
-
-    models_to_run = list(available_models) if all_models else [model]
-    if not all(m in available_models for m in models_to_run):
-        logger.error(f"错误: 指定模型不在配置中。请求: {models_to_run}, 可用: {list(available_models)}")
-        return
-  
-    # --- [新增] 执行健康检查 ---
-    # 使用 asyncio.run 来执行异步的健康检查函数
-    if not asyncio.run(health_checker.run_all_checks(models_to_run)):
-        # 详细的错误信息已在 health_checker 中打印
-        logger.critical("任务因健康检查失败而中止。")
-        return
-    # -----------------------------
-
-    # --- 2. 确定ID文件(s)和模型-文件映射 ---
-    tasks_to_distribute: List[Tuple[str, str]] = [] 
-
-    if id_file:
-        tasks_to_distribute = [(model_name, id_file) for model_name in models_to_run]
-    elif id_dir:
-        id_files_in_dir = sorted([
-            str(p.resolve()) for p in Path(id_dir).glob('*.txt') if p.is_file()
-        ])
-        if not id_files_in_dir:
-            logger.error(f"错误: 目录 '{id_dir}' 中没有找到任何 .txt 文件。")
-            return
-        if len(models_to_run) != len(id_files_in_dir):
-            logger.error(f"错误: 模型数量 ({len(models_to_run)}) 与目录 '{id_dir}' 中的 .txt 文件数量 ({len(id_files_in_dir)}) 不匹配。")
-            logger.error(f"模型: {models_to_run}\nID文件: {[Path(f).name for f in id_files_in_dir]}")
-            return
-        tasks_to_distribute = list(zip(models_to_run, id_files_in_dir))
-
-    # --- 3. 获取并发设置 ---
+    # [修改] 此函数现在作为命令行接口的包装器，调用核心逻辑函数。
     try:
-        llm_config = config_manager.get_llm_config()
-        max_workers = llm_config.get('max_workers', 1)
-        max_model_pipelines = llm_config.get('max_model_pipelines', 1)
+        result = run_distribution_task(
+            model=model,
+            all_models=all_models,
+            id_file=id_file,
+            id_dir=id_dir,
+            force_rerun=force_rerun,
+            chunk_size=chunk_size,
+            fresh_start=fresh_start,
+            db=db,
+            console_log_level=console_log_level,
+            file_log_level=file_log_level,
+            enable_file_log=enable_file_log,
+            dry_run=dry_run,
+            full_dry_run=full_dry_run # 传递新增参数
+        )
+        if result.get("errors"):
+            logger.error("一个或多个任务执行失败。详情请查看上面的日志。")
+            # 可选：根据需要设置非零退出码
+            # sys.exit(1)
+
+    except (ValueError, FileNotFoundError, RuntimeError) as e:
+        # 捕获参数校验和健康检查的错误
+        logger.error(f"任务启动失败: {e}")
+        # 打印帮助信息以指导用户
+        click.echo(click.get_current_context().get_help(), err=True)
+        # sys.exit(1)
     except Exception as e:
-        logger.error(f"从配置加载并发设置失败: {e}。将使用默认值 1。")
-        max_workers = 1
-        max_model_pipelines = 1
-
-    # --- 4. 记录启动信息 ---
-    logger.info("=" * 80)
-    logger.info("诗词ID分发标注工具启动")
-    logger.info(f"目标任务总数: {len(tasks_to_distribute)}")
-    logger.info(f"强制重跑: {force_rerun}, 全新开始: {fresh_start}, 批次大小: {chunk_size}")
-    logger.info(f"模型间最大并发数 (max_model_pipelines): {max_model_pipelines}")
-    logger.info(f"模型内最大并发数 (max_workers): {max_workers}")
-    if fresh_start:
-        logger.info("注意: 已启用全新开始模式，将忽略并删除所有现有进度文件。")
-    logger.info("将要执行的任务对:")
-    for model_name, current_id_file in tasks_to_distribute:
-        logger.info(f"  - 模型: [{model_name}] <---> 文件: [{Path(current_id_file).name}]")
-    logger.info("=" * 80)
-    
-    if not tasks_to_distribute:
-        logger.warning("没有要执行的任务。程序退出。")
-        return
-
-    # --- 5. 使用主线程池并发执行所有任务 ---
-    logger.info("开始并发执行所有任务...")
-    
-    with ThreadPoolExecutor(max_workers=max_model_pipelines, thread_name_prefix="ModelPipeline") as executor:
-        future_to_task = {
-            executor.submit(
-                run_annotation_for_model,
-                model=model_name,
-                id_file=current_id_file,
-                force_rerun=force_rerun,
-                chunk_size=chunk_size,
-                fresh_start=fresh_start,
-                max_workers=max_workers
-            ): (model_name, Path(current_id_file).name)
-            for model_name, current_id_file in tasks_to_distribute
-        }
-
-        for future in as_completed(future_to_task):
-            task_info = future_to_task[future]
-            try:
-                future.result()
-                logger.info(f"主线程监控到任务 [{task_info[0]}]-[{task_info[1]}] 已成功结束。")
-            except Exception as e:
-                logger.error(f"主线程捕获到任务 [{task_info[0]}]-[{task_info[1]}] 执行期间发生严重错误: {e}", exc_info=True)
-        
-        # 显示进度文件状态
-        progress_files = list(Path(".progress_cache").glob("state_*.json")) if Path(".progress_cache").exists() else []
-        if progress_files:
-            logger.info(f"注意: 仍有 {len(progress_files)} 个未完成任务的进度文件存在于 .progress_cache 目录中。")
-            logger.info("这些文件将在对应任务下次运行时自动加载，如需重新开始请使用 --fresh-start 参数。")
-        else:
-            logger.info("所有任务已完成，进度文件已清理。")
-
-    total_runtime = time.time() - script_start_time
-    logger.info("=" * 80)
-    logger.info(f"所有指定的模型任务均已执行完毕。总耗时: {total_runtime:.2f} 秒。")
-    logger.info("=" * 80)
+        logger.critical(f"发生未预料的严重错误: {e}", exc_info=True)
+        # sys.exit(1)
 
 
 if __name__ == '__main__':
