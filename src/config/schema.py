@@ -130,11 +130,6 @@ class ProjectDatabaseConfig:
     """项目数据库配置"""
     # 指定要使用的数据库配置名称（来自GlobalDatabaseConfig.available_configs）
     config_name: str = "default"
-    # 或者直接指定数据库路径 (可选，优先级高于config_name)
-    db_paths: Optional[Dict[str, str]] = None  # e.g., {"TangShi": "data/TangShi.db"}
-    db_path: Optional[str] = None  # 旧的单数据库模式，用于向后兼容
-    # 分离数据库路径配置（可选，优先级高于全局配置中的模板）
-    separate_db_paths: Optional[Dict[str, str]] = None  # e.g., {"raw_data": "data/raw_data.db"}
 
 @dataclass
 class ProjectDataPathConfig:

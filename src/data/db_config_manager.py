@@ -13,60 +13,51 @@ project_root = Path(__file__).parent.parent.absolute()
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from src.config import get_config_manager
-config_manager = get_config_manager()
 
 
-def get_database_paths() -> Dict[str, Any]:
+def extract_project_name_from_output_dir(output_dir: str) -> str:
     """
-    获取分离数据库路径配置
+    从 output_dir 中提取项目名称。
+    例如：如果 output_dir 是 'data/SocialPoemAnalysis'，则项目名称为 'SocialPoemAnalysis'。
+    """
+    return Path(output_dir).name
+
+
+def get_separate_database_paths(project_name: str) -> Dict[str, str]:
+    """
+    获取分离数据库路径配置，根据项目名称动态生成。
     
-    Returns:
-        Dict[str, Any]: 包含数据库路径配置的字典
-    """
-    # 始终返回分离数据库配置
-    return {
-        'type': 'separate',
-        'paths': get_separate_database_paths()
-    }
-
-
-def get_separate_database_paths() -> Dict[str, str]:
-    """
-    获取分离数据库路径配置
-    
+    Args:
+        project_name: 当前项目的名称。
+        
     Returns:
         Dict[str, str]: 分离数据库路径配置
     """
-    # 获取生效的数据库配置
-    db_config = config_manager.get_effective_database_config()
+    base_data_dir = Path("data")
+    project_data_dir = base_data_dir / project_name
+
+    # 动态生成数据库路径
+    resolved_paths = {
+        'raw_data': str(project_data_dir / "raw_data.db"),
+        'annotation': str(project_data_dir / "annotation.db"),
+        'emotion': str(project_data_dir / "emotion.db")
+    }
     
-    # 处理分离数据库配置
-    if 'separate_db_paths' in db_config:
-        separate_paths = db_config['separate_db_paths']
-        # 解析占位符并转换为绝对路径
-        resolved_paths = {}
-        for name, path in separate_paths.items():
-            # 转换为绝对路径
-            if not Path(path).is_absolute():
-                resolved_paths[name] = str(Path(path).resolve())
-            else:
-                resolved_paths[name] = path
-        return resolved_paths
-    else:
-        # 使用默认路径配置
-        return {
-            'raw_data': 'data/default/raw_data.db',
-            'annotation': 'data/default/annotation.db',
-            'emotion': 'data/default/emotion.db'
-        }
+    # 确保所有路径都是绝对路径
+    for name, path in resolved_paths.items():
+        if not Path(path).is_absolute():
+            resolved_paths[name] = str(Path(path).resolve())
+
+    return resolved_paths
 
 
-def ensure_database_directory_exists(db_path: str) -> None:
+from pathlib import Path
+
+def ensure_database_directory_exists(db_path: Path) -> None:
     """
     确保数据库目录存在
     
     Args:
         db_path: 数据库文件路径
     """
-    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    db_path.parent.mkdir(parents=True, exist_ok=True)

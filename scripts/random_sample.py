@@ -12,26 +12,31 @@ from src.data import get_data_manager
 from src.config import config_manager
 
 
-def get_random_poem_ids(db_name, sample_size=1, exclude_annotated=False, model_identifier=None, active_only=False):
+import sqlite3 # Add this import
+
+def get_random_poem_ids(output_dir: str, source_dir: str, sample_size: int = 1, exclude_annotated: bool = False, model_identifier: Optional[str] = None, active_only: bool = False) -> List[int]:
     """高效随机抽取诗词ID。
     新增功能：可以通过 exclude_annotated 和 model_identifier 参数控制是否排除已标注的诗词。
     新增功能：可以通过 active_only 参数控制是否只抽取 data_status 为 'active' 的诗词。
     """
     try:
         # 获取指定数据库的数据管理器
-        data_manager = get_data_manager(db_name)
+        data_manager = get_data_manager(output_dir=output_dir, source_dir=source_dir)
         
         # 获取数据库路径
-        db_configs = data_manager.separate_db_manager.db_configs if hasattr(data_manager, 'separate_db_manager') else {}
-        raw_data_db_path = db_configs.get('raw_data', f"data/{db_name}/raw_data.db")
-        annotation_db_path = db_configs.get('annotation', f"data/{db_name}/annotation.db")
+        raw_data_db_path = data_manager.separate_db_paths.get('raw_data')
+        annotation_db_path = data_manager.separate_db_paths.get('annotation')
+
+        if not raw_data_db_path:
+            print("无法获取原始数据数据库路径。", file=sys.stderr)
+            return []
         
         # 获取数据库连接
         raw_data_conn = sqlite3.connect(raw_data_db_path)
         raw_data_conn.row_factory = sqlite3.Row
         raw_data_cursor = raw_data_conn.cursor()
         
-        annotation_conn = sqlite3.connect(annotation_db_path) if os.path.exists(annotation_db_path) else None
+        annotation_conn = sqlite3.connect(annotation_db_path) if annotation_db_path and os.path.exists(annotation_db_path) else None
         annotation_cursor = annotation_conn.cursor() if annotation_conn else None
         
         try:
@@ -162,8 +167,10 @@ def get_random_poem_ids(db_name, sample_size=1, exclude_annotated=False, model_i
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='随机抽取诗词ID并输出到文件')
-    parser.add_argument('--db', type=str, default='poetry.db', help='SQLite数据库文件路径 (默认: poetry.db)')
-    parser.add_argument('--db-name', type=str, help='数据库名称（从配置文件中获取路径）')
+    parser.add_argument('--output-dir', type=str, required=True,
+                        help='指定项目输出目录，用于派生项目名称和数据库路径。')
+    parser.add_argument('--source-dir', type=str, required=True,
+                        help='指定数据源目录。')
     parser.add_argument('-n', '--count', type=int, default=1, help='要抽取的诗词ID数量 (默认: 1)')
                         
     parser.add_argument('--exclude-annotated', action='store_true',
@@ -186,9 +193,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # --- 互斥参数检查 ---
-    if args.db_name and args.db and args.db != 'poetry.db':
-        parser.error("错误: --db-name 和 --db 参数不能同时使用。")
-        
     if args.output_file:
         if args.output_dir:
             parser.error("错误: --output-file 和 --output-dir 参数不能同时使用。")
@@ -199,17 +203,11 @@ if __name__ == "__main__":
     # 现在允许 --exclude-annotated 不指定 --model，表示排除所有已标注的诗词
     pass
 
-    # --- 获取数据库名称 ---
-    db_name = "default"
-    if args.db_name:
-        db_name = args.db_name
-    elif args.db and args.db != 'poetry.db':
-        parser.error("错误: --db 参数已废弃，请使用 --db-name 参数指定数据库名称。")
-
     # --- 获取诗词ID ---
     poem_ids = get_random_poem_ids(
-        db_name, 
-        args.count, 
+        output_dir=args.output_dir,
+        source_dir=args.source_dir,
+        sample_size=args.count, 
         exclude_annotated=args.exclude_annotated,
         model_identifier=args.model,
         active_only=args.active_only  # 传递 active_only 参数

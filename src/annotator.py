@@ -15,7 +15,6 @@ from pathlib import Path
 from .data import get_data_manager
 from .async_data_manager import AsyncDataManager
 from .llm_factory import llm_factory
-from src.data.separate_databases import get_separate_db_manager # Import get_separate_db_manager
 from .config import config_manager
 from .annotation_data_logger import AnnotationDataLogger
 from .prompt_builder import prompt_builder
@@ -28,8 +27,10 @@ logger = logging.getLogger(__name__)
 class Annotator:
     """诗词情感标注器 - 负责单个模型的并发标注任务"""
 
-    def __init__(self, config_name: str, dry_run: bool = False, full_dry_run: bool = False):
+    def __init__(self, config_name: str, output_dir: str, source_dir: str, dry_run: bool = False, full_dry_run: bool = False):
         """初始化标注器"""
+        self.output_dir = output_dir
+        self.source_dir = source_dir
         self.dry_run = dry_run
         self.full_dry_run = full_dry_run
 
@@ -313,13 +314,8 @@ class Annotator:
         """
         logger.info(f"[{self.model_identifier}] 开始为诗词ID流式传输并验证标注: {poem_id}")
 
-        # 获取数据库路径
-        # 获取 SeparateDBManager 实例
-        separate_db_manager = get_separate_db_manager()
-
         try:
-            # AsyncDataManager 现在直接接收 SeparateDBManager 实例
-            data_manager = AsyncDataManager(separate_db_manager)
+            data_manager = AsyncDataManager(self.output_dir, self.source_dir)
             poems = await data_manager.get_poems_by_ids([poem_id])
             if not poems:
                 raise ValueError(f"未找到ID为 {poem_id} 的诗词。")
@@ -363,10 +359,7 @@ class Annotator:
         # self.model_logger.info(f"开始标注任务 - 限制: {limit or '无'}, 范围: {start_id or '开始'}-{end_id or '结束'}, 强制重跑: {force_rerun}, 指定ID: {poem_ids is not None}")  # 已注释：不再使用模型特定日志
         logger.info(f"开始标注任务 - 限制: {limit or '无'}, 范围: {start_id or '开始'}-{end_id or '结束'}, 强制重跑: {force_rerun}, 指定ID: {poem_ids is not None}")
         
-        # 获取 SeparateDBManager 实例
-        separate_db_manager = get_separate_db_manager()
-        # AsyncDataManager 现在直接接收 SeparateDBManager 实例
-        data_manager = AsyncDataManager(separate_db_manager)
+        data_manager = AsyncDataManager(self.output_dir, self.source_dir)
         
         # 移除 async with 语句，因为 AsyncDataManager 不再是异步上下文管理器
         # async with AsyncDataManager(db_path) as data_manager:

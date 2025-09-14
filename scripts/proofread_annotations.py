@@ -57,18 +57,19 @@ def read_ids_in_chunks(file_path: str, chunk_size: int = 5000) -> Generator[List
         raise
 
 
-def proofread_annotations(db_name: str, id_file_path: str, model_identifier: str, 
-                          output_dir: str, chunk_size: int):
+def proofread_annotations(output_dir: str, source_dir: str, id_file_path: str, model_identifier: str, 
+                          chunk_size: int):
     """
     校对诗词标注状态的主函数。
     """
     logger.info("校对任务开始...")
-    logger.info(f"数据库: {db_name}")
+    logger.info(f"项目输出目录: {output_dir}")
+    logger.info(f"数据源目录: {source_dir}")
     logger.info(f"ID文件: {id_file_path}")
     logger.info(f"校对模型: '{model_identifier}'")
     logger.info(f"查询批次大小: {chunk_size}")
 
-    dm = get_data_manager(db_name)
+    dm = get_data_manager(output_dir=output_dir, source_dir=source_dir)
     
     # 初始化集合来存储所有ID
     all_target_ids = set()
@@ -158,23 +159,23 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     
-    parser.add_argument('--db-name', type=str, default="default",
-                        help="数据库名称。")
+    parser.add_argument('--output-dir', type=str, required=True,
+                        help="指定项目输出目录，用于派生项目名称和数据库路径。")
+    parser.add_argument('--source-dir', type=str, required=True,
+                        help="指定数据源目录。")
     parser.add_argument('--id-file', type=str, required=True,
                         help="包含待校对诗词ID的文本文件路径（每行一个ID）。")
     parser.add_argument('--model', type=str, required=True,
                         help="要校对的标注模型标识符 (例如 'glm-4-flash')。")
-    parser.add_argument('--output-dir', type=str, default="data/proofread_results",
-                        help="用于存放'已完成'和'待处理'ID列表的输出目录。")
     parser.add_argument('--chunk-size', type=int, default=5000,
                         help="每次从数据库查询的ID数量。调整此值以平衡性能和内存占用。")
     
     args = parser.parse_args()
 
     proofread_annotations(
-        db_name=args.db_name,
+        output_dir=args.output_dir,
+        source_dir=args.source_dir,
         id_file_path=args.id_file,
         model_identifier=args.model,
-        output_dir=args.output_dir,
         chunk_size=args.chunk_size
     )

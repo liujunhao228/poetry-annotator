@@ -102,33 +102,6 @@ class ProjectConfigLoader:
             db = self.config['Database']
             db_config.config_name = db.get('config_name', db_config.config_name)
             
-            # 数据库路径配置
-            db_paths_str = db.get('db_paths')
-            if db_paths_str:
-                db_paths = {}
-                for item in db_paths_str.split(','):
-                    if '=' in item:
-                        key, value = item.split('=', 1)
-                        db_paths[key.strip()] = value.strip()
-                db_config.db_paths = db_paths
-            
-            db_config.db_path = db.get('db_path', db_config.db_path)
-            
-            # 分离数据库路径配置
-            separate_db_paths_str = db.get('separate_db_paths')
-            if separate_db_paths_str:
-                separate_db_paths = {}
-                # 处理键值对格式，支持逗号分隔的多个键值对
-                for item in separate_db_paths_str.split(','):
-                    item = item.strip()
-                    if '=' in item:
-                        key, value = item.split('=', 1)
-                        separate_db_paths[key.strip()] = value.strip()
-                db_config.separate_db_paths = separate_db_paths
-            else:
-                # 如果没有separate_db_paths，尝试从全局配置中获取默认值
-                # 这里我们不设置默认值，让配置管理器处理
-                pass
         return db_config
 
     def _save_database_config(self, config: configparser.ConfigParser, db_config: ProjectDatabaseConfig):
@@ -136,16 +109,6 @@ class ProjectConfigLoader:
         config.add_section('Database')
         config['Database']['config_name'] = db_config.config_name
         
-        if db_config.db_paths:
-            db_paths_str = ','.join([f"{k}={v}" for k, v in db_config.db_paths.items()])
-            config['Database']['db_paths'] = db_paths_str
-            
-        if db_config.db_path:
-            config['Database']['db_path'] = db_config.db_path
-            
-        if db_config.separate_db_paths:
-            separate_db_paths_str = ','.join([f"{k}={v}" for k, v in db_config.separate_db_paths.items()])
-            config['Database']['separate_db_paths'] = separate_db_paths_str
 
     def _load_data_path_config(self) -> ProjectDataPathConfig:
         """加载数据路径配置"""

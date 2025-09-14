@@ -175,11 +175,11 @@ def read_poem_ids_in_chunks(file_path: str, chunk_size: int):
             yield chunk
 
 
-def process_chunk(args: Tuple[str, List[int], bool, bool, bool]) -> Dict[str, Any]:
+def process_chunk(args: Tuple[str, List[int], bool, bool, bool, str, str]) -> Dict[str, Any]:
     """
     【内层并发单元】工作线程执行的函数，处理一个批次的ID。
     """
-    model_name, poem_ids_chunk, force_rerun, dry_run, full_dry_run = args
+    model_name, poem_ids_chunk, force_rerun, dry_run, full_dry_run, output_dir, source_dir = args
     thread_ident = threading.get_ident()
     logger.debug(f"线程 {thread_ident} 开始为模型 '{model_name}' 处理 {len(poem_ids_chunk)} 个ID的批次。")
 
@@ -200,7 +200,7 @@ def process_chunk(args: Tuple[str, List[int], bool, bool, bool]) -> Dict[str, An
 
     # 否则（非 dry_run 或 full_dry_run 模式），实例化 Annotator 并运行
     try:
-        annotator = Annotator(model_name, dry_run=dry_run, full_dry_run=full_dry_run)
+        annotator = Annotator(model_name, output_dir=output_dir, source_dir=source_dir, dry_run=dry_run, full_dry_run=full_dry_run)
         results = asyncio.run(annotator.run(poem_ids=poem_ids_chunk, force_rerun=force_rerun))
         # logger.debug(f"线程 {thread_ident} 完成为模型 '{model_name}' 处理批次。")
         return results
@@ -214,7 +214,7 @@ def process_chunk(args: Tuple[str, List[int], bool, bool, bool]) -> Dict[str, An
         }
 
 
-def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_size: int, fresh_start: bool, max_workers: int, dry_run: bool = False, full_dry_run: bool = False):
+def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_size: int, fresh_start: bool, max_workers: int, output_dir: str, source_dir: str, dry_run: bool = False, full_dry_run: bool = False):
     """
     【外层并发单元】为单个指定模型和单个ID文件运行完整的并行标注流程。
     """
@@ -266,7 +266,7 @@ def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_
           
         logger.info(f"总共有 {len(id_chunks)} 个批次，将从批次 {last_completed_chunk_index + 2} 开始处理 {len(chunks_to_process)} 个批次。")
       
-        task_args = [(model, chunk, force_rerun, dry_run, full_dry_run) for chunk in chunks_to_process]
+        task_args = [(model, chunk, force_rerun, dry_run, full_dry_run, output_dir, source_dir) for chunk in chunks_to_process]
       
         with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix=f"{model[:10]}_worker") as executor:
             results_iterator = executor.map(process_chunk, task_args)
@@ -340,7 +340,8 @@ def run_distribution_task(
     force_rerun: bool = False,
     chunk_size: int = 1000,
     fresh_start: bool = False,
-    db: Optional[str] = None,
+    output_dir: str = "",
+    source_dir: str = "",
     console_log_level: Optional[str] = None,
     file_log_level: Optional[str] = None,
     enable_file_log: Optional[bool] = None,
@@ -358,7 +359,8 @@ def run_distribution_task(
     :param force_rerun: 强制重新标注。
     :param chunk_size: 批次大小。
     :param fresh_start: 清除进度从头开始。
-    :param db: 数据库名称。
+    :param output_dir: 项目输出目录，用于派生项目名称和数据库路径。
+    :param source_dir: 数据源目录。
     :param console_log_level: 控制台日志级别。
     :param file_log_level: 文件日志级别。
     :param enable_file_log: 是否启用文件日志。
@@ -373,12 +375,13 @@ def run_distribution_task(
         enable_file_log=enable_file_log
     )
     
-    if db:
-        try:
-            get_data_manager(db_name=db)
-        except ValueError as e:
-            logger.error(f"数据库设置错误: {e}")
-            raise  # 向上抛出异常
+    # 移除对 db 参数的直接处理，因为现在通过 output_dir 和 source_dir 间接管理
+    # if db:
+    #     try:
+    #         get_data_manager(db_name=db)
+    #     except ValueError as e:
+    #         logger.error(f"数据库设置错误: {e}")
+    #         raise  # 向上抛出异常
 
     # 2. 初始化插件系统
     logger.info("初始化插件系统...")
@@ -464,7 +467,7 @@ def run_distribution_task(
     errors = []
     with ThreadPoolExecutor(max_workers=max_model_pipelines, thread_name_prefix="ModelPipeline") as executor:
         future_to_task = {
-            executor.submit(run_annotation_for_model, model=m, id_file=f, force_rerun=force_rerun, chunk_size=chunk_size, fresh_start=fresh_start, max_workers=max_workers, dry_run=dry_run, full_dry_run=full_dry_run): (m, Path(f).name)
+            executor.submit(run_annotation_for_model, model=m, id_file=f, force_rerun=force_rerun, chunk_size=chunk_size, fresh_start=fresh_start, max_workers=max_workers, output_dir=output_dir, source_dir=source_dir, dry_run=dry_run, full_dry_run=full_dry_run): (m, Path(f).name)
             for m, f in tasks_to_distribute
         }
         for future in as_completed(future_to_task):
@@ -502,14 +505,15 @@ def run_distribution_task(
 @click.option('--force-rerun', '-r', is_flag=True, default=False, help="强制重新标注已完成的条目")
 @click.option('--chunk-size', '-c', type=int, default=1000, show_default=True, help="每个批次处理的诗词数量")
 @click.option('--fresh-start', '-s', is_flag=True, default=False, help="忽略并清除旧的进度，从头开始运行")
-@click.option('--db', type=str, help="数据库名称（从配置文件中获取路径）")
+@click.option('--output-dir', type=click.Path(file_okay=False, resolve_path=True), required=True, help="项目输出目录，用于派生项目名称和数据库路径")
+@click.option('--source-dir', type=click.Path(exists=True, file_okay=False, resolve_path=True), required=True, help="数据源目录")
 # [新增] 专门用于控制日志的命令行选项
 @click.option('--console-log-level', type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR']), default=None, help='设置控制台的日志级别 (覆盖配置文件)')
 @click.option('--file-log-level', type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR']), default=None, help='设置文件日志的级别 (覆盖配置文件)')
 @click.option('--enable-file-log', is_flag=True, default=None, help='强制启用文件日志 (覆盖配置文件)')
 @click.option('--dry-run', is_flag=True, default=False, help="空运行模式，测试流程而不实际调用LLM")
 @click.option('--full-dry-run', is_flag=True, default=False, help="在dry-run模式下，执行完整流程测试（包括响应解析、内容验证、数据保存到JSON文件），而非跳过这些流程。") # 新增参数
-def cli(model, all_models, id_file, id_dir, force_rerun, chunk_size, fresh_start, db, console_log_level, file_log_level, enable_file_log, dry_run, full_dry_run):
+def cli(model, all_models, id_file, id_dir, force_rerun, chunk_size, fresh_start, output_dir, source_dir, console_log_level, file_log_level, enable_file_log, dry_run, full_dry_run):
     """
     【主控制函数】从文件分批读取诗词ID并以多模型并发方式分发标注任务。
     """
@@ -523,7 +527,8 @@ def cli(model, all_models, id_file, id_dir, force_rerun, chunk_size, fresh_start
             force_rerun=force_rerun,
             chunk_size=chunk_size,
             fresh_start=fresh_start,
-            db=db,
+            output_dir=output_dir,
+            source_dir=source_dir,
             console_log_level=console_log_level,
             file_log_level=file_log_level,
             enable_file_log=enable_file_log,

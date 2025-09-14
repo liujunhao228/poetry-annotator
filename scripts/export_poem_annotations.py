@@ -83,11 +83,16 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
-        '-d', '--db_name',
+        '--output_dir',
         type=str,
-        default="default",
-        help='要查询的数据库名称 (默认: "default")。\n'
-             '可用的数据库名称取决于 config.ini 中的配置。'
+        required=True,
+        help='指定项目输出目录，用于派生项目名称和数据库路径。'
+    )
+    parser.add_argument(
+        '--source_dir',
+        type=str,
+        required=True,
+        help='指定数据源目录。'
     )
     parser.add_argument(
         '-p', '--poem_id',
@@ -103,15 +108,16 @@ def main():
 
     args = parser.parse_args()
 
-    db_name = args.db_name
+    output_dir = args.output_dir
+    source_dir = args.source_dir
     poem_id = args.poem_id
     output_file = args.output
 
-    logger.info(f"开始导出诗词ID {poem_id} 的标注数据 (数据库: {db_name})")
+    logger.info(f"开始导出诗词ID {poem_id} 的标注数据 (项目输出目录: {output_dir}, 数据源目录: {source_dir})")
 
     try:
         # 1. 创建导出器实例
-        exporter = AnnotationDataExporter(db_name=db_name)
+        exporter = AnnotationDataExporter(output_dir=output_dir, source_dir=source_dir)
 
         # 2. 获取标注数据DataFrame，仅包含指定列
         required_columns = ['model_identifier', 'sentence_id', 'primary_emotion_name', 'secondary_emotion_names']

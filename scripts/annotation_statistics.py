@@ -26,10 +26,16 @@ except ImportError:
 def main():
     parser = argparse.ArgumentParser(description="诗词情感标注统计脚本")
     parser.add_argument(
-        "--db",
+        "--output_dir",
         type=str,
-        default="default",
-        help="指定数据库名称 (默认: default)"
+        required=True,
+        help="指定项目输出目录，用于派生项目名称和数据库路径"
+    )
+    parser.add_argument(
+        "--source_dir",
+        type=str,
+        required=True,
+        help="指定数据源目录"
     )
     parser.add_argument(
         "--output",
@@ -41,8 +47,8 @@ def main():
     
     try:
         # 获取数据管理器实例
-        data_manager = get_data_manager(args.db)
-        print(f"正在使用数据库: {args.db} (路径: {data_manager.db_path})")
+        data_manager = get_data_manager(output_dir=args.output_dir, source_dir=args.source_dir)
+        print(f"正在使用项目输出目录: {args.output_dir}, 数据源目录: {args.source_dir}")
         
         # 获取统计数据
         print("正在获取标注统计信息...")

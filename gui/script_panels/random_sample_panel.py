@@ -6,6 +6,7 @@ import gettext
 from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFormLayout, QSpinBox, QMessageBox, QFileDialog
 )
+from PyQt5.QtCore import Qt
 from ..script_panel_base import ScriptPanelBase
 
 _ = gettext.gettext
@@ -25,6 +26,8 @@ class RandomSamplePanel(ScriptPanelBase):
         self.script_output_display = QTextEdit()
         self.script_output_display.setReadOnly(True)
         self.script_output_display.setPlaceholderText(_("Script output will appear here..."))
+        # Add a property for styling
+        self.script_output_display.setProperty("class", "output-display")
 
         # Connect signals from base class to update this panel's output display
         self.script_output.connect(self._update_output_display)
@@ -32,6 +35,9 @@ class RandomSamplePanel(ScriptPanelBase):
         self.script_finished.connect(self._on_script_finished)
 
         form_layout = QFormLayout()
+        form_layout.setLabelAlignment(Qt.AlignRight)  # Right-align labels
+        form_layout.setHorizontalSpacing(15)  # Add horizontal spacing
+        form_layout.setVerticalSpacing(10)  # Add vertical spacing
 
         # Database Name Input
         self.db_name_input = QLineEdit()
@@ -58,10 +64,18 @@ class RandomSamplePanel(ScriptPanelBase):
         # Run Button
         self.run_button = QPushButton(_("Generate Random Sample"))
         self.run_button.clicked.connect(self.run_script)
-        form_layout.addRow(self.run_button)
+        # Center the button
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        button_layout.addWidget(self.run_button)
+        button_layout.addStretch()
+        form_layout.addRow(button_layout)
 
         self.layout.addLayout(form_layout)
-        self.layout.addWidget(QLabel(_("Script Output:")))
+        # Add a title for the output section
+        output_title = QLabel(_("Script Output:"))
+        output_title.setProperty("class", "section-title")
+        self.layout.addWidget(output_title)
         self.layout.addWidget(self.script_output_display)
 
     def _select_output_file(self):

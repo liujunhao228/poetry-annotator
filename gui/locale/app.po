@@ -5,7 +5,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2025-09-13 13:48+0800\n"
+"POT-Creation-Date: 2025-09-13 18:12+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -15,98 +15,103 @@ msgstr ""
 "Generated-By: pygettext.py 1.5\n"
 
 
-#: gui/app.py:33 gui\app.py:33
+#: gui/app.py:34 gui\app.py:34
 msgid "Annotation Statistics"
 msgstr ""
 
-#: gui/app.py:34 gui/script_panels\distribute_tasks_panel.py:70 gui\app.py:34
+#: gui/app.py:35 gui/script_panels\distribute_tasks_panel.py:70 gui\app.py:35
 msgid "Distribute Tasks"
 msgstr ""
 
-#: gui/app.py:35 gui\app.py:35
+#: gui/app.py:36 gui\app.py:36
 msgid "Export Poem Annotations"
 msgstr ""
 
-#: gui/app.py:36 gui\app.py:36
+#: gui/app.py:37 gui\app.py:37
 msgid "Find Duplicate Poems"
 msgstr ""
 
-#: gui/app.py:37 gui/script_panels\proofread_annotations_panel.py:52
-#: gui\app.py:37
+#: gui/app.py:38 gui/script_panels\proofread_annotations_panel.py:52
+#: gui\app.py:38
 msgid "Proofread Annotations"
 msgstr ""
 
-#: gui/app.py:38 gui\app.py:38
+#: gui/app.py:39 gui\app.py:39
 msgid "Random Sample"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:32
+#: gui/config_panels\global_config_panel.py:39
+#: gui/config_panels\global_config_panel.py:56
 msgid "Edit Global Configuration"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:57
-#: gui/config_panels\project_config_panel.py:72
+#: gui/config_panels\global_config_panel.py:76
+#: gui/config_panels\project_config_panel.py:91
 msgid "Help"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:61
-#: gui/config_panels\project_config_panel.py:76
+#: gui/config_panels\global_config_panel.py:80
+#: gui/config_panels\llm_config_panel.py:65
+#: gui/config_panels\plugins_config_panel.py:47
+#: gui/config_panels\project_config_panel.py:95
 msgid "Save"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:63
-#: gui/config_panels\project_config_panel.py:78
+#: gui/config_panels\global_config_panel.py:82
+#: gui/config_panels\project_config_panel.py:97
 msgid "Cancel"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:81
+#: gui/config_panels\global_config_panel.py:100
 msgid "<b>%s Settings</b>"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:86
+#: gui/config_panels\global_config_panel.py:105
 msgid "%s:"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:96
+#: gui/config_panels\global_config_panel.py:115
 msgid "No suitable widget for field '%s' of type %s"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:125
+#: gui/config_panels\global_config_panel.py:144
+#: gui/config_panels\project_config_panel.py:160
 msgid "Comma-separated values"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:130
+#: gui/config_panels\global_config_panel.py:149
+#: gui/config_panels\project_config_panel.py:165
 msgid "JSON string (e.g., {\"key\": \"value\"})"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:181
+#: gui/config_panels\global_config_panel.py:200
 msgid "Global configuration saved."
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:181
-#: gui/config_panels\project_config_panel.py:229
+#: gui/config_panels\global_config_panel.py:200
+#: gui/config_panels\project_config_panel.py:245
 msgid "Save Successful"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:185
+#: gui/config_panels\global_config_panel.py:204
 msgid "Failed to save global configuration. Check logs for details."
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:185
-#: gui/config_panels\project_config_panel.py:233
+#: gui/config_panels\global_config_panel.py:204
+#: gui/config_panels\project_config_panel.py:249
 msgid "Save Error"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:287
+#: gui/config_panels\global_config_panel.py:306
 msgid "'{}' in '{}' must be an integer."
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:287
-#: gui/config_panels\global_config_panel.py:290
-#: gui/config_panels\global_config_panel.py:293
-#: gui/config_panels\project_config_panel.py:335
-#: gui/config_panels\project_config_panel.py:338
-#: gui/config_panels\project_config_panel.py:341
+#: gui/config_panels\global_config_panel.py:306
+#: gui/config_panels\global_config_panel.py:309
+#: gui/config_panels\global_config_panel.py:312
+#: gui/config_panels\project_config_panel.py:351
+#: gui/config_panels\project_config_panel.py:354
+#: gui/config_panels\project_config_panel.py:357
 #: gui/script_panels\annotation_statistics_panel.py:72
 #: gui/script_panels\annotation_statistics_panel.py:75
 #: gui/script_panels\distribute_tasks_panel.py:99
@@ -120,72 +125,141 @@ msgstr ""
 #: gui/script_panels\find_duplicate_poems_panel.py:76
 #: gui/script_panels\proofread_annotations_panel.py:73
 #: gui/script_panels\proofread_annotations_panel.py:76
-#: gui/script_panels\random_sample_panel.py:80
-#: gui/script_panels\random_sample_panel.py:83
-#: gui/script_panels\random_sample_panel.py:86
+#: gui/script_panels\random_sample_panel.py:94
+#: gui/script_panels\random_sample_panel.py:97
+#: gui/script_panels\random_sample_panel.py:100
 msgid "Validation Error"
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:290
+#: gui/config_panels\global_config_panel.py:309
 msgid "'{}' in '{}' must be a number."
 msgstr ""
 
-#: gui/config_panels\global_config_panel.py:293
+#: gui/config_panels\global_config_panel.py:312
 msgid "'{}' in '{}' must be a valid JSON object."
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:35
+#: gui/config_panels\llm_config_panel.py:17
+msgid "LLM Model Configuration"
+msgstr ""
+
+#: gui/config_panels\llm_config_panel.py:41
+msgid "Add Model"
+msgstr ""
+
+#: gui/config_panels\llm_config_panel.py:43
+#: gui/config_panels\llm_config_panel.py:121
+msgid "Remove Model"
+msgstr ""
+
+#: gui/config_panels\llm_config_panel.py:55
+msgid "Model Name:"
+msgstr ""
+
+#: gui/config_panels\llm_config_panel.py:56
+msgid "API Key:"
+msgstr ""
+
+#: gui/config_panels\llm_config_panel.py:57
+msgid "Base URL:"
+msgstr ""
+
+#: gui/config_panels\llm_config_panel.py:67
+#: gui/config_panels\plugins_config_panel.py:49 gui/help_window.py:35
+#: gui\help_window.py:35
+msgid "Close"
+msgstr ""
+
+#: gui/config_panels\llm_config_panel.py:122
+msgid "Are you sure you want to remove the model '{}'?"
+msgstr ""
+
+#: gui/config_panels\llm_config_panel.py:161
+#: gui/config_panels\plugins_config_panel.py:75
+msgid "Save Configuration"
+msgstr ""
+
+#: gui/config_panels\llm_config_panel.py:161
+#: gui/config_panels\plugins_config_panel.py:75 gui/main_window.py:149
+#: gui\main_window.py:149
+msgid "Configuration saved successfully!"
+msgstr ""
+
+#: gui/config_panels\llm_config_panel.py:164
+#: gui/config_panels\plugins_config_panel.py:78
+msgid "Error"
+msgstr ""
+
+#: gui/config_panels\llm_config_panel.py:164
+#: gui/config_panels\plugins_config_panel.py:78
+msgid "Failed to save configuration."
+msgstr ""
+
+#: gui/config_panels\plugins_config_panel.py:23
+msgid "Plugin Configuration"
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:42
+#: gui/config_panels\project_config_panel.py:60
 msgid "Edit Project Configuration"
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:53
+#: gui/config_panels\project_config_panel.py:68
 msgid "Active Project:"
 msgstr ""
 
 #: gui/config_panels\project_config_panel.py:115
+msgid "<b>{} Settings</b>"
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:120
+msgid "{}:"
+msgstr ""
+
+#: gui/config_panels\project_config_panel.py:131
 msgid "No suitable widget for field '{}' of type {}"
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:165
+#: gui/config_panels\project_config_panel.py:181
 msgid "Project Switched"
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:165
-#: gui/config_panels\project_config_panel.py:166 gui/main_window.py:131
-#: gui\main_window.py:131
+#: gui/config_panels\project_config_panel.py:181
+#: gui/config_panels\project_config_panel.py:182 gui/main_window.py:154
+#: gui\main_window.py:154
 msgid "Switched to project: {}"
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:168
+#: gui/config_panels\project_config_panel.py:184
 msgid "Project Switch Error"
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:168
-#: gui/config_panels\project_config_panel.py:170
+#: gui/config_panels\project_config_panel.py:184
+#: gui/config_panels\project_config_panel.py:186
 msgid "Failed to switch to project: {}"
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:180
+#: gui/config_panels\project_config_panel.py:196
 msgid "No project configuration found to load."
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:229
+#: gui/config_panels\project_config_panel.py:245
 msgid "Project configuration saved."
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:233
+#: gui/config_panels\project_config_panel.py:249
 msgid "Failed to save project configuration. Check logs for details."
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:335
+#: gui/config_panels\project_config_panel.py:351
 msgid "{field_name} in {section_name} must be an integer."
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:338
+#: gui/config_panels\project_config_panel.py:354
 msgid "{field_name} in {section_name} must be a number."
 msgstr ""
 
-#: gui/config_panels\project_config_panel.py:341
+#: gui/config_panels\project_config_panel.py:357
 msgid "{field_name} in {section_name} must be a valid JSON object."
 msgstr ""
 
@@ -246,134 +320,146 @@ msgid "Override the global LLM model for this project."
 msgstr ""
 
 #: gui/help_texts.py:24 gui\help_texts.py:24
-msgid "Override the global API key for this project."
+msgid "Manage individual LLM model configurations, including API keys and base URLs."
 msgstr ""
 
 #: gui/help_texts.py:25 gui\help_texts.py:25
-msgid "Override the global base URL for this project."
+msgid "Override the global API key for this project."
 msgstr ""
 
 #: gui/help_texts.py:26 gui\help_texts.py:26
-msgid "Override the global database type for this project."
+msgid "Override the global base URL for this project."
 msgstr ""
 
 #: gui/help_texts.py:27 gui\help_texts.py:27
-msgid "Override the global database path for this project."
+msgid "Override the global database type for this project."
 msgstr ""
 
 #: gui/help_texts.py:28 gui\help_texts.py:28
-msgid "Override the global source JSON directory for this project."
+msgid "Override the global database path for this project."
 msgstr ""
 
 #: gui/help_texts.py:29 gui\help_texts.py:29
-msgid "Override the global log directory for this project."
+msgid "Override the global source JSON directory for this project."
 msgstr ""
 
 #: gui/help_texts.py:30 gui\help_texts.py:30
-msgid "Override the global output directory for this project."
+msgid "Override the global log directory for this project."
 msgstr ""
 
 #: gui/help_texts.py:31 gui\help_texts.py:31
-msgid "Override the global prompt template directory for this project."
+msgid "Override the global output directory for this project."
 msgstr ""
 
 #: gui/help_texts.py:32 gui\help_texts.py:32
-msgid "Override the global logging level for this project."
+msgid "Override the global prompt template directory for this project."
 msgstr ""
 
 #: gui/help_texts.py:33 gui\help_texts.py:33
-msgid "Override the global log file for this project."
+msgid "Override the global logging level for this project."
 msgstr ""
 
 #: gui/help_texts.py:34 gui\help_texts.py:34
-msgid "List of enabled plugins for this project (comma-separated)."
+msgid "Override the global log file for this project."
+msgstr ""
+
+#: gui/help_texts.py:35 gui\help_texts.py:35
+msgid "Enable or disable plugins for the current project."
 msgstr ""
 
 #: gui/help_window.py:16 gui\help_window.py:16
 msgid "Configuration Help"
 msgstr ""
 
-#: gui/help_window.py:35 gui\help_window.py:35
-msgid "Close"
-msgstr ""
-
 #: gui/help_window.py:44 gui\help_window.py:44
 msgid "Configuration Options"
 msgstr ""
 
-#: gui/main_window.py:21 gui\main_window.py:21
+#: gui/main_window.py:26 gui\main_window.py:26
 msgid "Poetry Annotator GUI"
 msgstr ""
 
-#: gui/main_window.py:43 gui\main_window.py:43
+#: gui/main_window.py:58 gui\main_window.py:58
 msgid "Ready"
 msgstr ""
 
-#: gui/main_window.py:61 gui\main_window.py:61
+#: gui/main_window.py:76 gui\main_window.py:76
 msgid "&File"
 msgstr ""
 
-#: gui/main_window.py:62 gui\main_window.py:62
+#: gui/main_window.py:77 gui\main_window.py:77
 msgid "E&xit"
 msgstr ""
 
-#: gui/main_window.py:64 gui\main_window.py:64
+#: gui/main_window.py:79 gui\main_window.py:79
 msgid "Exit application"
 msgstr ""
 
-#: gui/main_window.py:69 gui\main_window.py:69
+#: gui/main_window.py:84 gui\main_window.py:84
 msgid "&Settings"
 msgstr ""
 
-#: gui/main_window.py:71 gui\main_window.py:71
+#: gui/main_window.py:86 gui\main_window.py:86
 msgid "Edit &Global Configuration"
 msgstr ""
 
-#: gui/main_window.py:75 gui\main_window.py:75
+#: gui/main_window.py:90 gui\main_window.py:90
 msgid "Edit &Project Configuration"
 msgstr ""
 
-#: gui/main_window.py:80 gui\main_window.py:80
+#: gui/main_window.py:94 gui\main_window.py:94
+msgid "Edit &LLM Configuration"
+msgstr ""
+
+#: gui/main_window.py:98 gui\main_window.py:98
+msgid "Edit &Plugins Configuration"
+msgstr ""
+
+#: gui/main_window.py:103 gui\main_window.py:103
 msgid "&Help"
 msgstr ""
 
-#: gui/main_window.py:81 gui\main_window.py:81
+#: gui/main_window.py:104 gui\main_window.py:104
 msgid "&About"
 msgstr ""
 
-#: gui/main_window.py:94 gui\main_window.py:94
+#: gui/main_window.py:117 gui\main_window.py:117
 msgid "GUI application started."
 msgstr ""
 
-#: gui/main_window.py:107 gui\main_window.py:107
+#: gui/main_window.py:130 gui\main_window.py:130
 msgid "Added script panel: {}"
 msgstr ""
 
-#: gui/main_window.py:114 gui\main_window.py:114
+#: gui/main_window.py:137 gui\main_window.py:137
 msgid "Global configuration panel opened."
 msgstr ""
 
-#: gui/main_window.py:122 gui\main_window.py:122
+#: gui/main_window.py:145 gui\main_window.py:145
 msgid "Project configuration panel opened."
 msgstr ""
 
-#: gui/main_window.py:126 gui\main_window.py:126
-msgid "Configuration saved successfully!"
-msgstr ""
-
-#: gui/main_window.py:127 gui\main_window.py:127
+#: gui/main_window.py:150 gui\main_window.py:150
 msgid "Configuration saved signal received."
 msgstr ""
 
-#: gui/main_window.py:132 gui\main_window.py:132
+#: gui/main_window.py:155 gui\main_window.py:155
 msgid "Project switched to: {}"
 msgstr ""
 
-#: gui/main_window.py:136 gui\main_window.py:136
+#: gui/main_window.py:161 gui\main_window.py:161
+msgid "LLM configuration panel opened."
+msgstr ""
+
+#: gui/main_window.py:167 gui\main_window.py:167
+msgid "Plugins configuration panel opened."
+msgstr ""
+
+#: gui/main_window.py:171 gui\main_window.py:171
 msgid "About Poetry Annotator GUI"
 msgstr ""
 
-#: gui/main_window.py:137 gui\main_window.py:137
+#: gui/main_window.py:172 gui\main_window.py:172
 msgid ""
 "Poetry Annotator GUI\n"
 "\n"
@@ -382,11 +468,11 @@ msgid ""
 "A graphical user interface for managing poetry annotation tasks."
 msgstr ""
 
-#: gui/main_window.py:139 gui\main_window.py:139
+#: gui/main_window.py:174 gui\main_window.py:174
 msgid "Displayed about dialog."
 msgstr ""
 
-#: gui/main_window.py:145 gui\main_window.py:145
+#: gui/main_window.py:180 gui\main_window.py:180
 msgid "GUI application closing."
 msgstr ""
 
@@ -395,7 +481,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:27
 #: gui/script_panels\find_duplicate_poems_panel.py:27
 #: gui/script_panels\proofread_annotations_panel.py:27
-#: gui/script_panels\random_sample_panel.py:27
+#: gui/script_panels\random_sample_panel.py:28
 msgid "Script output will appear here..."
 msgstr ""
 
@@ -404,7 +490,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:38
 #: gui/script_panels\find_duplicate_poems_panel.py:38
 #: gui/script_panels\proofread_annotations_panel.py:38
-#: gui/script_panels\random_sample_panel.py:38
+#: gui/script_panels\random_sample_panel.py:44
 msgid "Enter database name (e.g., default)"
 msgstr ""
 
@@ -413,7 +499,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:39
 #: gui/script_panels\find_duplicate_poems_panel.py:39
 #: gui/script_panels\proofread_annotations_panel.py:39
-#: gui/script_panels\random_sample_panel.py:39
+#: gui/script_panels\random_sample_panel.py:45
 msgid "Database Name:"
 msgstr ""
 
@@ -428,7 +514,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:45
 #: gui/script_panels\find_duplicate_poems_panel.py:45
 #: gui/script_panels\proofread_annotations_panel.py:45
-#: gui/script_panels\random_sample_panel.py:45
+#: gui/script_panels\random_sample_panel.py:51
 msgid "Browse..."
 msgstr ""
 
@@ -436,7 +522,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:49
 #: gui/script_panels\find_duplicate_poems_panel.py:49
 #: gui/script_panels\proofread_annotations_panel.py:49
-#: gui/script_panels\random_sample_panel.py:49
+#: gui/script_panels\random_sample_panel.py:55
 msgid "Output File:"
 msgstr ""
 
@@ -449,7 +535,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:62
 #: gui/script_panels\find_duplicate_poems_panel.py:57
 #: gui/script_panels\proofread_annotations_panel.py:57
-#: gui/script_panels\random_sample_panel.py:64
+#: gui/script_panels\random_sample_panel.py:76
 msgid "Script Output:"
 msgstr ""
 
@@ -461,7 +547,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:77
 #: gui/script_panels\find_duplicate_poems_panel.py:64
 #: gui/script_panels\proofread_annotations_panel.py:64
-#: gui/script_panels\random_sample_panel.py:71
+#: gui/script_panels\random_sample_panel.py:85
 msgid "Select Output File"
 msgstr ""
 
@@ -470,7 +556,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:89
 #: gui/script_panels\find_duplicate_poems_panel.py:73
 #: gui/script_panels\proofread_annotations_panel.py:73
-#: gui/script_panels\random_sample_panel.py:80
+#: gui/script_panels\random_sample_panel.py:94
 msgid "Database Name cannot be empty."
 msgstr ""
 
@@ -478,7 +564,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:92
 #: gui/script_panels\find_duplicate_poems_panel.py:76
 #: gui/script_panels\proofread_annotations_panel.py:76
-#: gui/script_panels\random_sample_panel.py:83
+#: gui/script_panels\random_sample_panel.py:97
 msgid "Output File path cannot be empty."
 msgstr ""
 
@@ -487,7 +573,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:110
 #: gui/script_panels\find_duplicate_poems_panel.py:90
 #: gui/script_panels\proofread_annotations_panel.py:90
-#: gui/script_panels\random_sample_panel.py:101
+#: gui/script_panels\random_sample_panel.py:115
 msgid "Starting '{}' with parameters: {}"
 msgstr ""
 
@@ -496,7 +582,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:113
 #: gui/script_panels\find_duplicate_poems_panel.py:93
 #: gui/script_panels\proofread_annotations_panel.py:93
-#: gui/script_panels\random_sample_panel.py:104
+#: gui/script_panels\random_sample_panel.py:118
 msgid "Input validation failed for '{}'."
 msgstr ""
 
@@ -505,7 +591,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:126
 #: gui/script_panels\find_duplicate_poems_panel.py:106
 #: gui/script_panels\proofread_annotations_panel.py:106
-#: gui/script_panels\random_sample_panel.py:117
+#: gui/script_panels\random_sample_panel.py:131
 msgid "--- {} Started ---"
 msgstr ""
 
@@ -514,7 +600,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:128
 #: gui/script_panels\find_duplicate_poems_panel.py:108
 #: gui/script_panels\proofread_annotations_panel.py:108
-#: gui/script_panels\random_sample_panel.py:119
+#: gui/script_panels\random_sample_panel.py:133
 msgid "Script '{}' started."
 msgstr ""
 
@@ -523,7 +609,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:134
 #: gui/script_panels\find_duplicate_poems_panel.py:114
 #: gui/script_panels\proofread_annotations_panel.py:114
-#: gui/script_panels\random_sample_panel.py:125
+#: gui/script_panels\random_sample_panel.py:139
 msgid "successfully"
 msgstr ""
 
@@ -532,7 +618,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:134
 #: gui/script_panels\find_duplicate_poems_panel.py:114
 #: gui/script_panels\proofread_annotations_panel.py:114
-#: gui/script_panels\random_sample_panel.py:125
+#: gui/script_panels\random_sample_panel.py:139
 msgid "with errors"
 msgstr ""
 
@@ -541,7 +627,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:135
 #: gui/script_panels\find_duplicate_poems_panel.py:115
 #: gui/script_panels\proofread_annotations_panel.py:115
-#: gui/script_panels\random_sample_panel.py:126
+#: gui/script_panels\random_sample_panel.py:140
 msgid "--- {} Finished {} ---"
 msgstr ""
 
@@ -550,7 +636,7 @@ msgstr ""
 #: gui/script_panels\export_poem_annotations_panel.py:137
 #: gui/script_panels\find_duplicate_poems_panel.py:117
 #: gui/script_panels\proofread_annotations_panel.py:117
-#: gui/script_panels\random_sample_panel.py:128
+#: gui/script_panels\random_sample_panel.py:142
 msgid "Script '{}' finished {}."
 msgstr ""
 
@@ -581,7 +667,7 @@ msgstr ""
 #: gui/script_panels\distribute_tasks_panel.py:82
 #: gui/script_panels\find_duplicate_poems_panel.py:64
 #: gui/script_panels\proofread_annotations_panel.py:64
-#: gui/script_panels\random_sample_panel.py:71
+#: gui/script_panels\random_sample_panel.py:85
 msgid "JSON Files (*.json);;Text Files (*.txt);;All Files (*.*)"
 msgstr ""
 
@@ -653,51 +739,239 @@ msgstr ""
 msgid "Select output file path for proofreading results"
 msgstr ""
 
-#: gui/script_panels\random_sample_panel.py:44
+#: gui/script_panels\random_sample_panel.py:50
 msgid "Select output file path for random sample"
 msgstr ""
 
-#: gui/script_panels\random_sample_panel.py:56
+#: gui/script_panels\random_sample_panel.py:62
 msgid "Sample Size:"
 msgstr ""
 
-#: gui/script_panels\random_sample_panel.py:59
+#: gui/script_panels\random_sample_panel.py:65
 msgid "Generate Random Sample"
 msgstr ""
 
-#: gui/script_panels\random_sample_panel.py:86
+#: gui/script_panels\random_sample_panel.py:100
 msgid "Sample Size must be a positive integer."
 msgstr ""
 
-#: gui\script_panel_base.py:61
+#: gui\i18n_config.py:8
+msgid "Max Workers"
+msgstr ""
+
+#: gui\i18n_config.py:9
+msgid "Max Model Pipelines"
+msgstr ""
+
+#: gui\i18n_config.py:10
+msgid "Max Retries"
+msgstr ""
+
+#: gui\i18n_config.py:11
+msgid "Retry Delay"
+msgstr ""
+
+#: gui\i18n_config.py:12
+msgid "Breaker Fail Max"
+msgstr ""
+
+#: gui\i18n_config.py:13
+msgid "Breaker Reset Timeout"
+msgstr ""
+
+#: gui\i18n_config.py:14
+msgid "Save Full Response"
+msgstr ""
+
+#: gui\i18n_config.py:17
+msgid "Available Configs"
+msgstr ""
+
+#: gui\i18n_config.py:18
+msgid "Separate DB Template"
+msgstr ""
+
+#: gui\i18n_config.py:27
+msgid "Console Log Level"
+msgstr ""
+
+#: gui\i18n_config.py:28
+msgid "File Log Level"
+msgstr ""
+
+#: gui\i18n_config.py:29
+msgid "Enable File Log"
+msgstr ""
+
+#: gui\i18n_config.py:30
+msgid "Log File"
+msgstr ""
+
+#: gui\i18n_config.py:31
+msgid "Enable Console Log"
+msgstr ""
+
+#: gui\i18n_config.py:32
+msgid "Max File Size (MB)"
+msgstr ""
+
+#: gui\i18n_config.py:33
+msgid "Backup Count"
+msgstr ""
+
+#: gui\i18n_config.py:34
+msgid "Quiet Third Party"
+msgstr ""
+
+#: gui\i18n_config.py:37
+msgid "Enable Custom Download"
+msgstr ""
+
+#: gui\i18n_config.py:40
+msgid "XML Path"
+msgstr ""
+
+#: gui\i18n_config.py:41
+msgid "MD Path"
+msgstr ""
+
+#: gui\i18n_config.py:44
+msgid "Provider"
+msgstr ""
+
+#: gui\i18n_config.py:45
+msgid "Model Name"
+msgstr ""
+
+#: gui\i18n_config.py:46
+msgid "API Key"
+msgstr ""
+
+#: gui\i18n_config.py:47
+msgid "Base URL"
+msgstr ""
+
+#: gui\i18n_config.py:48
+msgid "Request Delay"
+msgstr ""
+
+#: gui\i18n_config.py:49
+msgid "Temperature"
+msgstr ""
+
+#: gui\i18n_config.py:50
+msgid "Max Tokens"
+msgstr ""
+
+#: gui\i18n_config.py:51
+msgid "Timeout"
+msgstr ""
+
+#: gui\i18n_config.py:54
+msgid "Config Name"
+msgstr ""
+
+#: gui\i18n_config.py:55
+msgid "DB Paths"
+msgstr ""
+
+#: gui\i18n_config.py:56
+msgid "DB Path"
+msgstr ""
+
+#: gui\i18n_config.py:57
+msgid "Separate DB Paths"
+msgstr ""
+
+#: gui\i18n_config.py:61
+msgid "Source Directory"
+msgstr ""
+
+#: gui\i18n_config.py:62
+msgid "Output Directory"
+msgstr ""
+
+#: gui\i18n_config.py:68
+msgid "Model Names"
+msgstr ""
+
+#: gui\i18n_config.py:71
+msgid "Enabled Plugins"
+msgstr ""
+
+#: gui\i18n_config.py:72
+msgid "Plugin Paths"
+msgstr ""
+
+#: gui\i18n_config.py:75
+msgid "LLM"
+msgstr ""
+
+#: gui\i18n_config.py:76
+msgid "Database"
+msgstr ""
+
+#: gui\i18n_config.py:77
+msgid "Data Path"
+msgstr ""
+
+#: gui\i18n_config.py:78
+msgid "Prompt"
+msgstr ""
+
+#: gui\i18n_config.py:79
+msgid "Logging"
+msgstr ""
+
+#: gui\i18n_config.py:80
+msgid "Visualizer"
+msgstr ""
+
+#: gui\i18n_config.py:81
+msgid "Categories"
+msgstr ""
+
+#: gui\i18n_config.py:82
+msgid "Model Template"
+msgstr ""
+
+#: gui\i18n_config.py:83
+msgid "Model"
+msgstr ""
+
+#: gui\i18n_config.py:84
+msgid "Plugins"
+msgstr ""
+
+#: gui\script_panel_base.py:62
 msgid "A script is already running. Please wait for it to finish."
 msgstr ""
 
-#: gui\script_panel_base.py:61
+#: gui\script_panel_base.py:62
 msgid "Script Running"
 msgstr ""
 
-#: gui\script_panel_base.py:77
+#: gui\script_panel_base.py:78
 msgid "Script Finished"
 msgstr ""
 
-#: gui\script_panel_base.py:77
+#: gui\script_panel_base.py:78
 msgid "{} executed successfully."
 msgstr ""
 
-#: gui\script_panel_base.py:82
+#: gui\script_panel_base.py:83
 msgid "Script Error"
 msgstr ""
 
-#: gui\script_panel_base.py:82
+#: gui\script_panel_base.py:83
 msgid "{} failed: {}"
 msgstr ""
 
-#: gui\script_panel_base.py:95
+#: gui\script_panel_base.py:96
 msgid "Select File"
 msgstr ""
 
-#: gui\script_panel_base.py:102
+#: gui\script_panel_base.py:103
 msgid "Select Directory"
 msgstr ""
 

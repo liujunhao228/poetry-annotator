@@ -15,11 +15,18 @@ from PyQt5.QtCore import pyqtSignal, Qt
 from ..config_manager import ConfigHandler
 from ..help_texts import HELP_TEXTS
 from ..help_window import HelpWindow
+from ..i18n_config import translate_config_key
 from src.config.schema import ProjectConfig, ProjectLLMConfig, ProjectDatabaseConfig, \
     ProjectDataPathConfig, ProjectPromptConfig, ProjectLoggingConfig, \
     ProjectVisualizerConfig, ProjectModelConfig, ProjectPluginsConfig
 
 _ = gettext.gettext
+
+
+def _translate_config_key(k):
+    """Translates a configuration key, providing a fallback to a human-readable format."""
+    return translate_config_key(k)
+
 
 class ProjectConfigPanel(QDialog):
     """
@@ -47,9 +54,17 @@ class ProjectConfigPanel(QDialog):
         Sets up the main layout and dynamically builds the configuration form.
         """
         main_layout = QVBoxLayout(self)
+        main_layout.setSpacing(10)  # Add spacing between elements
 
+        # Add a title for the dialog
+        title_label = QLabel(_("Edit Project Configuration"))
+        title_label.setProperty("class", "dialog-title")
+        title_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(title_label)
+        
         # Project Selection
         project_selection_layout = QHBoxLayout()
+        project_selection_layout.setSpacing(10)  # Add spacing between elements
         project_selection_layout.addWidget(QLabel(_("Active Project:")))
         self.project_combo = QComboBox()
         self.project_combo.addItems(self.config_handler.get_available_projects())
@@ -62,6 +77,9 @@ class ProjectConfigPanel(QDialog):
         self.scroll_area.setWidgetResizable(True)
         self.scroll_content = QWidget()
         self.form_layout = QFormLayout(self.scroll_content)
+        self.form_layout.setLabelAlignment(Qt.AlignRight)  # Right-align labels
+        self.form_layout.setHorizontalSpacing(15)  # Add horizontal spacing
+        self.form_layout.setVerticalSpacing(10)  # Add vertical spacing
         self.scroll_area.setWidget(self.scroll_content)
         main_layout.addWidget(self.scroll_area)
 
@@ -69,6 +87,7 @@ class ProjectConfigPanel(QDialog):
 
         # Action buttons
         button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)  # Add spacing between buttons
         self.help_button = QPushButton(_("Help"))
         self.help_button.clicked.connect(self._show_help)
         button_layout.addStretch()
@@ -93,12 +112,12 @@ class ProjectConfigPanel(QDialog):
             if is_dataclass(field_type):
                 # Create a group for nested dataclasses
                 group_layout = QFormLayout()
-                group_label = QLabel(_("<b>{} Settings</b>").format(field_name.replace('_', ' ').title()))
+                group_label = QLabel(_("<b>{} Settings</b>").format(_translate_config_key(field_name)))
                 parent_layout.addRow(group_label)
                 parent_layout.addRow(group_layout)
                 self._build_config_form(field_type, group_layout, full_field_name)
             else:
-                translated_label = _("{}:").format(field_name.replace('_', ' ').title())
+                translated_label = _("{}:").format(_translate_config_key(field_name))
                 label = QLabel(translated_label)
                 widget = self._create_input_widget(field_type, full_field_name)
                 if widget:

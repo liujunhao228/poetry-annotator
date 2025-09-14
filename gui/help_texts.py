@@ -21,6 +21,7 @@ HELP_TEXTS = {
     # Project Configurations
     "Project.llm.service": _("Override the global LLM service for this project."),
     "Project.llm.model": _("Override the global LLM model for this project."),
+    "Project.llm.models": _("Manage individual LLM model configurations, including API keys and base URLs."),
     "Project.llm.api_key": _("Override the global API key for this project."),
     "Project.llm.base_url": _("Override the global base URL for this project."),
     "Project.database.type": _("Override the global database type for this project."),
@@ -31,5 +32,5 @@ HELP_TEXTS = {
     "Project.prompt.prompt_template_dir": _("Override the global prompt template directory for this project."),
     "Project.logging.level": _("Override the global logging level for this project."),
     "Project.logging.file": _("Override the global log file for this project."),
-    "Project.plugins.enabled_plugins": _("List of enabled plugins for this project (comma-separated)."),
+    "Project.plugins": _("Enable or disable plugins for the current project."),
 }

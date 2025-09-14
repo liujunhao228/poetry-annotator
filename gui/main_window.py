@@ -3,13 +3,18 @@
 # This will be the main application window, managing tabs for different script panels.
 
 import logging
+import os
 from PyQt5.QtWidgets import QMainWindow, QTabWidget, QStatusBar, QVBoxLayout, QWidget, QTextEdit, QMenuBar, QAction, QMessageBox
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 from .utils import LogStreamHandler
 from .config_panels.global_config_panel import GlobalConfigPanel
 from .config_panels.project_config_panel import ProjectConfigPanel
+from .config_panels.llm_config_panel import LLMConfigPanel
+from .config_panels.plugins_config_panel import PluginsConfigPanel
 from .config_manager import ConfigHandler
 from .i18n import _
+from .styles import get_stylesheet
 
 class MainWindow(QMainWindow):
     """
@@ -20,6 +25,13 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.setWindowTitle(_("Poetry Annotator GUI"))
         self.setGeometry(100, 100, 1200, 800) # Initial window size
+        
+        # Set window icon
+        icon_path = os.path.join(os.path.dirname(__file__), 'resources', 'app_icon.txt')  # Using the placeholder file
+        if os.path.exists(icon_path):
+            # In a real application, this would be an actual icon file
+            # self.setWindowIcon(QIcon(icon_path))
+            pass
 
         self._setup_ui()
         self._setup_logging()
@@ -28,6 +40,9 @@ class MainWindow(QMainWindow):
         """
         Sets up the main window's UI components: tab widget, status bar, menu bar, and log display.
         """
+        # Apply stylesheet
+        self.setStyleSheet(get_stylesheet())
+        
         # Central Widget and Layout
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -75,6 +90,14 @@ class MainWindow(QMainWindow):
         project_config_action = QAction(_("Edit &Project Configuration"), self)
         project_config_action.triggered.connect(self._open_project_config)
         settings_menu.addAction(project_config_action)
+
+        llm_config_action = QAction(_("Edit &LLM Configuration"), self)
+        llm_config_action.triggered.connect(self._open_llm_config)
+        settings_menu.addAction(llm_config_action)
+
+        plugins_config_action = QAction(_("Edit &Plugins Configuration"), self)
+        plugins_config_action.triggered.connect(self._open_plugins_config)
+        settings_menu.addAction(plugins_config_action)
 
         # Help Menu
         help_menu = menu_bar.addMenu(_("&Help"))
@@ -130,6 +153,18 @@ class MainWindow(QMainWindow):
         """Handles actions after a project is switched."""
         self.status_bar.showMessage(_("Switched to project: {}").format(project_name))
         logging.info(_("Project switched to: {}").format(project_name))
+
+    def _open_llm_config(self):
+        """Opens the LLM configuration panel."""
+        llm_config_dialog = LLMConfigPanel(self)
+        llm_config_dialog.exec_()
+        logging.info(_("LLM configuration panel opened."))
+
+    def _open_plugins_config(self):
+        """Opens the plugins configuration panel."""
+        plugins_config_dialog = PluginsConfigPanel(self)
+        plugins_config_dialog.exec_()
+        logging.info(_("Plugins configuration panel opened."))
 
     def _show_about_dialog(self):
         """Displays an about dialog."""

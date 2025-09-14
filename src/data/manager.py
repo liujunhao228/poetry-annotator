@@ -2,61 +2,50 @@
 完全重构的数据管理器
 仅作为插件的调度器和接口层，不包含任何核心业务逻辑
 """
-import logging
-import sqlite3
-from pathlib import Path
-from typing import List, Dict, Any, Optional, Set
-from src.config import get_config_manager
-from .models import Poem, Author, Annotation
-from .exceptions import DataError, DatabaseError
-from src.component_system import get_component_system, ComponentType
-from src.data.poem_processing import PoemClassificationCore
+from src.data.db_config_manager import get_separate_database_paths, extract_project_name_from_output_dir, ensure_database_directory_exists
 
+
+from src.data.db_config_manager import get_separate_database_paths, extract_project_name_from_output_dir, ensure_database_directory_exists
+import logging
+from pathlib import Path
+from typing import Dict, Any, Optional, List, Set
+
+# 导入必要的模型和异常
+from src.data.models import Poem, Author # Assuming these are defined elsewhere
+from src.data.exceptions import DatabaseError, DataError # Assuming these are defined elsewhere
+from src.plugin_system.manager import get_plugin_manager
+from src.emotion_classification.core import EmotionClassificationCore
 
 class DataManager:
     """完全重构的数据管理器，核心逻辑全部由插件承担"""
     
-    def __init__(self, db_name: str = "default"):
-        """初始化数据管理器"""
-        # 获取配置管理器实例
-        config_manager = get_config_manager()
+    def __init__(self, output_dir: str, source_dir: str):
+        """
+        初始化数据管理器。
         
-        # 获取数据库配置
-        db_config = config_manager.get_effective_database_config()
-        
-        # 处理分离数据库配置
-        separate_db_paths = db_config.get('separate_db_paths', {})
-        self.db_name = db_name
-        
-        # 从配置中获取数据库路径，优先使用分离数据库配置
-        if separate_db_paths:
-            if db_name in separate_db_paths:
-                # 如果指定了特定的数据库名称，使用对应的配置
-                self.db_path = separate_db_paths[db_name]
-            elif 'raw_data' in separate_db_paths:
-                # 默认使用原始数据数据库路径
-                self.db_path = separate_db_paths['raw_data']
-            else:
-                # 如果没有找到合适的配置，使用默认路径
-                self.db_path = f"data/{db_name}/raw_data.db"
-        else:
-            # 如果没有分离数据库配置，使用默认路径
-            self.db_path = f"data/{db_name}/raw_data.db"
-            
-        # 获取数据源目录配置
-        data_config = config_manager.get_effective_data_config()
-        self.source_dir = data_config['source_dir']
-        
+        Args:
+            output_dir: 项目的输出目录，用于派生项目名称和数据库路径。
+            source_dir: 数据源目录。
+        """
         self.logger = logging.getLogger(__name__)
-        self.logger.info(f"数据管理器初始化 - 数据库: {self.db_path}, 数据源: {self.source_dir}")
+        
+        # 从 output_dir 提取项目名称
+        self.project_name = extract_project_name_from_output_dir(output_dir)
+        self.output_dir = output_dir
+        self.source_dir = source_dir # Store source_dir
+        
+        # 根据项目名称动态获取数据库路径
+        self.separate_db_paths = get_separate_database_paths(self.project_name)
+        
+        self.logger.info(f"数据管理器初始化 - 项目名称: {self.project_name}, 数据库路径: {self.separate_db_paths}")
         
         # 初始化组件系统
         project_root = Path(__file__).parent.parent.parent
         self.component_system = get_component_system(project_root)
         
         # 初始化分离数据库管理器 (提前初始化，以便插件可以使用)
-        from .separate_databases import get_separate_db_manager
-        self.separate_db_manager = get_separate_db_manager()
+        from .separate_databases import SeparateDatabaseManager
+        self.separate_db_manager = SeparateDatabaseManager(self.separate_db_paths)
         
         # 为了保持向后兼容性，添加适配器属性
         self.db_adapter = self.separate_db_manager.raw_data_db
@@ -83,42 +72,45 @@ class DataManager:
             # This will cause subsequent calls to self.social_poem_plugin to fail if not handled
             self.social_poem_plugin = None # Explicitly set to None if creation fails
         
-        # 检查数据库文件是否存在，如果不存在则初始化
-        if not Path(self.db_path).exists():
-            self.logger.info(f"数据库文件 {self.db_path} 不存在，正在初始化...")
-            self._initialize_database_if_not_exists()
+        # 检查所有数据库文件是否存在，如果不存在则初始化
+        for db_name, db_path in self.separate_db_paths.items():
+            if not Path(db_path).exists():
+                self.logger.info(f"数据库文件 {db_path} 不存在，正在初始化...")
+                self._initialize_database_if_not_exists(db_path)
         
         # 初始化诗词分类核心处理器
-        self.poem_classification_core = PoemClassificationCore(project_root=str(project_root))
+        # self.poem_classification_core = PoemClassificationCore(project_root=str(project_root)) # Removed as per plan
     
     def _set_id_prefix(self):
         """为不同数据库设置ID前缀，确保全局唯一性"""
         # 定义数据库名称到前缀的映射
+        # Simplified to use a default prefix if project name doesn't match
         db_prefixes = {
             "TangShi": 1000000,  # 唐诗ID前缀
             "SongCi": 2000000,   # 宋词ID前缀
             "YuanQu": 3000000,   # 元曲ID前缀
+            "SocialPoemAnalysis": 4000000, # Example for SocialPoemAnalysis
             "default": 0         # 默认数据库前缀
         }
         
-        # 根据数据库名称设置前缀
-        self.id_prefix = db_prefixes.get(self.db_name, 0)
-        self.logger.info(f"数据库 {self.db_name} 的ID前缀设置为: {self.id_prefix}")
+        self.id_prefix = db_prefixes.get(self.project_name, 0)
+        self.logger.info(f"项目 {self.project_name} 的ID前缀设置为: {self.id_prefix}")
     
-    def _initialize_database_if_not_exists(self):
+    def _initialize_database_if_not_exists(self, db_path: str):
         """如果数据库文件不存在则初始化"""
         try:
+            db_path_obj = Path(db_path)
             # 确保数据库目录存在
-            Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+            ensure_database_directory_exists(db_path_obj)
             
             # 创建一个空的数据库文件
-            with open(self.db_path, 'w') as f:
+            with open(db_path_obj, 'w') as f:
                 pass
                 
-            self.logger.info(f"已创建空数据库文件: {self.db_path}")
+            self.logger.info(f"已创建空数据库文件: {db_path}")
         except Exception as e:
             self.logger.error(f"创建数据库文件失败: {e}")
-            raise DatabaseError(f"无法创建数据库文件 {self.db_path}: {e}")
+            raise DatabaseError(f"无法创建数据库文件 {db_path}: {e}")
     
     # 所有业务逻辑都直接委托给统一插件
     
@@ -197,51 +189,33 @@ class DataManager:
             raise DataError("SocialPoemAnalysisPlugin 未成功加载，无法执行批量插入诗词操作。")
         return self.social_poem_plugin.batch_insert_poems(poems_data, start_id=start_id, id_prefix=self.id_prefix)
 
-    def classify_data(self, db_name: str = "default", dry_run: bool = False):
-        """
-        对诗词数据进行分类
-        
-        Args:
-            db_name: 数据库名称
-            dry_run: 是否为试运行模式
-            
-        Returns:
-            分类统计信息
-        """
-        return self.poem_classification_core.classify_poems_data(self, db_name, dry_run)
+    # Removed classification methods as per plan
+    # def classify_data(self, db_name: str = "default", dry_run: bool = False):
+    #     """
+    #     对诗词数据进行分类
+    #     """
+    #     return self.poem_classification_core.classify_poems_data(self, db_name, dry_run)
 
-    def reset_data_classification(self, db_name: str = "default", dry_run: bool = False):
-        """
-        重置数据分类
-        
-        Args:
-            db_name: 数据库名称
-            dry_run: 是否为试运行模式
-            
-        Returns:
-            重置统计信息
-        """
-        return self.poem_classification_core.reset_pre_classification(self, db_name, dry_run)
+    # def reset_data_classification(self, db_name: str = "default", dry_run: bool = False):
+    #     """
+    #     重置数据分类
+    #     """
+    #     return self.poem_classification_core.reset_pre_classification(self, db_name, dry_run)
 
-    def generate_classification_report(self, db_name: str = "default"):
-        """
-        生成分类报告
-        
-        Args:
-            db_name: 数据库名称
-            
-        Returns:
-            分类报告
-        """
-        return self.poem_classification_core.get_classification_report(self, db_name)
+    # def generate_classification_report(self, db_name: str = "default"):
+    #     """
+    #     生成分类报告
+    #     """
+    #     return self.poem_classification_core.get_classification_report(self, db_name)
 
 # 全局数据管理器实例
-data_manager = None
+data_manager: Optional[DataManager] = None
 
 
-def get_data_manager(db_name: str = "default"):
+def get_data_manager(output_dir: str, source_dir: str) -> DataManager:
     """获取数据管理器实例，支持在运行时切换数据库"""
     global data_manager
-    if data_manager is None or data_manager.db_name != db_name:
-        data_manager = DataManager(db_name=db_name)
+    # 如果 data_manager 不存在，或者 output_dir 发生变化，则重新初始化
+    if data_manager is None or data_manager.output_dir != output_dir:
+        data_manager = DataManager(output_dir=output_dir, source_dir=source_dir)
     return data_manager

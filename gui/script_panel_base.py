@@ -35,6 +35,7 @@ class ScriptPanelBase(QWidget, ABC, metaclass=CombinedMeta):
         Subclasses should call this and then add their specific UI elements.
         """
         self.layout = QVBoxLayout(self)
+        self.layout.setSpacing(10)  # Add spacing between elements
         self.setup_ui() # Abstract method to be implemented by subclasses
 
     @abstractmethod

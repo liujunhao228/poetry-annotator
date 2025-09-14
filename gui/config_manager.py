@@ -100,5 +100,68 @@ class ConfigHandler:
         """
         return self._backend_config_manager.switch_project_config(project_name)
 
-    # Potentially add methods to get schema for dynamic UI generation
-    # For now, we'll assume a fixed UI structure for config panels.
+    def get_llm_models(self) -> Dict[str, Any]:
+        """
+        Retrieves the LLM models configuration.
+        """
+        models = {}
+        model_names = self._backend_config_manager.model_manager.list_model_configs()
+        for name in model_names:
+            models[name] = self._backend_config_manager.model_manager.get_model_config(name)
+        return models
+
+    def save_llm_models(self, models_data: Dict[str, Any]):
+        """
+        Saves the LLM models configuration.
+        """
+        try:
+            # This is a simplified approach. A more robust implementation would
+            # handle additions and removals of models properly.
+            for model_name, model_config in models_data.items():
+                self._backend_config_manager.model_manager.add_model_section(model_name, model_config)
+            logging.info("LLM models configuration saved successfully.")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to save LLM models configuration: {e}")
+            return False
+
+    def get_plugins_config(self) -> Dict[str, Any]:
+        """
+        Retrieves the project's plugin configuration.
+        """
+        plugins = {}
+        if self.get_project_config():
+            config = self._backend_config_manager.project_plugin_loader.project_plugins_ini_path
+            import configparser
+            parser = configparser.ConfigParser()
+            parser.read(config, encoding='utf-8')
+            for section in parser.sections():
+                if section.startswith("Plugin."):
+                    plugin_name = section[len("Plugin."):]
+                    plugins[plugin_name] = dict(parser.items(section))
+        return plugins
+
+    def save_plugins_config(self, plugins_data: Dict[str, Any]):
+        """
+        Saves the project's plugin configuration.
+        """
+        try:
+            config_path = self._backend_config_manager.project_plugin_loader.project_plugins_ini_path
+            import configparser
+            parser = configparser.ConfigParser()
+            parser.read(config_path, encoding='utf-8')
+            for plugin_name, plugin_config in plugins_data.items():
+                section_name = f"Plugin.{plugin_name}"
+                if not parser.has_section(section_name):
+                    parser.add_section(section_name)
+                for key, value in plugin_config.items():
+                    parser.set(section_name, key, str(value))
+            
+            with open(config_path, 'w', encoding='utf-8') as configfile:
+                parser.write(configfile)
+
+            logging.info("Plugins configuration saved successfully.")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to save plugins configuration: {e}")
+            return False
