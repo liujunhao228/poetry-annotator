@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox, QListWidget,
     QFormLayout, QLineEdit, QWidget, QLabel, QListWidgetItem
 )
+from PyQt5.QtCore import Qt
 from ..i18n import _
 from ..config_manager import ConfigHandler
 
