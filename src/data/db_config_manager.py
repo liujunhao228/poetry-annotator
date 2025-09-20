@@ -23,18 +23,17 @@ def extract_project_name_from_output_dir(output_dir: str) -> str:
     return Path(output_dir).name
 
 
-def get_separate_database_paths(project_name: str) -> Dict[str, str]:
+def get_separate_database_paths(output_dir: str) -> Dict[str, str]:
     """
-    获取分离数据库路径配置，根据项目名称动态生成。
+    获取分离数据库路径配置，根据输出目录动态生成。
     
     Args:
-        project_name: 当前项目的名称。
+        output_dir: 项目的输出数据目录，例如 'data/SocialPoemAnalysis'。
         
     Returns:
         Dict[str, str]: 分离数据库路径配置
     """
-    base_data_dir = Path("data")
-    project_data_dir = base_data_dir / project_name
+    project_data_dir = Path(output_dir)
 
     # 动态生成数据库路径
     resolved_paths = {
@@ -53,11 +52,15 @@ def get_separate_database_paths(project_name: str) -> Dict[str, str]:
 
 from pathlib import Path
 
-def ensure_database_directory_exists(db_path: Path) -> None:
+def ensure_database_directory_exists(db_path: Any) -> None:
     """
     确保数据库目录存在
     
     Args:
-        db_path: 数据库文件路径
+        db_path: 数据库文件路径 (可以是 str 或 Path 对象)
     """
+    # 如果 db_path 是字符串，则转换为 Path 对象
+    if isinstance(db_path, str):
+        db_path = Path(db_path)
+    
     db_path.parent.mkdir(parents=True, exist_ok=True)

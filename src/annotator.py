@@ -21,16 +21,17 @@ from .prompt_builder import prompt_builder
 from .logging_config import get_log_directory # 导入获取日志目录的函数
 from datetime import datetime # 导入 datetime 用于生成时间戳
 from src.llm_services.schemas import PoemData # 导入 PoemData DTO
+from .data import get_data_manager # 导入 get_data_manager
 
 logger = logging.getLogger(__name__)
 
 class Annotator:
     """诗词情感标注器 - 负责单个模型的并发标注任务"""
 
-    def __init__(self, config_name: str, output_dir: str, source_dir: str, dry_run: bool = False, full_dry_run: bool = False):
+    def __init__(self, config_name: str, db_name: str, dry_run: bool = False, full_dry_run: bool = False):
         """初始化标注器"""
-        self.output_dir = output_dir
-        self.source_dir = source_dir
+        self.db_name = db_name
+        # source_dir 将由 DataManager 内部派生，Annotator 不再直接管理
         self.dry_run = dry_run
         self.full_dry_run = full_dry_run
 
@@ -315,8 +316,9 @@ class Annotator:
         logger.info(f"[{self.model_identifier}] 开始为诗词ID流式传输并验证标注: {poem_id}")
 
         try:
-            data_manager = AsyncDataManager(self.output_dir, self.source_dir)
-            poems = await data_manager.get_poems_by_ids([poem_id])
+            data_manager_instance = get_data_manager(db_name=self.db_name)
+            async_data_manager = AsyncDataManager(data_manager_instance.separate_db_manager)
+            poems = await async_data_manager.get_poems_by_ids([poem_id])
             if not poems:
                 raise ValueError(f"未找到ID为 {poem_id} 的诗词。")
             poem = poems[0]
@@ -355,22 +357,20 @@ class Annotator:
         
         # INFO级别：任务启动信息，对用户清晰展示任务参数。
         logger.info(f"[{self.model_identifier}] 开始标注任务 - 限制: {limit or '无'}, 范围: {start_id or '开始'}-{end_id or '结束'}, 强制重跑: {force_rerun}, 指定ID: {poem_ids is not None}")
-        # 在模型特定日志中也记录任务启动信息
-        # self.model_logger.info(f"开始标注任务 - 限制: {limit or '无'}, 范围: {start_id or '开始'}-{end_id or '结束'}, 强制重跑: {force_rerun}, 指定ID: {poem_ids is not None}")  # 已注释：不再使用模型特定日志
         logger.info(f"开始标注任务 - 限制: {limit or '无'}, 范围: {start_id or '开始'}-{end_id or '结束'}, 强制重跑: {force_rerun}, 指定ID: {poem_ids is not None}")
         
-        data_manager = AsyncDataManager(self.output_dir, self.source_dir)
+        # 获取 DataManager 实例，然后从中获取 SeparateDatabaseManager
+        data_manager_instance = get_data_manager(db_name=self.db_name)
+        async_data_manager = AsyncDataManager(data_manager_instance.separate_db_manager)
         
-        # 移除 async with 语句，因为 AsyncDataManager 不再是异步上下文管理器
-        # async with AsyncDataManager(db_path) as data_manager:
         if poem_ids is not None:
             # 如果指定了ID列表，但不是强制重跑，需要过滤掉已经标注过的诗词
             if not force_rerun:
-                poems = await data_manager.get_poems_by_ids_filtered(poem_ids, self.model_identifier)
+                poems = await async_data_manager.get_poems_by_ids_filtered(poem_ids, self.model_identifier)
             else:
-                poems = await data_manager.get_poems_by_ids(poem_ids)
+                poems = await async_data_manager.get_poems_by_ids(poem_ids)
         else:
-            poems = await data_manager.get_poems_to_annotate(
+            poems = await async_data_manager.get_poems_to_annotate(
                 model_identifier=self.model_identifier,
                 limit=limit, start_id=start_id, end_id=end_id, force_rerun=force_rerun
             )
@@ -380,12 +380,10 @@ class Annotator:
         if not poems:
             # INFO级别：告知用户没有待处理项，是重要的流程状态。
             logger.info(f"[{self.model_identifier}] 没有找到待标注的诗词。")
-            # self.model_logger.info("没有找到待标注的诗词。")  # 已注释：不再使用模型特定日志
             return {'total': 0, 'completed': 0, 'failed': 0, 'model': self.model_identifier}
             
         # INFO级别：告知用户待处理项总数，是重要的流程状态。
         logger.info(f"[{self.model_identifier}] 找到 {total_poems} 首待标注诗词，并发数: {self.max_workers}")
-        # self.model_logger.info(f"找到 {total_poems} 首待标注诗词，并发数: {self.max_workers}")  # 已注释：不再使用模型特定日志
         
         semaphore = asyncio.Semaphore(self.max_workers)
         
@@ -426,7 +424,7 @@ class Annotator:
                 continue # 跳过数据库保存
 
             # 非 dry-run 模式，保存结果到数据库
-            await data_manager.save_annotation(
+            await data_manager_instance.save_annotation(
                 poem_id=result['poem_id'],
                 model_identifier=self.model_identifier,
                 status=result['status'],

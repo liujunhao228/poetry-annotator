@@ -93,7 +93,7 @@ class LLMFactory:
         try:
             if not config_name:
                 raise ValueError("必须提供模型配置名称")
-            model_config = config_manager.get_model_config(config_name)
+            model_config = config_manager.model_manager.get_model_config(config_name)
             provider = model_config.get('provider')
             if not provider:
                 raise ValueError(f"模型配置 '{config_name}' 必须包含 'provider' 字段")
@@ -145,7 +145,7 @@ class LLMFactory:
         try:
             if not config_name:
                 raise ValueError("必须提供模型配置名称")
-            model_config = config_manager.get_model_config(config_name)
+            model_config = config_manager.model_manager.get_model_config(config_name)
             provider = model_config.get('provider')
             if not provider:
                 raise ValueError(f"模型配置 '{config_name}' 必须包含 'provider' 字段")

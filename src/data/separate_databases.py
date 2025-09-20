@@ -15,8 +15,9 @@ from .exceptions import DatabaseError
 class SeparateDatabaseManager:
     """分离数据库管理器，负责管理原始数据、标注数据和情感分类数据的分离存储"""
 
-    def __init__(self):
+    def __init__(self, output_dir: str):
         self.logger = logging.getLogger(__name__)
+        self.output_dir = output_dir
         self.db_configs = self._get_database_configs()
         
         # 为了保持向后兼容性，添加适配器属性
@@ -27,7 +28,7 @@ class SeparateDatabaseManager:
     def _get_database_configs(self) -> Dict[str, str]:
         """获取分离数据库配置"""
         # 使用统一的配置管理获取分离数据库路径
-        separate_paths = get_separate_database_paths()
+        separate_paths = get_separate_database_paths(self.output_dir)
         
         # 确保数据库目录存在
         for path in separate_paths.values():
@@ -466,15 +467,15 @@ import threading
 _separate_db_manager_lock = threading.Lock()
 
 
-def get_separate_db_manager() -> SeparateDatabaseManager:
+def get_separate_db_manager(project_name: str) -> SeparateDatabaseManager:
     """获取分离数据库管理器实例"""
     global separate_db_manager, _separate_db_manager_lock
     
     # 使用双重检查锁定确保线程安全
-    if separate_db_manager is None:
+    if separate_db_manager is None or separate_db_manager.project_name != project_name:
         with _separate_db_manager_lock:
             # 再次检查，防止重复创建
-            if separate_db_manager is None:
-                separate_db_manager = SeparateDatabaseManager()
+            if separate_db_manager is None or separate_db_manager.project_name != project_name:
+                separate_db_manager = SeparateDatabaseManager(project_name)
     
     return separate_db_manager

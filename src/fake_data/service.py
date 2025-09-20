@@ -4,16 +4,16 @@ import asyncio
 import logging
 from typing import List, Dict, Any, Optional, Callable
 from .models import FakeLLMConfig, FakeAnnotation
-from src.llm_services.base_service import BaseLLMService
 from src.llm_services.schemas import PoemData, EmotionSchema
 
 
-class FakeDataService(BaseLLMService):
+class FakeDataService:
     """假数据服务，模拟LLM API响应"""
     
     def __init__(self, config: Dict[str, Any], model_config_name: str, response_parser=None):
-        # 调用基类构造函数
-        super().__init__(config, model_config_name, response_parser)
+        self.config = config
+        self.model_config_name = model_config_name
+        self.model = model_config_name # 添加 model 属性以兼容 LLMFactory
         
         # 初始化假数据配置
         self.fake_config = FakeLLMConfig(
@@ -51,6 +51,12 @@ class FakeDataService(BaseLLMService):
     def set_annotation_generator(self, generator: Callable[[PoemData, EmotionSchema], List[Dict[str, Any]]]):
         """设置假数据生成器函数"""
         self.annotation_generator = generator
+
+    def _generate_sentences_with_id(self, paragraphs: List[str]) -> List[Dict[str, str]]:
+        """
+        为句子生成ID并构建JSON格式
+        """
+        return [{"id": f"S{i+1}", "sentence": sentence} for i, sentence in enumerate(paragraphs)]
     
     async def annotate_poem(self, poem: PoemData, emotion_schema: EmotionSchema) -> List[Dict[str, Any]]:
         """模拟诗词标注"""

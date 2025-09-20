@@ -16,39 +16,16 @@
 import importlib
 import logging
 from typing import Dict, Any, Optional, Type, Union
-from src.config.plugin_loader import ProjectPluginConfigLoader
-from src.config.schema import PluginConfig
+from src.config.schema import PluginConfig, ProjectPluginsConfig
 # 导入新的插件系统
-from src.plugin_system import get_plugin_manager, PluginLoader
+from src.plugin_system import get_plugin_manager
 from src.plugin_system.plugin_types import PluginType
 from src.plugin_system.base import ComponentType, Component, BasePlugin # Import from base.py
+from src.plugin_system.direct_loader import DirectPluginLoader # Import DirectPluginLoader
+from src.config import config_manager as backend_config_manager # Import the backend config manager
 
 # 配置日志
 logger = logging.getLogger(__name__)
-
-
-class Plugin(BasePlugin): # Inherit from BasePlugin
-    """插件基类"""
-    def __init__(self, component_type: ComponentType, plugin_config: PluginConfig):
-        super().__init__(plugin_config) # Call BasePlugin's constructor
-        self.component_type = component_type # Add component_type attribute
-    
-    def get_name(self) -> str:
-        """获取插件名称"""
-        # Assuming plugin_config has a name, or derive it
-        return self.plugin_config.name if self.plugin_config.name else "Unnamed Plugin"
-    
-    def get_description(self) -> str:
-        """获取插件描述"""
-        return self.plugin_config.description if self.plugin_config.description else "No description provided."
-    
-    def initialize(self):
-        """插件初始化方法"""
-        super().initialize() # Call BasePlugin's initialize
-    
-    def cleanup(self):
-        """插件清理方法"""
-        super().cleanup() # Call BasePlugin's cleanup
 
 
 class ComponentSystem:
@@ -58,7 +35,7 @@ class ComponentSystem:
         # 确保 project_root 是 Path 对象
         from pathlib import Path
         self.project_root = Path(project_root) if isinstance(project_root, str) else project_root
-        self._plugin_configs: Dict[str, PluginConfig] = {}
+        self._plugin_configs: Dict[str, PluginConfig] = {} # Store all loaded plugin configs
         self._component_registry: Dict[ComponentType, Type[Component]] = {}
         # 使用全局插件管理器
         self.plugin_manager = get_plugin_manager()
@@ -68,53 +45,34 @@ class ComponentSystem:
     def _load_plugin_configs(self):
         """加载所有已启用的项目插件配置"""
         try:
-            project_plugins_ini_path = self.project_root / "project" / "plugins.ini"
+            # 获取项目插件配置
+            project_plugins_config: ProjectPluginsConfig = backend_config_manager.get_project_plugins_config()
             
-            if project_plugins_ini_path.exists():
-                try:
-                    project_plugin_loader = ProjectPluginConfigLoader(str(project_plugins_ini_path))
-                    project_plugin_config: ProjectPluginsConfig = project_plugin_loader.load_project_plugin_config()
-                    project_enabled_plugins = project_plugin_config.enabled_plugins
+            logger.info(f"项目插件配置加载完成，共 {len(project_plugins_config.plugins)} 个插件。")
+            
+            import sys
+            for plugin_name, plugin_config in project_plugins_config.plugins.items():
+                self._plugin_configs[plugin_name] = plugin_config # Store all plugin configs
+                
+                if plugin_config.enabled:
+                    logger.info(f"加载插件配置: {plugin_name}, enabled: {plugin_config.enabled}")
                     
-                    logger.info(f"项目插件配置加载完成，启用的插件: {project_enabled_plugins}")
-                    logger.info(f"插件路径: {project_plugin_config.plugin_paths}")
-                    
-                    # 为项目插件添加 plugin_paths 到 sys.path
-                    import sys
-                    for plugin_path in project_plugin_config.plugin_paths:
-                        # 处理相对路径和绝对路径
-                        if plugin_path.startswith("project/"):
-                            # 如果是project开头的路径，直接使用
-                            full_plugin_path = str(self.project_root / plugin_path)
-                        else:
-                            # 其他路径在project目录下查找
-                            full_plugin_path = str(self.project_root / "project" / plugin_path)
+                    # 为项目插件添加 plugin_paths 到 sys.path (使用 plugin_config.path)
+                    if plugin_config.path:
+                        full_plugin_path = str(self.project_root / plugin_config.path)
                         if full_plugin_path not in sys.path:
                             sys.path.insert(0, full_plugin_path)
                             logger.debug(f"已将项目插件路径添加到 sys.path: {full_plugin_path}")
                     
-                    for plugin_name in project_enabled_plugins:
-                        try:
-                            plugin_config: PluginConfig = project_plugin_loader.load_plugin_config(plugin_name)
-                            logger.info(f"加载插件配置: {plugin_name}, enabled: {plugin_config.enabled}")
-                            if plugin_config.enabled:
-                                self._plugin_configs[plugin_name] = plugin_config
-                                logger.info(f"成功加载并启用项目插件配置: {plugin_name}")
-                            else:
-                                logger.info(f"项目插件配置已加载但未启用: {plugin_name}")
-                        except Exception as e:
-                            logger.error(f"加载项目插件 '{plugin_name}' 的配置时出错: {e}")
-                    
-                    # 使用新的插件加载器加载所有启用的插件
-                    from src.plugin_system.project_config_manager import ProjectPluginConfigManager
-                    config_manager = ProjectPluginConfigManager(self._plugin_configs)
-                    PluginLoader.load_plugins_from_config(config_manager, self.plugin_manager, self.project_root)                    # 注册项目插件到新的插件系统
-                    from src.plugin_system.project_plugins import register_project_plugins
-                    register_project_plugins(self.plugin_manager, self._plugin_configs)
-                except Exception as e:
-                    logger.error(f"加载项目插件配置时出错: {e}")
-            else:
-                logger.warning(f"项目插件配置文件不存在: {project_plugins_ini_path}。将不加载任何项目插件。")
+                    try:
+                        # 直接加载插件并注册到全局插件管理器
+                        plugin_instance = DirectPluginLoader.load_plugin(plugin_config)
+                        self.plugin_manager.register_plugin(plugin_instance)
+                        logger.info(f"成功加载并启用项目插件: {plugin_name}")
+                    except Exception as e:
+                        logger.error(f"加载项目插件 '{plugin_name}' 时出错: {e}")
+                else:
+                    logger.info(f"项目插件配置已加载但未启用: {plugin_name}")
         except Exception as e:
             logger.error(f"加载插件配置时出错: {e}")
     

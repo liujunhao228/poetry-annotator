@@ -5,7 +5,7 @@
 import os
 from typing import Dict, Any, Optional, List
 
-from src.config.schema import GlobalConfig, ProjectConfig, PluginConfig, ProjectPluginsConfig, ProjectPluginsConfig, ProjectPluginsConfig, ProjectPluginsConfig, ProjectPluginsConfig
+from src.config.schema import GlobalConfig, ProjectConfig, PluginConfig, ProjectPluginsConfig
 from src.config.global_config_loader import GlobalConfigLoader
 from src.config.project_config_loader import ProjectConfigLoader
 from src.config.project_manager import ProjectConfigManager
@@ -77,6 +77,9 @@ class ConfigManager:
         """加载项目配置文件（如果指定了项目配置文件）"""
         if self.project_loader:
             self.project_config = self.project_loader.load()
+            # Load plugin configurations and merge into project_config
+            if self.project_plugin_loader:
+                self.project_config.plugins = self.project_plugin_loader.load_project_plugin_config()
 
     def save_global_config(self):
         """将当前全局配置写入文件"""
@@ -85,6 +88,9 @@ class ConfigManager:
     def save_project_config(self):
         """将当前项目配置写入文件"""
         if self.project_loader and self.project_config:
+            # Save plugin configurations first
+            if self.project_plugin_loader:
+                self.project_plugin_loader.save_project_plugin_config(self.project_config.plugins)
             self.project_loader.save(self.project_config)
 
     # --- 配置获取方法 ---
@@ -202,16 +208,12 @@ class ConfigManager:
 
     def get_project_plugins_config(self) -> ProjectPluginsConfig:
         """获取项目插件配置"""
-        if self.project_plugin_loader:
-            return self.project_plugin_loader.load_project_plugin_config()
-        return ProjectPluginsConfig()
+        return self.project_config.plugins
 
 
     def get_plugin_config(self, plugin_name: str) -> PluginConfig:
         """获取特定插件配置"""
-        if self.project_plugin_loader:
-            return self.project_plugin_loader.load_plugin_config(plugin_name)
-        return PluginConfig()
+        return self.project_config.plugins.plugins.get(plugin_name, PluginConfig())
 
     # --- 其他方法保持不变或稍作修改 ---
 

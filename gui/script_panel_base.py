@@ -2,6 +2,7 @@
 # Defines the ScriptPanelBase class, a base class for all script-specific GUI panels.
 # It provides common interfaces and functionalities for script execution and UI setup.
 
+import logging
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QFileDialog, QMessageBox
 from PyQt5.QtCore import pyqtSignal, QObject
 from abc import ABC, abstractmethod, ABCMeta
@@ -72,15 +73,47 @@ class ScriptPanelBase(QWidget, ABC, metaclass=CombinedMeta):
         self.script_started.emit(self.script_name)
         self.worker.start()
 
+    def _create_function_worker(self, target_function, function_args: dict):
+        """
+        Creates and starts a FunctionWorker in a separate thread.
+        Connects worker signals to panel slots.
+        """
+        if self.worker and self.worker.isRunning():
+            QMessageBox.warning(self, _("Script Running"), _("A task is already running. Please wait for it to finish."))
+            return
+
+        from .workers import FunctionWorker # Deferred import to avoid circular dependency
+        self.worker = FunctionWorker(target_function, function_args)
+        self.worker.finished.connect(self._on_function_worker_finished)
+        self.worker.error_occurred.connect(self._on_worker_error) # Use common error handler
+        self.worker.output_emitted.connect(self._on_worker_output) # Use common output handler
+        self.worker.progress_updated.connect(self._on_worker_progress) # Use common progress handler
+
+        self.script_started.emit(self.script_name)
+        self.worker.start()
+
     def _on_worker_finished(self):
-        """Slot to handle worker finished signal."""
+        """Slot to handle ScriptWorker finished signal."""
         self.script_finished.emit(self.script_name, True)
         QMessageBox.information(self, _("Script Finished"), _("{} executed successfully.").format(self.script_name))
 
+    def _on_function_worker_finished(self, result: object):
+        """Slot to handle FunctionWorker finished signal."""
+        self.script_finished.emit(self.script_name, True)
+        # Optionally display the result or a summary
+        if isinstance(result, dict) and result.get("status") == "completed_with_errors":
+            QMessageBox.warning(self, _("Task Finished with Errors"), _("{} finished with errors. Check output for details.").format(self.script_name))
+        else:
+            QMessageBox.information(self, _("Task Finished"), _("{} executed successfully.").format(self.script_name))
+        
+        # Log the full result for debugging
+        logging.debug(f"FunctionWorker finished with result: {result}")
+
+
     def _on_worker_error(self, error_message: str):
-        """Slot to handle worker error signal."""
+        """Slot to handle worker error signal (common for both ScriptWorker and FunctionWorker)."""
         self.script_finished.emit(self.script_name, False)
-        QMessageBox.critical(self, _("Script Error"), _("{} failed: {}").format(self.script_name, error_message))
+        QMessageBox.critical(self, _("Task Error"), _("{} failed: {}").format(self.script_name, error_message))
 
     def _on_worker_output(self, output: str):
         """Slot to handle worker output signal."""
@@ -120,3 +153,10 @@ class ScriptPanelBase(QWidget, ABC, metaclass=CombinedMeta):
         Returns True if inputs are valid, False otherwise.
         """
         return True
+
+    def update_database_name(self, db_name: str):
+        """
+        A method for panels to update the database name in their UI.
+        Subclasses can override this method if they need to handle this update.
+        """
+        pass

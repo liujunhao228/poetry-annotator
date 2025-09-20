@@ -3,9 +3,6 @@
 仅作为插件的调度器和接口层，不包含任何核心业务逻辑
 """
 from src.data.db_config_manager import get_separate_database_paths, extract_project_name_from_output_dir, ensure_database_directory_exists
-
-
-from src.data.db_config_manager import get_separate_database_paths, extract_project_name_from_output_dir, ensure_database_directory_exists
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Set
@@ -16,36 +13,56 @@ from src.data.exceptions import DatabaseError, DataError # Assuming these are de
 from src.plugin_system.manager import get_plugin_manager
 from src.emotion_classification.core import EmotionClassificationCore
 
+from src.component_system import get_component_system, ComponentType
+from src.config.project_config_loader import ProjectConfigLoader
+from src.config.schema import ProjectConfig
+
 class DataManager:
     """完全重构的数据管理器，核心逻辑全部由插件承担"""
     
-    def __init__(self, output_dir: str, source_dir: str):
+    def __init__(self, project_name: str):
         """
         初始化数据管理器。
         
         Args:
-            output_dir: 项目的输出目录，用于派生项目名称和数据库路径。
-            source_dir: 数据源目录。
+            project_name: 当前项目的名称。
         """
         self.logger = logging.getLogger(__name__)
+        self.project_name = project_name
         
-        # 从 output_dir 提取项目名称
-        self.project_name = extract_project_name_from_output_dir(output_dir)
-        self.output_dir = output_dir
-        self.source_dir = source_dir # Store source_dir
+        # 获取项目根目录并构建 project.ini 路径
+        project_root = Path(__file__).parent.parent.parent
+        project_ini_path = project_root / "project" / "project.ini"
         
-        # 根据项目名称动态获取数据库路径
-        self.separate_db_paths = get_separate_database_paths(self.project_name)
+        # 加载项目配置
+        config_loader = ProjectConfigLoader(str(project_ini_path))
+        project_config = config_loader.load()
         
-        self.logger.info(f"数据管理器初始化 - 项目名称: {self.project_name}, 数据库路径: {self.separate_db_paths}")
+        # 从配置中获取 source_dir 和 output_dir
+        configured_source_dir = project_config.data_path.source_dir
+        configured_output_dir = project_config.data_path.output_dir
+        
+        # 根据配置的 output_dir 动态获取数据库路径
+        self.separate_db_paths = get_separate_database_paths(configured_output_dir)
+        
+        # 设置源数据目录
+        if "fake_data" in self.project_name.lower():
+            self.source_dir = None
+            self.logger.info(f"数据管理器初始化 - 项目名称: {self.project_name} (假数据项目), 源数据目录设置为 None。")
+        else:
+            # 使用从 project.ini 读取的 source_dir
+            self.source_dir = Path(configured_source_dir)
+            if not self.source_dir.exists():
+                self.logger.warning(f"配置的源数据目录 {self.source_dir} 不存在。请确保数据已准备好。")
+            self.logger.info(f"数据管理器初始化 - 项目名称: {self.project_name}, 数据库路径: {self.separate_db_paths}, 源数据目录: {self.source_dir}")
         
         # 初始化组件系统
-        project_root = Path(__file__).parent.parent.parent
+        # project_root = Path(__file__).parent.parent.parent # 已经获取过，无需重复
         self.component_system = get_component_system(project_root)
         
         # 初始化分离数据库管理器 (提前初始化，以便插件可以使用)
         from .separate_databases import SeparateDatabaseManager
-        self.separate_db_manager = SeparateDatabaseManager(self.separate_db_paths)
+        self.separate_db_manager = SeparateDatabaseManager(output_dir=configured_output_dir)
         
         # 为了保持向后兼容性，添加适配器属性
         self.db_adapter = self.separate_db_manager.raw_data_db
@@ -132,11 +149,11 @@ class DataManager:
         """根据ID列表获取诗词信息"""
         return self.social_poem_plugin.get_poems_by_ids(poem_ids)
     
-    def save_annotation(self, poem_id: int, model_identifier: str, status: str,
-                        annotation_result: Optional[str] = None, 
-                        error_message: Optional[str] = None) -> bool:
+    async def save_annotation(self, poem_id: int, model_identifier: str, status: str,
+                              annotation_result: Optional[str] = None, 
+                              error_message: Optional[str] = None) -> bool:
         """保存标注结果"""
-        return self.social_poem_plugin.save_annotation(
+        return await self.social_poem_plugin.save_annotation(
             poem_id, model_identifier, status, annotation_result, error_message
         )
     
@@ -164,10 +181,16 @@ class DataManager:
     # 数据加载和存储方法也直接委托给统一插件
     def load_data_from_json(self, json_file: str) -> List[Dict[str, Any]]:
         """从JSON文件加载数据"""
+        if self.source_dir is None:
+            self.logger.info(f"假数据项目 '{self.project_name}' 不从文件加载数据，返回空列表。")
+            return []
         return self.social_poem_plugin.load_data_from_json(self.source_dir, json_file)
     
     def load_all_json_files(self) -> List[Dict[str, Any]]:
         """加载所有JSON文件的数据"""
+        if self.source_dir is None:
+            self.logger.info(f"假数据项目 '{self.project_name}' 不从文件加载数据，返回空列表。")
+            return []
         return self.social_poem_plugin.load_all_json_files(self.source_dir)
     
     def load_author_data(self, source_dir: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -189,33 +212,14 @@ class DataManager:
             raise DataError("SocialPoemAnalysisPlugin 未成功加载，无法执行批量插入诗词操作。")
         return self.social_poem_plugin.batch_insert_poems(poems_data, start_id=start_id, id_prefix=self.id_prefix)
 
-    # Removed classification methods as per plan
-    # def classify_data(self, db_name: str = "default", dry_run: bool = False):
-    #     """
-    #     对诗词数据进行分类
-    #     """
-    #     return self.poem_classification_core.classify_poems_data(self, db_name, dry_run)
-
-    # def reset_data_classification(self, db_name: str = "default", dry_run: bool = False):
-    #     """
-    #     重置数据分类
-    #     """
-    #     return self.poem_classification_core.reset_pre_classification(self, db_name, dry_run)
-
-    # def generate_classification_report(self, db_name: str = "default"):
-    #     """
-    #     生成分类报告
-    #     """
-    #     return self.poem_classification_core.get_classification_report(self, db_name)
-
 # 全局数据管理器实例
 data_manager: Optional[DataManager] = None
 
 
-def get_data_manager(output_dir: str, source_dir: str) -> DataManager:
+def get_data_manager(db_name: str) -> DataManager:
     """获取数据管理器实例，支持在运行时切换数据库"""
     global data_manager
-    # 如果 data_manager 不存在，或者 output_dir 发生变化，则重新初始化
-    if data_manager is None or data_manager.output_dir != output_dir:
-        data_manager = DataManager(output_dir=output_dir, source_dir=source_dir)
+    # 如果 data_manager 不存在，或者 db_name 发生变化，则重新初始化
+    if data_manager is None or data_manager.project_name != db_name:
+        data_manager = DataManager(project_name=db_name)
     return data_manager

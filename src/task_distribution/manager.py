@@ -15,14 +15,12 @@
 
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from pathlib import Path
 
 # 获取当前脚本的绝对路径
 script_dir = Path(__file__).resolve().parent
 # 获取项目根目录
-project_root = script_dir.parent
+project_root = script_dir.parent.parent # Adjust project_root for the new location
 # 将项目根目录添加到 sys.path
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
@@ -175,11 +173,11 @@ def read_poem_ids_in_chunks(file_path: str, chunk_size: int):
             yield chunk
 
 
-def process_chunk(args: Tuple[str, List[int], bool, bool, bool, str, str]) -> Dict[str, Any]:
+def process_chunk(args: Tuple[str, List[int], bool, bool, bool, str]) -> Dict[str, Any]:
     """
     【内层并发单元】工作线程执行的函数，处理一个批次的ID。
     """
-    model_name, poem_ids_chunk, force_rerun, dry_run, full_dry_run, output_dir, source_dir = args
+    model_name, poem_ids_chunk, force_rerun, dry_run, full_dry_run, db_name = args
     thread_ident = threading.get_ident()
     logger.debug(f"线程 {thread_ident} 开始为模型 '{model_name}' 处理 {len(poem_ids_chunk)} 个ID的批次。")
 
@@ -200,7 +198,7 @@ def process_chunk(args: Tuple[str, List[int], bool, bool, bool, str, str]) -> Di
 
     # 否则（非 dry_run 或 full_dry_run 模式），实例化 Annotator 并运行
     try:
-        annotator = Annotator(model_name, output_dir=output_dir, source_dir=source_dir, dry_run=dry_run, full_dry_run=full_dry_run)
+        annotator = Annotator(model_name, db_name=db_name, dry_run=dry_run, full_dry_run=full_dry_run)
         results = asyncio.run(annotator.run(poem_ids=poem_ids_chunk, force_rerun=force_rerun))
         # logger.debug(f"线程 {thread_ident} 完成为模型 '{model_name}' 处理批次。")
         return results
@@ -214,7 +212,7 @@ def process_chunk(args: Tuple[str, List[int], bool, bool, bool, str, str]) -> Di
         }
 
 
-def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_size: int, fresh_start: bool, max_workers: int, output_dir: str, source_dir: str, dry_run: bool = False, full_dry_run: bool = False):
+def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_size: int, fresh_start: bool, max_workers: int, db_name: str, dry_run: bool = False, full_dry_run: bool = False):
     """
     【外层并发单元】为单个指定模型和单个ID文件运行完整的并行标注流程。
     """
@@ -266,7 +264,7 @@ def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_
           
         logger.info(f"总共有 {len(id_chunks)} 个批次，将从批次 {last_completed_chunk_index + 2} 开始处理 {len(chunks_to_process)} 个批次。")
       
-        task_args = [(model, chunk, force_rerun, dry_run, full_dry_run, output_dir, source_dir) for chunk in chunks_to_process]
+        task_args = [(model, chunk, force_rerun, dry_run, full_dry_run, db_name) for chunk in chunks_to_process]
       
         with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix=f"{model[:10]}_worker") as executor:
             results_iterator = executor.map(process_chunk, task_args)
@@ -333,20 +331,18 @@ def run_annotation_for_model(model: str, id_file: str, force_rerun: bool, chunk_
 
 
 def run_distribution_task(
-    model: Optional[str] = None,
-    all_models: bool = False,
+    selected_models: Optional[List[str]] = None, # Changed from model and all_models
     id_file: Optional[str] = None,
     id_dir: Optional[str] = None,
     force_rerun: bool = False,
     chunk_size: int = 1000,
     fresh_start: bool = False,
-    output_dir: str = "",
-    source_dir: str = "",
+    db_name: str = "",
     console_log_level: Optional[str] = None,
     file_log_level: Optional[str] = None,
     enable_file_log: Optional[bool] = None,
     dry_run: bool = False,
-    full_dry_run: bool = False # 新增参数
+    full_dry_run: bool = False
 ) -> Dict[str, Any]:
     """
     【模块化入口函数】执行诗词标注任务分发。
@@ -359,8 +355,7 @@ def run_distribution_task(
     :param force_rerun: 强制重新标注。
     :param chunk_size: 批次大小。
     :param fresh_start: 清除进度从头开始。
-    :param output_dir: 项目输出目录，用于派生项目名称和数据库路径。
-    :param source_dir: 数据源目录。
+    :param db_name: 数据库名称，作为数据输出源和输出路径。
     :param console_log_level: 控制台日志级别。
     :param file_log_level: 文件日志级别。
     :param enable_file_log: 是否启用文件日志。
@@ -376,12 +371,13 @@ def run_distribution_task(
     )
     
     # 移除对 db 参数的直接处理，因为现在通过 output_dir 和 source_dir 间接管理
-    # if db:
-    #     try:
-    #         get_data_manager(db_name=db)
-    #     except ValueError as e:
-    #         logger.error(f"数据库设置错误: {e}")
-    #         raise  # 向上抛出异常
+    if db_name:
+        try:
+            # 尝试获取数据管理器，确保数据库配置正确
+            get_data_manager(db_name=db_name)
+        except ValueError as e:
+            logger.error(f"数据库设置错误: {e}")
+            raise  # 向上抛出异常
 
     # 2. 初始化插件系统
     logger.info("初始化插件系统...")
@@ -394,20 +390,20 @@ def run_distribution_task(
     script_start_time = time.time()
 
     # 3. 参数校验
-    if not model and not all_models:
-        raise ValueError("错误: 必须提供 'model' 或 'all_models' 参数之一。")
-    if model and all_models:
-        raise ValueError("错误: 'model' 和 'all_models' 参数是互斥的。")
+    if not selected_models:
+        raise ValueError("错误: 必须提供 'selected_models' 参数。")
     if not id_file and not id_dir:
         raise ValueError("错误: 必须提供 'id_file' 或 'id_dir' 参数之一。")
     if id_file and id_dir:
         raise ValueError("错误: 'id_file' 和 'id_dir' 参数是互斥的。")
+    if not db_name:
+        raise ValueError("错误: 必须提供 '--db' 参数来指定数据库。")
 
     available_models = llm_factory.list_configured_models().keys()
     if not available_models:
         raise ValueError("错误: 配置文件中没有找到任何 [Model.*] 配置。")
 
-    models_to_run = list(available_models) if all_models else [model]
+    models_to_run = selected_models
     if not all(m in available_models for m in models_to_run):
         raise ValueError(f"错误: 指定模型不在配置中。请求: {models_to_run}, 可用: {list(available_models)}")
 
@@ -467,7 +463,7 @@ def run_distribution_task(
     errors = []
     with ThreadPoolExecutor(max_workers=max_model_pipelines, thread_name_prefix="ModelPipeline") as executor:
         future_to_task = {
-            executor.submit(run_annotation_for_model, model=m, id_file=f, force_rerun=force_rerun, chunk_size=chunk_size, fresh_start=fresh_start, max_workers=max_workers, output_dir=output_dir, source_dir=source_dir, dry_run=dry_run, full_dry_run=full_dry_run): (m, Path(f).name)
+            executor.submit(run_annotation_for_model, model=m, id_file=f, force_rerun=force_rerun, chunk_size=chunk_size, fresh_start=fresh_start, max_workers=max_workers, db_name=db_name, dry_run=dry_run, full_dry_run=full_dry_run): (m, Path(f).name)
             for m, f in tasks_to_distribute
         }
         for future in as_completed(future_to_task):
@@ -495,72 +491,5 @@ def run_distribution_task(
     }
 
 
-@click.command()
-@click.option('--model', '-m', help="指定要使用的模型配置别名 (与 --all-models 互斥)")
-@click.option('--all-models', '-a', is_flag=True, default=False, help="对所有已配置的模型执行标注任务 (与 --model 互斥)")
-@click.option('--id-file', '-f', type=click.Path(exists=True, dir_okay=False, resolve_path=True), 
-              help="包含诗词ID的文本文件路径 (与 --id-dir 互斥)。如果指定，该文件将被所有选定模型使用。")
-@click.option('--id-dir', '-d', type=click.Path(exists=True, file_okay=False, resolve_path=True), 
-              help="包含多个诗词ID文件的目录路径 (与 --id-file 互斥)。")
-@click.option('--force-rerun', '-r', is_flag=True, default=False, help="强制重新标注已完成的条目")
-@click.option('--chunk-size', '-c', type=int, default=1000, show_default=True, help="每个批次处理的诗词数量")
-@click.option('--fresh-start', '-s', is_flag=True, default=False, help="忽略并清除旧的进度，从头开始运行")
-@click.option('--output-dir', type=click.Path(file_okay=False, resolve_path=True), required=True, help="项目输出目录，用于派生项目名称和数据库路径")
-@click.option('--source-dir', type=click.Path(exists=True, file_okay=False, resolve_path=True), required=True, help="数据源目录")
-# [新增] 专门用于控制日志的命令行选项
-@click.option('--console-log-level', type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR']), default=None, help='设置控制台的日志级别 (覆盖配置文件)')
-@click.option('--file-log-level', type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR']), default=None, help='设置文件日志的级别 (覆盖配置文件)')
-@click.option('--enable-file-log', is_flag=True, default=None, help='强制启用文件日志 (覆盖配置文件)')
-@click.option('--dry-run', is_flag=True, default=False, help="空运行模式，测试流程而不实际调用LLM")
-@click.option('--full-dry-run', is_flag=True, default=False, help="在dry-run模式下，执行完整流程测试（包括响应解析、内容验证、数据保存到JSON文件），而非跳过这些流程。") # 新增参数
-def cli(model, all_models, id_file, id_dir, force_rerun, chunk_size, fresh_start, output_dir, source_dir, console_log_level, file_log_level, enable_file_log, dry_run, full_dry_run):
-    """
-    【主控制函数】从文件分批读取诗词ID并以多模型并发方式分发标注任务。
-    """
-    # [修改] 此函数现在作为命令行接口的包装器，调用核心逻辑函数。
-    try:
-        result = run_distribution_task(
-            model=model,
-            all_models=all_models,
-            id_file=id_file,
-            id_dir=id_dir,
-            force_rerun=force_rerun,
-            chunk_size=chunk_size,
-            fresh_start=fresh_start,
-            output_dir=output_dir,
-            source_dir=source_dir,
-            console_log_level=console_log_level,
-            file_log_level=file_log_level,
-            enable_file_log=enable_file_log,
-            dry_run=dry_run,
-            full_dry_run=full_dry_run # 传递新增参数
-        )
-        if result.get("errors"):
-            logger.error("一个或多个任务执行失败。详情请查看上面的日志。")
-            # 可选：根据需要设置非零退出码
-            # sys.exit(1)
-
-    except (ValueError, FileNotFoundError, RuntimeError) as e:
-        # 捕获参数校验和健康检查的错误
-        logger.error(f"任务启动失败: {e}")
-        # 打印帮助信息以指导用户
-        click.echo(click.get_current_context().get_help(), err=True)
-        # sys.exit(1)
-    except Exception as e:
-        logger.critical(f"发生未预料的严重错误: {e}", exc_info=True)
-        # sys.exit(1)
-
-
-if __name__ == '__main__':
-    # 为了能够从项目根目录直接运行此脚本（python -m src.distribute_tasks），
-    # 我们需要在脚本主入口进行一些路径处理，以确保能正确找到 `src` 目录下的其他模块。
-    # 如果您总是通过 `python distribute_tasks.py` 在根目录运行，这部分不是必须的，但这是一个好的实践。
-    import sys
-    from pathlib import Path
-    # 将项目根目录添加到Python路径
-    project_root = Path(__file__).resolve().parent.parent
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
-
-    # 现在可以安全地调用 cli 函数了
-    cli()
+# The cli() function and __main__ block are removed as this file is now a module.
+# If a CLI entry point is still desired, it should be handled in main.py or a dedicated CLI module.

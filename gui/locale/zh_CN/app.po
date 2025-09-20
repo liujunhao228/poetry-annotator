@@ -1,19 +1,18 @@
-# SOME DESCRIPTIVE TITLE.
+# Chinese translations for Poetry Annotator GUI.
 # Copyright (C) YEAR ORGANIZATION
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2025-09-13 18:12+0800\n"
-"PO-Revision-Date: 2025-09-13 18:13+0800\n"
+"POT-Creation-Date: 2025-09-20 11:07+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language-Team: Chinese <zh_CN@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: pygettext.py 1.5\n"
-
 
 #: gui/app.py:34 gui\app.py:34
 msgid "Annotation Statistics"
@@ -21,7 +20,7 @@ msgstr "标注统计"
 
 #: gui/app.py:35 gui/script_panels\distribute_tasks_panel.py:70 gui\app.py:35
 msgid "Distribute Tasks"
-msgstr "分配任务"
+msgstr "任务分配"
 
 #: gui/app.py:36 gui\app.py:36
 msgid "Export Poem Annotations"
@@ -46,19 +45,21 @@ msgid "Edit Global Configuration"
 msgstr "编辑全局配置"
 
 #: gui/config_panels\global_config_panel.py:76
-#: gui/config_panels\project_config_panel.py:91
+#: gui/config_panels\llm_model_config_dialog.py:70
+#: gui/config_panels\project_config_panel.py:163
 msgid "Help"
 msgstr "帮助"
 
 #: gui/config_panels\global_config_panel.py:80
-#: gui/config_panels\llm_config_panel.py:65
-#: gui/config_panels\plugins_config_panel.py:47
-#: gui/config_panels\project_config_panel.py:95
+#: gui/config_panels\llm_config_panel.py:66
+#: gui/config_panels\llm_model_config_dialog.py:74
+#: gui/config_panels\project_config_panel.py:167
 msgid "Save"
 msgstr "保存"
 
 #: gui/config_panels\global_config_panel.py:82
-#: gui/config_panels\project_config_panel.py:97
+#: gui/config_panels\llm_model_config_dialog.py:76
+#: gui/config_panels\project_config_panel.py:169
 msgid "Cancel"
 msgstr "取消"
 
@@ -72,24 +73,27 @@ msgstr "%s："
 
 #: gui/config_panels\global_config_panel.py:115
 msgid "No suitable widget for field '%s' of type %s"
-msgstr "没有适用于类型 %s 字段 '%s' 的小部件"
+msgstr "没有适用于类型 %s 的字段 '%s' 的小部件"
 
 #: gui/config_panels\global_config_panel.py:144
-#: gui/config_panels\project_config_panel.py:160
+#: gui/config_panels\llm_model_config_dialog.py:130
+#: gui/config_panels\project_config_panel.py:265
 msgid "Comma-separated values"
 msgstr "逗号分隔值"
 
 #: gui/config_panels\global_config_panel.py:149
-#: gui/config_panels\project_config_panel.py:165
+#: gui/config_panels\llm_model_config_dialog.py:134
+#: gui/config_panels\project_config_panel.py:270
 msgid "JSON string (e.g., {\"key\": \"value\"})"
-msgstr "JSON 字符串（例如：{\"key\": \"value\"}）"
+msgstr "JSON 字符串（例如，{\"key\": \"value\"}）"
 
 #: gui/config_panels\global_config_panel.py:200
 msgid "Global configuration saved."
 msgstr "全局配置已保存。"
 
 #: gui/config_panels\global_config_panel.py:200
-#: gui/config_panels\project_config_panel.py:245
+#: gui/config_panels\llm_model_config_dialog.py:192
+#: gui/config_panels\project_config_panel.py:592
 msgid "Save Successful"
 msgstr "保存成功"
 
@@ -98,7 +102,8 @@ msgid "Failed to save global configuration. Check logs for details."
 msgstr "保存全局配置失败。请查看日志获取详细信息。"
 
 #: gui/config_panels\global_config_panel.py:204
-#: gui/config_panels\project_config_panel.py:249
+#: gui/config_panels\llm_model_config_dialog.py:196
+#: gui/config_panels\project_config_panel.py:596
 msgid "Save Error"
 msgstr "保存错误"
 
@@ -109,9 +114,12 @@ msgstr "'{}' 在 '{}' 中必须是整数。"
 #: gui/config_panels\global_config_panel.py:306
 #: gui/config_panels\global_config_panel.py:309
 #: gui/config_panels\global_config_panel.py:312
-#: gui/config_panels\project_config_panel.py:351
-#: gui/config_panels\project_config_panel.py:354
-#: gui/config_panels\project_config_panel.py:357
+#: gui/config_panels\llm_model_config_dialog.py:285
+#: gui/config_panels\llm_model_config_dialog.py:288
+#: gui/config_panels\llm_model_config_dialog.py:291
+#: gui/config_panels\project_config_panel.py:731
+#: gui/config_panels\project_config_panel.py:734
+#: gui/config_panels\project_config_panel.py:737
 #: gui/script_panels\annotation_statistics_panel.py:72
 #: gui/script_panels\annotation_statistics_panel.py:75
 #: gui/script_panels\distribute_tasks_panel.py:99
@@ -139,133 +147,234 @@ msgstr "'{}' 在 '{}' 中必须是数字。"
 msgid "'{}' in '{}' must be a valid JSON object."
 msgstr "'{}' 在 '{}' 中必须是有效的 JSON 对象。"
 
-#: gui/config_panels\llm_config_panel.py:17
+#: gui/config_panels\llm_config_panel.py:18
 msgid "LLM Model Configuration"
 msgstr "LLM 模型配置"
 
-#: gui/config_panels\llm_config_panel.py:41
+#: gui/config_panels\llm_config_panel.py:42
 msgid "Add Model"
 msgstr "添加模型"
 
-#: gui/config_panels\llm_config_panel.py:43
-#: gui/config_panels\llm_config_panel.py:121
+#: gui/config_panels\llm_config_panel.py:44
+#: gui/config_panels\llm_config_panel.py:122
 msgid "Remove Model"
 msgstr "移除模型"
 
-#: gui/config_panels\llm_config_panel.py:55
+#: gui/config_panels\llm_config_panel.py:56
 msgid "Model Name:"
 msgstr "模型名称："
 
-#: gui/config_panels\llm_config_panel.py:56
+#: gui/config_panels\llm_config_panel.py:57
 msgid "API Key:"
 msgstr "API 密钥："
 
-#: gui/config_panels\llm_config_panel.py:57
+#: gui/config_panels\llm_config_panel.py:58
 msgid "Base URL:"
-msgstr "基本 URL："
+msgstr "基础 URL："
 
-#: gui/config_panels\llm_config_panel.py:67
-#: gui/config_panels\plugins_config_panel.py:49 gui/help_window.py:35
+#: gui/config_panels\llm_config_panel.py:68 gui/help_window.py:35
 #: gui\help_window.py:35
 msgid "Close"
 msgstr "关闭"
 
-#: gui/config_panels\llm_config_panel.py:122
+#: gui/config_panels\llm_config_panel.py:123
 msgid "Are you sure you want to remove the model '{}'?"
 msgstr "您确定要移除模型 '{}' 吗？"
 
-#: gui/config_panels\llm_config_panel.py:161
-#: gui/config_panels\plugins_config_panel.py:75
+#: gui/config_panels\llm_config_panel.py:162
 msgid "Save Configuration"
 msgstr "保存配置"
 
-#: gui/config_panels\llm_config_panel.py:161
-#: gui/config_panels\plugins_config_panel.py:75 gui/main_window.py:149
-#: gui\main_window.py:149
+#: gui/config_panels\llm_config_panel.py:162 gui/main_window.py:144
+#: gui\main_window.py:144
 msgid "Configuration saved successfully!"
 msgstr "配置保存成功！"
 
-#: gui/config_panels\llm_config_panel.py:164
-#: gui/config_panels\plugins_config_panel.py:78
-msgid "Error"
-msgstr "错误"
-
-#: gui/config_panels\llm_config_panel.py:164
-#: gui/config_panels\plugins_config_panel.py:78
+#: gui/config_panels\llm_config_panel.py:165
 msgid "Failed to save configuration."
 msgstr "保存配置失败。"
 
-#: gui/config_panels\plugins_config_panel.py:23
-msgid "Plugin Configuration"
-msgstr "插件配置"
+#: gui/config_panels\llm_config_panel.py:165
+#: gui/config_panels\project_config_panel.py:389
+msgid "Error"
+msgstr "错误"
 
-#: gui/config_panels\project_config_panel.py:42
-#: gui/config_panels\project_config_panel.py:60
+#: gui/config_panels\llm_model_config_dialog.py:35
+msgid "Edit Model Configuration: {}"
+msgstr "编辑模型配置：{}"
+
+#: gui/config_panels\llm_model_config_dialog.py:50
+msgid "Edit Configuration for Model: {}"
+msgstr "编辑模型配置：{}"
+
+#: gui/config_panels\llm_model_config_dialog.py:91
+#: gui/config_panels\project_config_panel.py:207
+msgid "{}:"
+msgstr "{}："
+
+#: gui/config_panels\llm_model_config_dialog.py:102
+#: gui/config_panels\project_config_panel.py:218
+msgid "No suitable widget for field '{}' of type {}"
+msgstr "没有适用于类型 {} 的字段 '{}' 的小部件"
+
+#: gui/config_panels\llm_model_config_dialog.py:146
+msgid "No configuration found for model '{}' to load."
+msgstr "未找到模型 '{}' 的配置以加载。"
+
+#: gui/config_panels\llm_model_config_dialog.py:192
+msgid "Model configuration saved."
+msgstr "模型配置已保存。"
+
+#: gui/config_panels\llm_model_config_dialog.py:196
+msgid "Failed to save model configuration. Check logs for details."
+msgstr "保存模型配置失败。请查看日志获取详细信息。"
+
+#: gui/config_panels\llm_model_config_dialog.py:285
+msgid "{field_name} must be an integer."
+msgstr "{field_name} 必须是整数。"
+
+#: gui/config_panels\llm_model_config_dialog.py:288
+msgid "{field_name} must be a number."
+msgstr "{field_name} 必须是数字。"
+
+#: gui/config_panels\llm_model_config_dialog.py:291
+msgid "{field_name} must be a valid JSON object."
+msgstr "{field_name} 必须是有效的 JSON 对象。"
+
+#: gui/config_panels\project_config_panel.py:45
+#: gui/config_panels\project_config_panel.py:64
 msgid "Edit Project Configuration"
 msgstr "编辑项目配置"
 
-#: gui/config_panels\project_config_panel.py:68
+#: gui/config_panels\project_config_panel.py:72
 msgid "Active Project:"
 msgstr "当前项目："
 
-#: gui/config_panels\project_config_panel.py:115
+#: gui/config_panels\project_config_panel.py:188
+msgid "<b>Plugin Settings</b>"
+msgstr "<b>插件设置</b>"
+
+#: gui/config_panels\project_config_panel.py:195
+msgid "<b>Project LLM Models</b>"
+msgstr "<b>项目 LLM 模型</b>"
+
+#: gui/config_panels\project_config_panel.py:202
 msgid "<b>{} Settings</b>"
 msgstr "<b>{} 设置</b>"
 
-#: gui/config_panels\project_config_panel.py:120
-msgid "{}:"
-msgstr "{}:"
+#: gui/config_panels\project_config_panel.py:242
+#: gui/script_panels\annotation_statistics_panel.py:44
+#: gui/script_panels\distribute_tasks_panel.py:46
+#: gui/script_panels\distribute_tasks_panel.py:56
+#: gui/script_panels\export_poem_annotations_panel.py:45
+#: gui/script_panels\find_duplicate_poems_panel.py:45
+#: gui/script_panels\proofread_annotations_panel.py:45
+#: gui/script_panels\random_sample_panel.py:51
+msgid "Browse..."
+msgstr "浏览..."
 
-#: gui/config_panels\project_config_panel.py:131
-msgid "No suitable widget for field '{}' of type {}"
-msgstr "没有适用于类型 {} 字段 '{}' 的小部件"
+#: gui/config_panels\project_config_panel.py:282 gui\script_panel_base.py:103
+msgid "Select Directory"
+msgstr "选择目录"
 
-#: gui/config_panels\project_config_panel.py:181
+#: gui/config_panels\project_config_panel.py:284 gui\script_panel_base.py:96
+msgid "Select File"
+msgstr "选择文件"
+
+#: gui/config_panels\project_config_panel.py:308
+msgid "Available Models"
+msgstr "可用模型"
+
+#: gui/config_panels\project_config_panel.py:318
+msgid "Create New Model Configuration"
+msgstr "创建新模型配置"
+
+#: gui/config_panels\project_config_panel.py:348
+msgid "Project's Active Models"
+msgstr "项目活动模型"
+
+#: gui/config_panels\project_config_panel.py:366
+msgid "Create New Model"
+msgstr "创建新模型"
+
+#: gui/config_panels\project_config_panel.py:366
+msgid "Enter a name for the new model:"
+msgstr "输入新模型的名称："
+
+#: gui/config_panels\project_config_panel.py:370
+msgid "Invalid Name"
+msgstr "无效名称"
+
+#: gui/config_panels\project_config_panel.py:370
+msgid "Model name cannot be empty."
+msgstr "模型名称不能为空。"
+
+#: gui/config_panels\project_config_panel.py:375
+msgid "A model with the name '{}' already exists. Please choose a different name."
+msgstr "名称为 '{}' 的模型已存在。请选择其他名称。"
+
+#: gui/config_panels\project_config_panel.py:375
+msgid "Duplicate Name"
+msgstr "重复名称"
+
+#: gui/config_panels\project_config_panel.py:385
+msgid "Model Created"
+msgstr "模型已创建"
+
+#: gui/config_panels\project_config_panel.py:385
+msgid "New model configuration '{}' created. You can now edit its settings."
+msgstr "新模型配置 '{}' 已创建。您现在可以编辑其设置。"
+
+#: gui/config_panels\project_config_panel.py:389
+msgid "Failed to create new model configuration."
+msgstr "创建新模型配置失败。"
+
+#: gui/config_panels\project_config_panel.py:504
 msgid "Project Switched"
 msgstr "项目已切换"
 
-#: gui/config_panels\project_config_panel.py:181
-#: gui/config_panels\project_config_panel.py:182 gui/main_window.py:154
-#: gui\main_window.py:154
+#: gui/config_panels\project_config_panel.py:504
+#: gui/config_panels\project_config_panel.py:505 gui/main_window.py:149
+#: gui\main_window.py:149
 msgid "Switched to project: {}"
 msgstr "已切换到项目：{}"
 
-#: gui/config_panels\project_config_panel.py:184
+#: gui/config_panels\project_config_panel.py:507
 msgid "Project Switch Error"
 msgstr "项目切换错误"
 
-#: gui/config_panels\project_config_panel.py:184
-#: gui/config_panels\project_config_panel.py:186
+#: gui/config_panels\project_config_panel.py:507
+#: gui/config_panels\project_config_panel.py:509
 msgid "Failed to switch to project: {}"
 msgstr "切换到项目失败：{}"
 
-#: gui/config_panels\project_config_panel.py:196
+#: gui/config_panels\project_config_panel.py:522
 msgid "No project configuration found to load."
 msgstr "未找到要加载的项目配置。"
 
-#: gui/config_panels\project_config_panel.py:245
+#: gui/config_panels\project_config_panel.py:592
 msgid "Project configuration saved."
 msgstr "项目配置已保存。"
 
-#: gui/config_panels\project_config_panel.py:249
+#: gui/config_panels\project_config_panel.py:596
 msgid "Failed to save project configuration. Check logs for details."
 msgstr "保存项目配置失败。请查看日志获取详细信息。"
 
-#: gui/config_panels\project_config_panel.py:351
+#: gui/config_panels\project_config_panel.py:731
 msgid "{field_name} in {section_name} must be an integer."
-msgstr "{field_name} 在 {section_name} 中必须是整数。"
+msgstr "{section_name} 中的 {field_name} 必须是整数。"
 
-#: gui/config_panels\project_config_panel.py:354
+#: gui/config_panels\project_config_panel.py:734
 msgid "{field_name} in {section_name} must be a number."
-msgstr "{field_name} 在 {section_name} 中必须是数字。"
+msgstr "{section_name} 中的 {field_name} 必须是数字。"
 
-#: gui/config_panels\project_config_panel.py:357
+#: gui/config_panels\project_config_panel.py:737
 msgid "{field_name} in {section_name} must be a valid JSON object."
-msgstr "{field_name} 在 {section_name} 中必须是有效的 JSON 对象。"
+msgstr "{section_name} 中的 {field_name} 必须是有效的 JSON 对象。"
 
 #: gui/help_texts.py:8 gui\help_texts.py:8
 msgid "The LLM service to use (e.g., 'openai', 'gemini')."
-msgstr "要使用的 LLM 服务（例如：'openai'、'gemini'）。"
+msgstr "要使用的 LLM 服务（例如，'openai'，'gemini'）。"
 
 #: gui/help_texts.py:9 gui\help_texts.py:9
 msgid "The specific model name to use for the selected service."
@@ -277,11 +386,11 @@ msgstr "您所选 LLM 服务的 API 密钥。"
 
 #: gui/help_texts.py:11 gui\help_texts.py:11
 msgid "The base URL for the API, if not using the default."
-msgstr "API 的基本 URL，如果未使用默认值。"
+msgstr "API 的基础 URL，如果未使用默认值。"
 
 #: gui/help_texts.py:12 gui\help_texts.py:12
 msgid "The type of database to use (e.g., 'sqlite')."
-msgstr "要使用的数据库类型（例如：'sqlite'）。"
+msgstr "要使用的数据库类型（例如，'sqlite'）。"
 
 #: gui/help_texts.py:13 gui\help_texts.py:13
 msgid "The file path for the database."
@@ -305,7 +414,7 @@ msgstr "包含提示模板的目录。"
 
 #: gui/help_texts.py:18 gui\help_texts.py:18
 msgid "The logging level (e.g., 'INFO', 'DEBUG')."
-msgstr "日志记录级别（例如：'INFO'、'DEBUG'）。"
+msgstr "日志级别（例如，'INFO'，'DEBUG'）。"
 
 #: gui/help_texts.py:19 gui\help_texts.py:19
 msgid "The file path for the log file."
@@ -321,7 +430,7 @@ msgstr "覆盖此项目的全局 LLM 模型。"
 
 #: gui/help_texts.py:24 gui\help_texts.py:24
 msgid "Manage individual LLM model configurations, including API keys and base URLs."
-msgstr "管理各个 LLM 模型的配置，包括 API 密钥和基本 URL。"
+msgstr "管理单个 LLM 模型配置，包括 API 密钥和基础 URL。"
 
 #: gui/help_texts.py:25 gui\help_texts.py:25
 msgid "Override the global API key for this project."
@@ -329,7 +438,7 @@ msgstr "覆盖此项目的全局 API 密钥。"
 
 #: gui/help_texts.py:26 gui\help_texts.py:26
 msgid "Override the global base URL for this project."
-msgstr "覆盖此项目的全局基本 URL。"
+msgstr "覆盖此项目的全局基础 URL。"
 
 #: gui/help_texts.py:27 gui\help_texts.py:27
 msgid "Override the global database type for this project."
@@ -357,7 +466,7 @@ msgstr "覆盖此项目的全局提示模板目录。"
 
 #: gui/help_texts.py:33 gui\help_texts.py:33
 msgid "Override the global logging level for this project."
-msgstr "覆盖此项目的全局日志记录级别。"
+msgstr "覆盖此项目的全局日志级别。"
 
 #: gui/help_texts.py:34 gui\help_texts.py:34
 msgid "Override the global log file for this project."
@@ -365,7 +474,7 @@ msgstr "覆盖此项目的全局日志文件。"
 
 #: gui/help_texts.py:35 gui\help_texts.py:35
 msgid "Enable or disable plugins for the current project."
-msgstr "为此项目启用或禁用插件。"
+msgstr "启用或禁用当前项目的插件。"
 
 #: gui/help_window.py:16 gui\help_window.py:16
 msgid "Configuration Help"
@@ -375,91 +484,83 @@ msgstr "配置帮助"
 msgid "Configuration Options"
 msgstr "配置选项"
 
-#: gui/main_window.py:26 gui\main_window.py:26
+#: gui/main_window.py:25 gui\main_window.py:25
 msgid "Poetry Annotator GUI"
 msgstr "诗歌标注器 GUI"
 
-#: gui/main_window.py:58 gui\main_window.py:58
+#: gui/main_window.py:57 gui\main_window.py:57
 msgid "Ready"
 msgstr "就绪"
 
-#: gui/main_window.py:76 gui\main_window.py:76
+#: gui/main_window.py:75 gui\main_window.py:75
 msgid "&File"
 msgstr "文件(&F)"
 
-#: gui/main_window.py:77 gui\main_window.py:77
+#: gui/main_window.py:76 gui\main_window.py:76
 msgid "E&xit"
 msgstr "退出(&X)"
 
-#: gui/main_window.py:79 gui\main_window.py:79
+#: gui/main_window.py:78 gui\main_window.py:78
 msgid "Exit application"
 msgstr "退出应用程序"
 
-#: gui/main_window.py:84 gui\main_window.py:84
+#: gui/main_window.py:83 gui\main_window.py:83
 msgid "&Settings"
 msgstr "设置(&S)"
 
-#: gui/main_window.py:86 gui\main_window.py:86
+#: gui/main_window.py:85 gui\main_window.py:85
 msgid "Edit &Global Configuration"
 msgstr "编辑全局配置(&G)"
 
-#: gui/main_window.py:90 gui\main_window.py:90
+#: gui/main_window.py:89 gui\main_window.py:89
 msgid "Edit &Project Configuration"
 msgstr "编辑项目配置(&P)"
 
-#: gui/main_window.py:94 gui\main_window.py:94
+#: gui/main_window.py:93 gui\main_window.py:93
 msgid "Edit &LLM Configuration"
-msgstr "编辑 &LLM 配置"
+msgstr "编辑 LLM 配置(&L)"
 
 #: gui/main_window.py:98 gui\main_window.py:98
-msgid "Edit &Plugins Configuration"
-msgstr "编辑 &插件配置"
-
-#: gui/main_window.py:103 gui\main_window.py:103
 msgid "&Help"
 msgstr "帮助(&H)"
 
-#: gui/main_window.py:104 gui\main_window.py:104
+#: gui/main_window.py:99 gui\main_window.py:99
 msgid "&About"
 msgstr "关于(&A)"
 
-#: gui/main_window.py:117 gui\main_window.py:117
+#: gui/main_window.py:112 gui\main_window.py:112
 msgid "GUI application started."
 msgstr "GUI 应用程序已启动。"
 
-#: gui/main_window.py:130 gui\main_window.py:130
+#: gui/main_window.py:125 gui\main_window.py:125
 msgid "Added script panel: {}"
 msgstr "已添加脚本面板：{}"
 
-#: gui/main_window.py:137 gui\main_window.py:137
+#: gui/main_window.py:132 gui\main_window.py:132
 msgid "Global configuration panel opened."
 msgstr "全局配置面板已打开。"
 
-#: gui/main_window.py:145 gui\main_window.py:145
+#: gui/main_window.py:140 gui\main_window.py:140
 msgid "Project configuration panel opened."
 msgstr "项目配置面板已打开。"
 
-#: gui/main_window.py:150 gui\main_window.py:150
+#: gui/main_window.py:145 gui\main_window.py:145
 msgid "Configuration saved signal received."
-msgstr "已收到配置保存信号。"
+msgstr "已接收到配置保存信号。"
 
-#: gui/main_window.py:155 gui\main_window.py:155
+#: gui/main_window.py:150 gui\main_window.py:150
 msgid "Project switched to: {}"
 msgstr "项目已切换到：{}"
 
-#: gui/main_window.py:161 gui\main_window.py:161
+#: gui/main_window.py:156 gui\main_window.py:156
 msgid "LLM configuration panel opened."
 msgstr "LLM 配置面板已打开。"
 
-#: gui/main_window.py:167 gui\main_window.py:167
-msgid "Plugins configuration panel opened."
-msgstr "插件配置面板已打开。"
-
-#: gui/main_window.py:171 gui\main_window.py:171
+#: gui/main_window.py:160 gui\main_window.py:160
 msgid "About Poetry Annotator GUI"
 msgstr "关于诗歌标注器 GUI"
 
-#: gui/main_window.py:172 gui\main_window.py:172
+#: gui/main_window.py:161 gui\main_window.py:161
 msgid ""
 "Poetry Annotator GUI\n"
 "\n"
@@ -473,11 +574,11 @@ msgstr ""
 "\n"
 "一个用于管理诗歌标注任务的图形用户界面。"
 
-#: gui/main_window.py:174 gui\main_window.py:174
+#: gui/main_window.py:163 gui\main_window.py:163
 msgid "Displayed about dialog."
 msgstr "已显示关于对话框。"
 
-#: gui/main_window.py:180 gui\main_window.py:180
+#: gui/main_window.py:169 gui\main_window.py:169
 msgid "GUI application closing."
 msgstr "GUI 应用程序正在关闭。"
 
@@ -494,10 +595,10 @@ msgstr "脚本输出将显示在此处..."
 #: gui/script_panels\distribute_tasks_panel.py:39
 #: gui/script_panels\export_poem_annotations_panel.py:38
 #: gui/script_panels\find_duplicate_poems_panel.py:38
-#: gui/script_panels\proofread_annotations_panel.py:38
+#: gui/script_panels\proofread_annotations_panel.py:39
 #: gui/script_panels\random_sample_panel.py:44
 msgid "Enter database name (e.g., default)"
-msgstr "输入数据库名称（例如：default）"
+msgstr "输入数据库名称（例如，default）"
 
 #: gui/script_panels\annotation_statistics_panel.py:38
 #: gui/script_panels\distribute_tasks_panel.py:40
@@ -512,16 +613,6 @@ msgstr "数据库名称："
 #: gui/script_panels\export_poem_annotations_panel.py:44
 msgid "Select output file path"
 msgstr "选择输出文件路径"
-
-#: gui/script_panels\annotation_statistics_panel.py:44
-#: gui/script_panels\distribute_tasks_panel.py:46
-#: gui/script_panels\distribute_tasks_panel.py:56
-#: gui/script_panels\export_poem_annotations_panel.py:45
-#: gui/script_panels\find_duplicate_poems_panel.py:45
-#: gui/script_panels\proofread_annotations_panel.py:45
-#: gui/script_panels\random_sample_panel.py:51
-msgid "Browse..."
-msgstr "浏览..."
 
 #: gui/script_panels\annotation_statistics_panel.py:48
 #: gui/script_panels\export_poem_annotations_panel.py:49
@@ -557,7 +648,7 @@ msgid "Select Output File"
 msgstr "选择输出文件"
 
 #: gui/script_panels\annotation_statistics_panel.py:72
-#: gui/script_panels\distribute_tasks_panel.py:99
+#: gui/script_panels\distribute_tasks_panel. 后缀.py:99
 #: gui/script_panels\export_poem_annotations_panel.py:89
 #: gui/script_panels\find_duplicate_poems_panel.py:73
 #: gui/script_panels\proofread_annotations_panel.py:73
@@ -647,7 +738,7 @@ msgstr "脚本 '{}' 已完成 {}。"
 
 #: gui/script_panels\distribute_tasks_panel.py:45
 msgid "Select input file (e.g., list of poems)"
-msgstr "选择输入文件（例如：诗歌列表）"
+msgstr "选择输入文件（例如，诗歌列表）"
 
 #: gui/script_panels\distribute_tasks_panel.py:50
 msgid "Input File:"
@@ -778,11 +869,11 @@ msgstr "重试延迟"
 
 #: gui\i18n_config.py:12
 msgid "Breaker Fail Max"
-msgstr "熔断器最大失败次数"
+msgstr "断路器最大失败次数"
 
 #: gui\i18n_config.py:13
 msgid "Breaker Reset Timeout"
-msgstr "熔断器重置超时"
+msgstr "断路器重置超时"
 
 #: gui\i18n_config.py:14
 msgid "Save Full Response"
@@ -826,7 +917,7 @@ msgstr "备份数量"
 
 #: gui\i18n_config.py:34
 msgid "Quiet Third Party"
-msgstr "静默第三方库"
+msgstr "静默第三方"
 
 #: gui\i18n_config.py:37
 msgid "Enable Custom Download"
@@ -842,7 +933,7 @@ msgstr "MD 路径"
 
 #: gui\i18n_config.py:44
 msgid "Provider"
-msgstr "提供商"
+msgstr "提供者"
 
 #: gui\i18n_config.py:45
 msgid "Model Name"
@@ -854,7 +945,7 @@ msgstr "API 密钥"
 
 #: gui\i18n_config.py:47
 msgid "Base URL"
-msgstr "基本 URL"
+msgstr "基础 URL"
 
 #: gui\i18n_config.py:48
 msgid "Request Delay"
@@ -901,56 +992,48 @@ msgid "Model Names"
 msgstr "模型名称"
 
 #: gui\i18n_config.py:71
-msgid "Enabled Plugins"
-msgstr "启用的插件"
+msgid "LLM"
+msgstr "LLM"
 
 #: gui\i18n_config.py:72
-msgid "Plugin Paths"
-msgstr "插件路径"
-
-#: gui\i18n_config.py:75
-msgid "LLM"
-msgstr "大语言模型"
-
-#: gui\i18n_config.py:76
 msgid "Database"
 msgstr "数据库"
 
-#: gui\i18n_config.py:77
+#: gui\i18n_config.py:73
 msgid "Data Path"
 msgstr "数据路径"
 
-#: gui\i18n_config.py:78
+#: gui\i18n_config.py:74
 msgid "Prompt"
 msgstr "提示"
 
-#: gui\i18n_config.py:79
+#: gui\i18n_config.py:75
 msgid "Logging"
-msgstr "日志"
+msgstr "日志记录"
 
-#: gui\i18n_config.py:80
+#: gui\i18n_config.py:76
 msgid "Visualizer"
 msgstr "可视化工具"
 
-#: gui\i18n_config.py:81
+#: gui\i18n_config.py:77
 msgid "Categories"
 msgstr "类别"
 
-#: gui\i18n_config.py:82
+#: gui\i18n_config.py:78
 msgid "Model Template"
 msgstr "模型模板"
 
-#: gui\i18n_config.py:83
+#: gui\i18n_config.py:79
 msgid "Model"
 msgstr "模型"
 
-#: gui\i18n_config.py:84
+#: gui\i18n_config.py:80
 msgid "Plugins"
 msgstr "插件"
 
 #: gui\script_panel_base.py:62
 msgid "A script is already running. Please wait for it to finish."
-msgstr "脚本正在运行中。请等待其完成。"
+msgstr "一个脚本正在运行。请等待其完成。"
 
 #: gui\script_panel_base.py:62
 msgid "Script Running"
@@ -971,11 +1054,3 @@ msgstr "脚本错误"
 #: gui\script_panel_base.py:83
 msgid "{} failed: {}"
 msgstr "{} 失败：{}"
-
-#: gui\script_panel_base.py:96
-msgid "Select File"
-msgstr "选择文件"
-
-#: gui\script_panel_base.py:103
-msgid "Select Directory"
-msgstr "选择目录"

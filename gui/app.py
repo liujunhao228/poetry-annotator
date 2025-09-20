@@ -38,6 +38,9 @@ def main():
     main_window.add_script_panel(ProofreadAnnotationsPanel(), _("Proofread Annotations"))
     main_window.add_script_panel(RandomSamplePanel(), _("Random Sample"))
 
+    # After all panels are added, trigger the initial configuration update
+    main_window._update_panels_with_project_config()
+
     main_window.show()
     sys.exit(app.exec_())
 

@@ -59,7 +59,6 @@ CONFIG_KEY_MAP = {
     # ProjectDataPathConfig
     # "config_name" is already defined
     "source_dir": _("Source Directory"),
-    "output_dir": _("Output Directory"),
 
     # ProjectPromptConfig
     # "config_name" is already defined
@@ -67,10 +66,6 @@ CONFIG_KEY_MAP = {
     # ProjectModelConfig
     "model_names": _("Model Names"),
 
-    # ProjectPluginsConfig
-    "enabled_plugins": _("Enabled Plugins"),
-    "plugin_paths": _("Plugin Paths"),
-    
     # Sections
     "llm": _("LLM"),
     "database": _("Database"),

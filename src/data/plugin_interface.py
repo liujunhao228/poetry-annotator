@@ -7,14 +7,15 @@ from typing import List, Dict, Any, Optional
 import pandas as pd
 from src.config.schema import PluginConfig
 from src.data.separate_databases import SeparateDatabaseManager
+from src.plugin_system.base import ComponentType
 
 
 class QueryPlugin(ABC):
     """查询插件抽象基类"""
     
-    def __init__(self, config: Optional[PluginConfig] = None, 
+    def __init__(self, plugin_config: Optional[PluginConfig] = None, 
                  separate_db_manager: Optional[SeparateDatabaseManager] = None):
-        self.config = config or PluginConfig()
+        self.plugin_config = plugin_config or PluginConfig()
         self.separate_db_manager = separate_db_manager
     
     @abstractmethod
@@ -80,14 +81,15 @@ class QueryPluginManager:
         
         project_plugins_config = self.config_manager.get_project_plugins_config()
         
-        # 遍历启用的插件列表，尝试加载每个插件
-        for plugin_name in project_plugins_config.enabled_plugins:
+        # 遍历所有插件配置，尝试加载启用的插件
+        for plugin_name, plugin_config in project_plugins_config.plugins.items():
             try:
-                # 获取插件配置
-                plugin_config = self.config_manager.get_plugin_config(plugin_name)
-                
                 # 如果插件被禁用，跳过
                 if not plugin_config.enabled:
+                    continue
+                
+                # 检查插件类型，确保只加载查询插件
+                if plugin_config.settings.get('type') != ComponentType.DATA_QUERY.value:
                     continue
                 
                 # 尝试导入并实例化插件
@@ -101,7 +103,7 @@ class QueryPluginManager:
                 plugin_class = getattr(plugin_module, plugin_class_name)
                 
                 # 实例化插件并传入配置和分离数据库管理器
-                plugin_instance = plugin_class(config=plugin_config, separate_db_manager=self.separate_db_manager)
+                plugin_instance = plugin_class(plugin_config=plugin_config, separate_db_manager=self.separate_db_manager)
                 self.register_plugin(plugin_instance)
                 
             except Exception as e:

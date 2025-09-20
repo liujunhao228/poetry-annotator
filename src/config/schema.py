@@ -69,31 +69,6 @@ class GlobalCategoriesConfig:
     xml_path: str = ""
     md_path: str = ""
 
-
-@dataclass
-class PluginConfig:
-    """插件配置"""
-    enabled: bool = True
-    path: str = ""
-    module: str = ""
-    class_name: str = ""
-    # 插件特定配置项将通过字典方式访问
-    settings: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class PluginConfig:
-    """插件配置"""
-    enabled: bool = True
-    path: str = ""
-    module: str = ""
-    class_name: str = ""
-    # 插件特定配置项将通过字典方式访问
-    settings: Dict[str, Any] = field(default_factory=dict)
-
-
-
-
 @dataclass
 class PluginConfig:
     """插件配置"""
@@ -167,8 +142,7 @@ class ProjectModelConfig:
 @dataclass
 class ProjectPluginsConfig:
     """项目插件配置"""
-    enabled_plugins: List[str] = field(default_factory=list)
-    plugin_paths: List[str] = field(default_factory=list)
+    plugins: Dict[str, PluginConfig] = field(default_factory=dict)
 
 # --- 主配置类 ---
 

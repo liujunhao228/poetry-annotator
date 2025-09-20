@@ -2,10 +2,11 @@
 # Manages GUI-specific configuration logic, interacting with backend configuration systems.
 
 import logging
+import os
 from typing import Dict, Any, Optional, List
 from src.config.manager import get_config_manager, ConfigManager as BackendConfigManager
 from src.config.schema import GlobalConfig, ProjectConfig # Assuming these are needed for type hinting or direct manipulation
-
+from src.config.model_manager import ModelManager
 class ConfigHandler:
     """
     Handles GUI-specific configuration logic, acting as an interface
@@ -69,9 +70,16 @@ class ConfigHandler:
                 for section_name, section_data in config_data.items():
                     if hasattr(current_project_config, section_name):
                         section_obj = getattr(current_project_config, section_name)
-                        for key, value in section_data.items():
-                            if hasattr(section_obj, key):
-                                setattr(section_obj, key, value)
+                        if section_name == 'plugins':
+                            # Special handling for ProjectPluginsConfig
+                            section_obj.plugins = section_data.plugins
+                        elif section_name == 'model':
+                            # Special handling for ProjectModelConfig
+                            section_obj.model_names = section_data.model_names
+                        else:
+                            for key, value in section_data.items():
+                                if hasattr(section_obj, key):
+                                    setattr(section_obj, key, value)
                 self._backend_config_manager.save_project_config()
                 logging.info("Project configuration saved successfully.")
                 return True
@@ -125,43 +133,54 @@ class ConfigHandler:
             logging.error(f"Failed to save LLM models configuration: {e}")
             return False
 
-    def get_plugins_config(self) -> Dict[str, Any]:
+    def list_all_model_names(self) -> List[str]:
         """
-        Retrieves the project's plugin configuration.
+        Lists all available model configuration names from the ModelManager.
         """
-        plugins = {}
-        if self.get_project_config():
-            config = self._backend_config_manager.project_plugin_loader.project_plugins_ini_path
-            import configparser
-            parser = configparser.ConfigParser()
-            parser.read(config, encoding='utf-8')
-            for section in parser.sections():
-                if section.startswith("Plugin."):
-                    plugin_name = section[len("Plugin."):]
-                    plugins[plugin_name] = dict(parser.items(section))
-        return plugins
+        return self._backend_config_manager.model_manager.list_model_configs()
 
-    def save_plugins_config(self, plugins_data: Dict[str, Any]):
+    def get_single_model_config(self, model_name: str) -> Dict[str, Any]:
         """
-        Saves the project's plugin configuration.
+        Retrieves the detailed configuration for a single model from the ModelManager.
+        """
+        return self._backend_config_manager.model_manager.get_model_config(model_name)
+
+    def save_single_model_config(self, model_name: str, config_data: Dict[str, Any]) -> bool:
+        """
+        Saves or updates the configuration for a single model using the ModelManager.
         """
         try:
-            config_path = self._backend_config_manager.project_plugin_loader.project_plugins_ini_path
-            import configparser
-            parser = configparser.ConfigParser()
-            parser.read(config_path, encoding='utf-8')
-            for plugin_name, plugin_config in plugins_data.items():
-                section_name = f"Plugin.{plugin_name}"
-                if not parser.has_section(section_name):
-                    parser.add_section(section_name)
-                for key, value in plugin_config.items():
-                    parser.set(section_name, key, str(value))
-            
-            with open(config_path, 'w', encoding='utf-8') as configfile:
-                parser.write(configfile)
-
-            logging.info("Plugins configuration saved successfully.")
+            self._backend_config_manager.model_manager.add_model_section(model_name, config_data)
+            logging.info(f"Model configuration for '{model_name}' saved successfully.")
             return True
         except Exception as e:
-            logging.error(f"Failed to save plugins configuration: {e}")
+            logging.error(f"Failed to save model configuration for '{model_name}': {e}")
             return False
+
+    def delete_single_model_config(self, model_name: str) -> bool:
+        """
+        Deletes a single model configuration using the ModelManager.
+        """
+        try:
+            self._backend_config_manager.model_manager.remove_model_section(model_name)
+            logging.info(f"Model configuration for '{model_name}' deleted successfully.")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to delete model configuration for '{model_name}': {e}")
+            return False
+
+    def get_plugins_config(self):
+        """
+        Retrieves the project plugins configuration.
+        """
+        return self._backend_config_manager.get_project_plugins_config()
+
+    def get_database_name(self) -> Optional[str]:
+        """
+        Extracts the database name from the project's output_dir path.
+        """
+        project_config = self.get_project_config()
+        if project_config and project_config.data_path and project_config.data_path.output_dir:
+            # e.g., "data/SocialPoemAnalysis" -> "SocialPoemAnalysis"
+            return os.path.basename(project_config.data_path.output_dir)
+        return None

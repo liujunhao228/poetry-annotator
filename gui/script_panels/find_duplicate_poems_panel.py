@@ -115,3 +115,11 @@ class FindDuplicatePoemsPanel(ScriptPanelBase):
         self.script_output_display.append(_("--- {} Finished {} ---").format(script_name, status))
         self.run_button.setEnabled(True) # Re-enable button
         logging.info(_("Script '{}' finished {}.").format(script_name, status))
+
+    def update_database_name(self, db_name: str):
+        """
+        Updates the database name input field and sets it to read-only.
+        """
+        if db_name:
+            self.db_name_input.setText(db_name)
+            self.db_name_input.setReadOnly(True)

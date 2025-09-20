@@ -15,32 +15,81 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 
+from src.task_distribution.manager import run_distribution_task # Import the new function
+
 def run_cli_mode(unknown_args):
     """运行CLI模式"""
-    import subprocess
-    # 检查是否处于 dry-run 模式
-    is_dry_run = '--dry-run' in unknown_args
+    # 解析 unknown_args 为 run_distribution_task 的参数
+    # 注意：这里需要将命令行参数转换为函数参数
+    # 这是一个简化的示例，实际应用中可能需要更复杂的参数解析逻辑
+    
+    # 默认参数值
+    params = {
+        "selected_models": [],
+        "id_file": None,
+        "id_dir": None,
+        "force_rerun": False,
+        "chunk_size": 1000,
+        "fresh_start": False,
+        "db_name": "",
+        "console_log_level": None,
+        "file_log_level": None,
+        "enable_file_log": None,
+        "dry_run": False,
+        "full_dry_run": False,
+    }
 
-    # 定位 distribute_tasks.py 脚本
-    distribute_script_path = project_root / "scripts" / "distribute_tasks.py"
-    if not distribute_script_path.exists():
-        print(f"错误: 核心任务脚本未找到: {distribute_script_path}")
-        sys.exit(1)
+    i = 0
+    while i < len(unknown_args):
+        arg = unknown_args[i]
+        if arg == '--selected-models' or arg == '-m':
+            i += 1
+            while i < len(unknown_args) and not unknown_args[i].startswith('-'):
+                params["selected_models"].append(unknown_args[i])
+                i += 1
+            i -= 1 # Adjust index for next loop iteration
+        elif arg == '--id-file' or arg == '-f':
+            params["id_file"] = unknown_args[i+1]
+            i += 1
+        elif arg == '--id-dir' or arg == '-d':
+            params["id_dir"] = unknown_args[i+1]
+            i += 1
+        elif arg == '--force-rerun' or arg == '-r':
+            params["force_rerun"] = True
+        elif arg == '--chunk-size' or arg == '-c':
+            params["chunk_size"] = int(unknown_args[i+1])
+            i += 1
+        elif arg == '--fresh-start' or arg == '-s':
+            params["fresh_start"] = True
+        elif arg == '--db':
+            params["db_name"] = unknown_args[i+1]
+            i += 1
+        elif arg == '--console-log-level':
+            params["console_log_level"] = unknown_args[i+1]
+            i += 1
+        elif arg == '--file-log-level':
+            params["file_log_level"] = unknown_args[i+1]
+            i += 1
+        elif arg == '--enable-file-log':
+            params["enable_file_log"] = True
+        elif arg == '--dry-run':
+            params["dry_run"] = True
+        elif arg == '--full-dry-run':
+            params["full_dry_run"] = True
+        i += 1
 
-    # 构建传递给子进程的命令
-    command = [sys.executable, str(distribute_script_path)]
-    # 传递所有未知参数
-    command.extend(unknown_args)
+    print(f"正在以CLI模式执行任务函数: run_distribution_task，参数: {params}")
 
-    print(f"正在以CLI模式执行任务脚本: {' '.join(command)}")
-
-    # 使用 subprocess 代替 os.system，实时输出日志
     try:
-        result = subprocess.run(command, check=False)
-        if result.returncode != 0:
-            print(f"CLI任务脚本执行失败，退出码: {result.returncode}")
+        result = run_distribution_task(**params)
+        if result.get("status") == "completed_with_errors":
+            print(f"CLI任务函数执行失败，错误: {result.get('errors')}")
+            sys.exit(1)
+        else:
+            print("CLI任务函数执行成功。")
     except Exception as e:
-        print(f"运行CLI任务脚本时发生异常: {e}")
+        print(f"运行CLI任务函数时发生异常: {e}")
+        sys.exit(1)
 
 
 def run_init_db_mode():
@@ -98,14 +147,16 @@ def run_init_db_mode():
 
 def run_gui_mode():
     """运行GUI模式"""
-    # 启动GUI模式 (使用scripts/gui_launcher.py)
-    gui_script_path = project_root / "scripts" / "gui_launcher.py"
-    if gui_script_path.exists():
-        # 直接运行GUI脚本
-        os.system(f"{sys.executable} {gui_script_path}")
-    else:
-        print("错误: 找不到GUI启动器脚本 (scripts/gui_launcher.py)")
+    try:
+        # 直接导入并运行GUI应用
+        from gui.app import main as gui_main
+        gui_main()
+    except ImportError as e:
+        print(f"错误: 无法导入GUI模块 - {e}")
         print("请确保GUI模块已正确安装。")
+        sys.exit(1)
+    except Exception as e:
+        print(f"错误: 启动GUI模式时出现问题 - {e}")
         sys.exit(1)
 
 

@@ -53,12 +53,9 @@ class DirectPluginLoader:
             logger.warning(f"Failed to get project plugin config: {e}")
             return
         
-        # 遍历启用的插件列表
-        for plugin_name in project_plugins_config.enabled_plugins:
+        # 遍历所有插件配置
+        for plugin_name, plugin_config in project_plugins_config.plugins.items():
             try:
-                # 获取插件配置
-                plugin_config = config_manager.get_plugin_config(plugin_name)
-                
                 # 如果插件被禁用，跳过
                 if not plugin_config.enabled:
                     logger.debug(f"Plugin '{plugin_name}' is disabled, skipping")

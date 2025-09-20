@@ -4,6 +4,7 @@
 
 import json
 import logging
+import asyncio # 导入 asyncio
 from typing import Tuple, Dict, Any, List, Optional, Set
 import pandas as pd
 
@@ -589,9 +590,9 @@ class SocialPoemAnalysisPlugin(BasePlugin):
         logger.info(f"诗词插入完成，成功插入 {inserted_count} 首诗词")
         return inserted_count
     
-    def save_annotation(self, poem_id: int, model_identifier: str, status: str,
-                       annotation_result: Optional[str] = None, 
-                       error_message: Optional[str] = None) -> bool:
+    async def save_annotation(self, poem_id: int, model_identifier: str, status: str,
+                              annotation_result: Optional[str] = None, 
+                              error_message: Optional[str] = None) -> bool:
         """保存标注结果到annotations表 (UPSERT)，时间戳带时区"""
         logger.debug(f"保存标注结果 - 诗词ID: {poem_id}, 模型: {model_identifier}, 状态: {status}")
         
@@ -602,30 +603,31 @@ class SocialPoemAnalysisPlugin(BasePlugin):
         tz = timezone(timedelta(hours=8))
         now = datetime.now(tz).isoformat()
 
-        # 使用上下文管理器确保连接正确处理
-        with self.separate_db_manager.annotation_db.get_connection() as conn:
-            cursor = conn.cursor()
-            
-            try:
-                cursor.execute('''
-                    INSERT INTO annotations (poem_id, model_identifier, status, annotation_result, error_message, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(poem_id, model_identifier) DO UPDATE SET
-                        status = excluded.status,
-                        annotation_result = excluded.annotation_result,
-                        error_message = excluded.error_message,
-                        updated_at = excluded.updated_at
-                ''', (poem_id, model_identifier, status, annotation_result, error_message, now, now))
-
-                conn.commit()
-                success = cursor.rowcount > 0
-                if success:
-                    logger.debug(f"标注结果保存成功 - 诗词ID: {poem_id}, 模型: {model_identifier}")
-                return success
-            except Exception as e:
-                logger.error(f"保存标注结果失败 - 诗词ID: {poem_id}, 模型: {model_identifier}, 错误: {e}")
-                conn.rollback()
-                return False
+        # 将同步数据库操作包装在 asyncio.to_thread 中
+        def _sync_save():
+            with self.separate_db_manager.annotation_db.get_connection() as conn:
+                cursor = conn.cursor()
+                try:
+                    cursor.execute('''
+                        INSERT INTO annotations (poem_id, model_identifier, status, annotation_result, error_message, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(poem_id, model_identifier) DO UPDATE SET
+                            status = excluded.status,
+                            annotation_result = excluded.annotation_result,
+                            error_message = excluded.error_message,
+                            updated_at = excluded.updated_at
+                    ''', (poem_id, model_identifier, status, annotation_result, error_message, now, now))
+                    conn.commit()
+                    success = cursor.rowcount > 0
+                    if success:
+                        logger.debug(f"标注结果保存成功 - 诗词ID: {poem_id}, 模型: {model_identifier}")
+                    return success
+                except Exception as e:
+                    logger.error(f"保存标注结果失败 - 诗词ID: {poem_id}, 模型: {model_identifier}, 错误: {e}")
+                    conn.rollback()
+                    return False
+        
+        return await asyncio.to_thread(_sync_save)
             
     # DataQueryPlugin 接口实现
     def get_poems_to_annotate(self, model_identifier: str, 

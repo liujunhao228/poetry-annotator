@@ -10,8 +10,6 @@ from PyQt5.QtGui import QIcon
 from .utils import LogStreamHandler
 from .config_panels.global_config_panel import GlobalConfigPanel
 from .config_panels.project_config_panel import ProjectConfigPanel
-from .config_panels.llm_config_panel import LLMConfigPanel
-from .config_panels.plugins_config_panel import PluginsConfigPanel
 from .config_manager import ConfigHandler
 from .i18n import _
 from .styles import get_stylesheet
@@ -35,6 +33,8 @@ class MainWindow(QMainWindow):
 
         self._setup_ui()
         self._setup_logging()
+        self.config_handler = ConfigHandler()
+        # Initial update will be triggered from app.py after panels are added
 
     def _setup_ui(self):
         """
@@ -95,10 +95,6 @@ class MainWindow(QMainWindow):
         llm_config_action.triggered.connect(self._open_llm_config)
         settings_menu.addAction(llm_config_action)
 
-        plugins_config_action = QAction(_("Edit &Plugins Configuration"), self)
-        plugins_config_action.triggered.connect(self._open_plugins_config)
-        settings_menu.addAction(plugins_config_action)
-
         # Help Menu
         help_menu = menu_bar.addMenu(_("&Help"))
         about_action = QAction(_("&About"), self)
@@ -153,18 +149,22 @@ class MainWindow(QMainWindow):
         """Handles actions after a project is switched."""
         self.status_bar.showMessage(_("Switched to project: {}").format(project_name))
         logging.info(_("Project switched to: {}").format(project_name))
+        self._update_panels_with_project_config()
+
+    def _update_panels_with_project_config(self):
+        """
+        Updates all script panels with the current project's configuration,
+        such as the database name.
+        """
+        db_name = self.config_handler.get_database_name()
+        if db_name:
+            for i in range(self.tab_widget.count()):
+                panel = self.tab_widget.widget(i)
+                if hasattr(panel, 'update_database_name'):
+                    panel.update_database_name(db_name)
 
     def _open_llm_config(self):
-        """Opens the LLM configuration panel."""
-        llm_config_dialog = LLMConfigPanel(self)
-        llm_config_dialog.exec_()
         logging.info(_("LLM configuration panel opened."))
-
-    def _open_plugins_config(self):
-        """Opens the plugins configuration panel."""
-        plugins_config_dialog = PluginsConfigPanel(self)
-        plugins_config_dialog.exec_()
-        logging.info(_("Plugins configuration panel opened."))
 
     def _show_about_dialog(self):
         """Displays an about dialog."""
