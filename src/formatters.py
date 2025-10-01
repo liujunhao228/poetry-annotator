@@ -49,14 +49,16 @@ def format_sentence_annotations_for_table(sentence_annotations: List[SentenceAnn
     for ann in sentence_annotations:
         # 格式化次情感列表为字符串
         secondary_names = [e['name'] for e in ann['secondary_emotions']]
+        primary_display = ann['primary_emotion']['name'] if ann['primary_emotion'] else 'N/A'
+        secondary_names = [e['name'] for e in ann['secondary_emotions']]
         secondary_display = ', '.join(secondary_names) if secondary_names else '无'
 
         table_data.append({
             "句子ID": ann['sentence_id'],
             "句子文本": ann['sentence_text'],
-            "当前主情感": ann['primary_emotion']['name'],
-            "当前次情感": secondary_display,
-            # "校对状态" 字段暂未实现，可预留或由GUI状态管理
+            "主情感": primary_display,
+            "次情感": secondary_display,
+            "理由": ann.get('rationale', '无')
         })
 
     return table_data

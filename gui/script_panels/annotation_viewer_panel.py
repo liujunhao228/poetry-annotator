@@ -1,5 +1,4 @@
 import logging
-import gettext
 import json
 from typing import List, Dict, Any # Import List and Dict for type hints
 from PyQt5.QtWidgets import (
@@ -9,8 +8,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import pyqtSignal, Qt
 from src.plugin_system.manager import PluginManager
 from src.data.models import Poem # 导入 Poem 模型
-
-_ = gettext.gettext
+from src.annotation_reviewer import AnnotationReviewerLogic # 导入 AnnotationReviewerLogic
+from gui.i18n import _ # 从 gui.i18n 导入 _
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +26,12 @@ class AnnotationViewerPanel(QWidget):
         if not self.social_poem_analysis_plugin:
             raise RuntimeError("SocialPoemAnalysisPlugin not found. Ensure it is loaded.")
         
+        # 初始化 AnnotationReviewerLogic，传入 social_poem_analysis_plugin 实例
+        self.annotation_reviewer_logic = AnnotationReviewerLogic(self.social_poem_analysis_plugin)
+
         self.current_poem_id = None
         self.current_model_identifier = "default" # Default annotation source
-        self.current_poem_data = None
+        self.current_poem_data = None # 存储 Poem 实例
         self.annotation_widgets = [] # To keep track of dynamically created annotation widgets
         self.poem_id_list: List[int] = [] # Stores poem IDs loaded from a file
         self.current_list_index: int = -1 # Current position in the poem_id_list
@@ -209,15 +211,25 @@ class AnnotationViewerPanel(QWidget):
     def _load_poem(self, poem_id: int):
         """Loads poem data and its annotations."""
         logger.info(f"Loading poem ID: {poem_id}")
-        poem = self.social_poem_analysis_plugin.get_poem_by_id(poem_id)
-        logger.debug(f"Result from get_poem_by_id for ID {poem_id}: {poem}") # Add debug log here
-        if poem:
+        
+        # 使用 AnnotationReviewerLogic 获取诗词信息
+        # 避免覆盖全局的 _ 翻译函数
+        poem_info, annotations_data = self.annotation_reviewer_logic.query_poem_and_annotation(poem_id, self.current_model_identifier)
+        
+        if poem_info:
             self.current_poem_id = poem_id
-            self.current_poem_data = poem
-            self.poem_id_label.setText(_("ID: {}").format(poem.id))
-            self.poem_title_label.setText(_("Title: {}").format(poem.title))
-            self.poem_author_label.setText(_("Author: {}").format(poem.author))
-            self.poem_text_display.setText("\n".join(poem.paragraphs))
+            # 将 poem_info 转换为 Poem 模型实例，以便保持 current_poem_data 的类型一致性
+            self.current_poem_data = Poem(
+                id=poem_info['id'],
+                title=poem_info['title'],
+                author=poem_info['author'],
+                paragraphs=poem_info['paragraphs'],
+                full_text=poem_info['full_text']
+            )
+            self.poem_id_label.setText(_("ID: {}").format(self.current_poem_data.id))
+            self.poem_title_label.setText(_("Title: {}").format(self.current_poem_data.title))
+            self.poem_author_label.setText(_("Author: {}").format(self.current_poem_data.author))
+            self.poem_text_display.setText("\n".join(self.current_poem_data.paragraphs))
             self._update_ui_state(True)
             self._populate_model_selector()
             self.poem_loaded.emit(poem_id) # Emit signal
@@ -247,13 +259,13 @@ class AnnotationViewerPanel(QWidget):
         """Populates the model selector with available annotation sources."""
         self.model_selector_combo.clear()
         if self.current_poem_id is not None:
-            sources = self.social_poem_analysis_plugin.get_annotation_sources_for_poem(self.current_poem_id)
+            # 使用 AnnotationReviewerLogic 获取可用模型
+            sources = self.annotation_reviewer_logic.get_available_models_for_poem(self.current_poem_id)
             # Add a "New Annotation" option
             self.model_selector_combo.addItem(_("New Annotation"), "new_annotation")
             for source in sources:
                 self.model_selector_combo.addItem(source, source)
             
-            # Try to select the default or first available source
             # Try to select the default or first available source
             # Find the index of the current_model_identifier if it exists in the combo box
             index_to_select = -1
@@ -293,10 +305,15 @@ class AnnotationViewerPanel(QWidget):
 
         annotations = []
         if self.current_model_identifier != "new_annotation":
-            annotations = self.social_poem_analysis_plugin.get_annotations_for_poem(
+            # 使用 AnnotationReviewerLogic 获取标注数据
+            _, annotations_from_logic = self.annotation_reviewer_logic.query_poem_and_annotation(
                 self.current_poem_id, self.current_model_identifier
             )
+            if annotations_from_logic:
+                annotations = annotations_from_logic
         
+        # _display_annotations 期望的 annotations 格式是 SentenceAnnotation 列表
+        # AnnotationReviewerLogic._process_sentence_annotations 已经将其转换为该格式
         self._display_annotations(self.current_poem_data.paragraphs, annotations)
 
     def _clear_annotation_editor(self):
@@ -320,8 +337,8 @@ class AnnotationViewerPanel(QWidget):
         # Map existing annotations by sentence_id for easy lookup
         annotations_map = {ann['sentence_id']: ann for ann in annotations}
 
-        # Get categories from the plugin
-        categories_data = self.social_poem_analysis_plugin.get_categories()
+        # Get categories from AnnotationReviewerLogic
+        categories_data = self.annotation_reviewer_logic.get_all_emotion_categories()
         
         for i, sentence_text in enumerate(paragraphs):
             sentence_id = f"S{i+1}"
@@ -420,8 +437,9 @@ class AnnotationViewerPanel(QWidget):
                 communication_scene_list = [c.strip() for c in cs_text.split(',') if c.strip()]
 
             annotation = {
-                "sentence_id": sentence_id,
-                # Use currentData() which was set during addItem to get the actual ID
+                "sentence_uid": sentence_id, # 插件期望 sentence_uid
+                "sentence_index": int(sentence_id[1:]) - 1, # 从 S1, S2... 提取索引
+                "sentence_text": self.current_poem_data.paragraphs[int(sentence_id[1:]) - 1], # 从当前诗词数据中获取句子文本
                 "relationship_action": ra_combo.currentData() if ra_combo.currentData() and ra_combo.currentData() != "" else None,
                 "emotional_strategy": es_combo.currentData() if es_combo.currentData() and es_combo.currentData() != "" else None,
                 "communication_scene": communication_scene_list,

@@ -149,38 +149,33 @@ class DataManager:
                              force_rerun: bool = False) -> List[Poem]:
         """获取指定模型待标注的诗词"""
         # 将用户提供的原始ID转换为数据库中的实际ID
-        database_start_id = self.id_prefix + start_id if start_id is not None else None
-        database_end_id = self.id_prefix + end_id if end_id is not None else None
+        # 移除重复添加 id_prefix，因为 social_poem_plugin 内部处理的 ID 已经是带前缀的
         return self.social_poem_plugin.get_poems_to_annotate(
-            model_identifier, limit, database_start_id, database_end_id, force_rerun
+            model_identifier, limit, start_id, end_id, force_rerun
         )
     
     def get_poem_by_id(self, poem_id: int) -> Optional[Poem]:
         """根据ID获取单首诗词信息"""
-        # 将用户提供的原始ID转换为数据库中的实际ID
-        database_poem_id = self.id_prefix + poem_id
-        return self.social_poem_plugin.get_poem_by_id(database_poem_id)
+        # 移除重复添加 id_prefix，因为 social_poem_plugin 内部处理的 ID 已经是带前缀的
+        return self.social_poem_plugin.get_poem_by_id(poem_id)
     
     def get_poems_by_ids(self, poem_ids: List[int]) -> List[Poem]:
         """根据ID列表获取诗词信息"""
-        # 将用户提供的原始ID列表转换为数据库中的实际ID列表
-        database_poem_ids = [self.id_prefix + pid for pid in poem_ids]
-        return self.social_poem_plugin.get_poems_by_ids(database_poem_ids)
+        # 移除重复添加 id_prefix，因为 social_poem_plugin 内部处理的 ID 已经是带前缀的
+        return self.social_poem_plugin.get_poems_by_ids(poem_ids)
     
     def get_annotations_for_poem(self, poem_id: int, model_identifier: str) -> List[Dict[str, Any]]:
         """获取指定诗词和模型标识符的所有句子标注"""
-        # 将用户提供的原始ID转换为数据库中的实际ID
-        database_poem_id = self.id_prefix + poem_id
-        return self.social_poem_plugin.get_annotations_for_poem(database_poem_id, model_identifier)
+        # 移除重复添加 id_prefix，因为 social_poem_plugin 内部处理的 ID 已经是带前缀的
+        return self.social_poem_plugin.get_annotations_for_poem(poem_id, model_identifier)
 
     async def save_annotation(self, poem_id: int, model_identifier: str, status: str,
                               annotation_result: Optional[str] = None, 
                               error_message: Optional[str] = None) -> bool:
         """保存标注结果"""
-        # 将用户提供的原始ID转换为数据库中的实际ID
-        database_poem_id = self.id_prefix + poem_id
+        # 移除重复添加 id_prefix，因为 social_poem_plugin 内部处理的 ID 已经是带前缀的
         return await self.social_poem_plugin.save_annotation(
-            database_poem_id, model_identifier, status, annotation_result, error_message
+            poem_id, model_identifier, status, annotation_result, error_message
         )
     
     def get_statistics(self) -> Dict[str, Any]:
@@ -202,15 +197,13 @@ class DataManager:
     
     def get_completed_poem_ids(self, poem_ids: List[int], model_identifier: str) -> Set[int]:
         """高效检查一组 poem_id 是否已被特定模型成功标注"""
-        # 将用户提供的原始ID列表转换为数据库中的实际ID列表
-        database_poem_ids = [self.id_prefix + pid for pid in poem_ids]
-        return self.social_poem_plugin.get_completed_poem_ids(database_poem_ids, model_identifier)
+        # 移除重复添加 id_prefix，因为 social_poem_plugin 内部处理的 ID 已经是带前缀的
+        return self.social_poem_plugin.get_completed_poem_ids(poem_ids, model_identifier)
 
     def get_annotation_sources_for_poem(self, poem_id: int) -> List[str]:
         """获取指定诗词的所有可用标注来源 (model_identifier)"""
-        # 将用户提供的原始ID转换为数据库中的实际ID
-        database_poem_id = self.id_prefix + poem_id
-        return self.social_poem_plugin.get_annotation_sources_for_poem(database_poem_id)
+        # 移除重复添加 id_prefix，因为 social_poem_plugin 内部处理的 ID 已经是带前缀的
+        return self.social_poem_plugin.get_annotation_sources_for_poem(poem_id)
     
     # 数据加载和存储方法也直接委托给统一插件
     def load_data_from_json(self, json_file: str) -> List[Dict[str, Any]]:
