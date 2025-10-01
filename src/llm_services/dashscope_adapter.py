@@ -47,10 +47,10 @@ class DashScopeAdapter(BaseLLMService):
     def _parse_and_validate_config(self):
         """集中处理 DashScope 特有配置的解析、类型转换和验证"""
         # DashScope特定参数
-        self.enable_search = self.config.get('enable_search', 'false').lower() == 'true'
+        self.enable_search = str(self.config.get('enable_search', 'false')).lower() == 'true'
         self.result_format = self.config.get('result_format', 'message')
-        self.incremental_output = self.config.get('incremental_output', 'false').lower() == 'true'
-        self.enable_thinking = self.config.get('enable_thinking', 'false').lower() == 'true'
+        self.incremental_output = str(self.config.get('incremental_output', 'false')).lower() == 'true'
+        self.enable_thinking = str(self.config.get('enable_thinking', 'false')).lower() == 'true'
 
         # 验证 result_format
         if self.result_format not in ['message', 'text']:

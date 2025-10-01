@@ -25,12 +25,12 @@ except ImportError:
 # 移除了对数据库适配器的导入
 
 try:
-    from src.plugin_label_parser import get_plugin_label_parser
+    from src.emotion_classification.manager import get_emotion_classification_manager
 except ImportError:
     # 当作为独立模块运行时
     import sys
     sys.path.append(str(Path(__file__).parent.parent))
-    from plugin_label_parser import get_plugin_label_parser
+    from emotion_classification.manager import get_emotion_classification_manager
 
 try:
     from src.db_initializer.plugin_interface import DatabaseInitPluginManager
@@ -65,11 +65,8 @@ class DatabaseInitializer:
         """初始化分离的数据库结构"""
         results = {}
         
-        # 根据项目名称动态获取数据库路径
-        separate_db_paths = get_separate_database_paths(self.project_name)
-        
         # 获取分离数据库管理器
-        separate_db_manager = SeparateDatabaseManager(separate_db_paths)
+        separate_db_manager = SeparateDatabaseManager(self.output_dir)
         
         # 设置分离数据库管理器到插件管理器
         self.separate_db_manager = separate_db_manager
@@ -84,6 +81,8 @@ class DatabaseInitializer:
         # 执行插件的数据库初始化
         try:
             # 在调用插件之前，更新插件配置以包含源数据路径和数据库路径
+            # 先获取数据库路径
+            separate_db_paths = get_separate_database_paths(self.output_dir)
             for plugin_name, plugin in self.plugin_manager.plugins.items():
                 # 更新插件配置中的源数据路径和数据库路径
                 if hasattr(plugin, 'source_dir') and not plugin.source_dir:
@@ -103,16 +102,13 @@ class DatabaseInitializer:
         
         return results
     
-    def get_database_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_database_stats(self) -> Dict[str, Any]:
         """获取分离数据库的统计信息"""
         stats = {}
         
         try:
-            # 根据项目名称动态获取数据库路径
-            separate_db_paths = get_separate_database_paths(self.project_name)
-            
             # 获取分离数据库管理器
-            separate_db_manager = SeparateDatabaseManager(separate_db_paths)
+            separate_db_manager = SeparateDatabaseManager(self.output_dir)
             
             # 获取分离数据库统计信息
             separate_stats = separate_db_manager.get_database_stats()
@@ -130,9 +126,19 @@ class DatabaseInitializer:
 db_initializer: Optional[DatabaseInitializer] = None
 
 
-def get_db_initializer(output_dir: str, source_dir: str) -> DatabaseInitializer:
+def get_db_initializer(output_dir: str = None, source_dir: str = None) -> DatabaseInitializer:
     """获取数据库初始化器实例"""
     global db_initializer
+    
+    # 如果没有提供参数，从配置中获取默认值
+    if output_dir is None or source_dir is None:
+        # 获取项目配置
+        project_config = config_manager.project_config
+        if output_dir is None:
+            output_dir = project_config.data_path.output_dir or "data/default"
+        if source_dir is None:
+            source_dir = project_config.data_path.source_dir or "data/source_json"
+    
     if db_initializer is None or db_initializer.output_dir != output_dir or db_initializer.source_dir != source_dir:
         db_initializer = DatabaseInitializer(output_dir=output_dir, source_dir=source_dir)
     return db_initializer

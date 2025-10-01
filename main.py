@@ -16,6 +16,10 @@ if str(project_root) not in sys.path:
 
 
 from src.task_distribution.manager import run_distribution_task # Import the new function
+from src.plugin_system.loader import PluginLoader
+from src.plugin_system.manager import get_plugin_manager
+from src.config.manager import get_config_manager
+from src.plugin_system.project_config_manager import ProjectPluginConfigManager
 
 def run_cli_mode(unknown_args):
     """运行CLI模式"""
@@ -92,15 +96,32 @@ def run_cli_mode(unknown_args):
         sys.exit(1)
 
 
-def run_init_db_mode():
+def run_init_db_mode(clear_existing: bool = False):
     """运行数据库初始化模式"""
     print("开始初始化数据库...")
+    
+    # 确保插件系统已加载
+    print("\n开始加载插件...")
+    try:
+        # 获取项目插件配置文件的路径
+        plugins_ini_path = project_root / 'project' / 'plugins.ini'
+        if not plugins_ini_path.exists():
+            raise FileNotFoundError(f"项目插件配置文件未找到: {plugins_ini_path}")
+
+        project_plugin_config_manager = ProjectPluginConfigManager(str(plugins_ini_path))
+        plugin_manager = get_plugin_manager()
+        PluginLoader.load_plugins_from_config(project_plugin_config_manager, plugin_manager, str(project_root))
+        print("插件加载完成。")
+    except Exception as e:
+        print(f"插件加载失败: {e}")
+        sys.exit(1)
+
     from src.db_initializer import get_db_initializer
     db_initializer = get_db_initializer()
     
     # 初始化分离的数据库结构
     print("\n开始初始化分离的数据库结构...")
-    separate_results = db_initializer.initialize_separate_databases()
+    separate_results = db_initializer.initialize_separate_databases(clear_existing=clear_existing)
     
     print("\n分离数据库初始化结果:")
     for db_name, db_results in separate_results.items():
@@ -274,6 +295,11 @@ def parse_arguments():
         help="启动模式: cli(命令行模式)、gui(功能工具集GUI模式)、gui-review(标注校对GUI模式)、visualizer(数据可视化模式)、init-db(初始化数据库) 或 test-annotate(简化测试标注模式) (默认: cli)"
     )
     parser.add_argument(
+        "--clear-db",
+        action="store_true",
+        help="在初始化数据库时，先删除现有数据库文件（仅在init-db模式下有效）"
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="空运行模式，使用假数据测试主流程"
@@ -356,7 +382,7 @@ def main():
     
     # 根据模式运行相应功能
     if args.mode == "init-db":
-        run_init_db_mode()
+        run_init_db_mode(clear_existing=args.clear_db)
     elif args.mode == "gui":
         run_gui_mode()
     elif args.mode == "gui-review":

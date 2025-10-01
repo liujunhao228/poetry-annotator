@@ -74,7 +74,7 @@ class ExportPoemAnnotationsPanel(ScriptPanelBase):
             "all": _("All Files (*.*)")
         }
         file_filter = filter_map.get(selected_format, filter_map["all"])
-        file_path, _ = QFileDialog.getSaveFileName(self, _("Select Output File"), "", file_filter)
+        file_path, selected_filter = QFileDialog.getSaveFileName(self, _("Select Output File"), "", file_filter)
         if file_path:
             # Ensure correct extension if not already present
             if not file_path.endswith(f".{selected_format}"):

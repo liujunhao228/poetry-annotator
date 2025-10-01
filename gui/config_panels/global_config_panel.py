@@ -125,6 +125,13 @@ class GlobalConfigPanel(QDialog):
         """
         Creates an appropriate input widget based on the field type.
         """
+        # 检查是否是 available_configs 字段，如果是，则创建只读的 QLineEdit
+        if (field_type == List[str] or field_type == Optional[List[str]]) and full_field_name.endswith('.available_configs'):
+            line_edit = QLineEdit()
+            line_edit.setReadOnly(True)  # 设置为只读
+            line_edit.setPlaceholderText(_("Defined in configuration file"))
+            return line_edit
+
         if field_type is str:
             return QLineEdit()
         elif field_type is int:
@@ -172,6 +179,7 @@ class GlobalConfigPanel(QDialog):
             elif full_field_name in self._widgets:
                 widget = self._widgets[full_field_name]
                 if isinstance(widget, QLineEdit):
+                    # 为 available_configs 字段（只读）和其他 List[str] 字段设置文本
                     if field_info.type == List[str] or field_info.type == Optional[List[str]]:
                         widget.setText(", ".join(value) if value else "")
                     elif field_info.type == Dict[str, str] or field_info.type == Optional[Dict[str, str]]:

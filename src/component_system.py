@@ -66,7 +66,7 @@ class ComponentSystem:
                     
                     try:
                         # 直接加载插件并注册到全局插件管理器
-                        plugin_instance = DirectPluginLoader.load_plugin(plugin_config)
+                        plugin_instance = DirectPluginLoader.load_plugin(plugin_config, self.project_root)
                         self.plugin_manager.register_plugin(plugin_instance)
                         logger.info(f"成功加载并启用项目插件: {plugin_name}")
                     except Exception as e:
@@ -128,11 +128,6 @@ class ComponentSystem:
             except Exception as e:
                 logger.error(f"加载 {component_type.value} 插件 '{plugin_config.module}.{plugin_config.class_name}' 失败: {e}")
                 # 记录错误但不中断，回退到默认实现
-        
-        if instance is None:
-            # 回退到默认实现
-            logger.info(f"未找到启用的 {component_type.value} 插件，使用默认实现。")
-            instance = self._get_default_component(component_type, **kwargs)
         
         # 缓存实例
         self._component_registry[component_type] = instance
@@ -227,13 +222,10 @@ class ComponentSystem:
             # 延迟导入以避免循环依赖
             from src.response_validation.manager import ResponseValidationManager as ResponseValidator
             return ResponseValidator()
-        elif component_type == ComponentType.LABEL_PARSER:
+        elif component_type == ComponentType.EMOTION_CLASSIFICATION:
             # 延迟导入以避免循环依赖
-            from src.emotion_classifier import EmotionClassifier
-            project_root = kwargs.get('project_root', self.project_root)
-            if ComponentType.LABEL_PARSER not in self._component_registry:
-                self._component_registry[ComponentType.LABEL_PARSER] = EmotionClassifier(project_root=project_root)
-            return self._component_registry[ComponentType.LABEL_PARSER]
+            from src.emotion_classification.plugin_adapter import EmotionClassifierPluginAdapter
+            return EmotionClassifierPluginAdapter(project_root=self.project_root, config=kwargs.get('config_manager'))
         else:
             raise ValueError(f"未知的组件类型: {component_type.value}")
 # 全局组件系统实例

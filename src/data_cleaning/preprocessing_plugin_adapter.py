@@ -4,16 +4,18 @@
 
 import logging
 from typing import Dict, Any
-from src.component_system import Plugin, ComponentType, PluginConfig
+from src.plugin_system.base import BasePlugin, ComponentType
+from src.config.schema import PluginConfig
 
 logger = logging.getLogger(__name__)
 
 
-class PreprocessingPlugin(Plugin):
+class PreprocessingPlugin(BasePlugin):
     """预处理插件基类"""
     
     def __init__(self, plugin_config: PluginConfig):
-        super().__init__(ComponentType.PREPROCESSING, plugin_config)
+        super().__init__(plugin_config)
+        self.component_type = ComponentType.PREPROCESSING
     
     def preprocess(self, data: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """

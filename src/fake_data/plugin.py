@@ -16,7 +16,7 @@ from src.llm_services.schemas import PoemData, EmotionSchema
 class FakeDataPlugin(LLMServicePlugin):
     """假数据插件，提供模拟LLM服务功能"""
     
-    def __init__(self, plugin_config: PluginConfig):
+    def __init__(self, plugin_config: PluginConfig, **kwargs):
         super().__init__(plugin_config)
         self.logger = logging.getLogger(self.__class__.__name__)
         

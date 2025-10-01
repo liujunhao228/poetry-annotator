@@ -91,3 +91,15 @@ class EmotionClassificationManager:
         :return: 对应的一级类别ID，如果未找到则返回None
         """
         return self.core.get_primary_category(secondary_id)
+
+# 全局情感分类管理器实例
+_emotion_classification_manager_instance: Optional[EmotionClassificationManager] = None
+
+def get_emotion_classification_manager(project_root: str = ".") -> EmotionClassificationManager:
+    """
+    获取全局情感分类管理器实例（单例模式）
+    """
+    global _emotion_classification_manager_instance
+    if _emotion_classification_manager_instance is None:
+        _emotion_classification_manager_instance = EmotionClassificationManager(project_root)
+    return _emotion_classification_manager_instance

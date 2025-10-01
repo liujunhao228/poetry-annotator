@@ -75,6 +75,11 @@ class DatabaseInitPlugin(BasePlugin):
     def initialize_database(self, db_name: str, clear_existing: bool = False) -> Dict[str, Any]:
         """初始化数据库"""
         pass
+
+    @abstractmethod
+    def get_db_init_sql(self) -> Optional[str]:
+        """获取数据库初始化SQL脚本"""
+        pass
     
     def on_database_initialized(self, db_name: str, result: Dict[str, Any]):
         """数据库初始化完成后的回调方法"""

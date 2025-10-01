@@ -38,15 +38,15 @@ class FindDuplicatePoemsPanel(ScriptPanelBase):
         self.db_name_input.setPlaceholderText(_("Enter database name (e.g., default)"))
         form_layout.addRow(QLabel(_("Database Name:")), self.db_name_input)
 
-        # Output File Path Input with File Dialog
+        # Output File Path Input with File Dialog (Optional)
         output_file_layout = QHBoxLayout()
         self.output_file_input = QLineEdit()
-        self.output_file_input.setPlaceholderText(_("Select output file path for duplicates"))
+        self.output_file_input.setPlaceholderText(_("Select output file path for duplicates (optional)"))
         self.output_file_button = QPushButton(_("Browse..."))
         self.output_file_button.clicked.connect(self._select_output_file)
         output_file_layout.addWidget(self.output_file_input)
         output_file_layout.addWidget(self.output_file_button)
-        form_layout.addRow(QLabel(_("Output File:")), output_file_layout)
+        form_layout.addRow(QLabel(_("Output File (Optional):")), output_file_layout)
 
         # Run Button
         self.run_button = QPushButton(_("Find Duplicates"))
@@ -61,7 +61,7 @@ class FindDuplicatePoemsPanel(ScriptPanelBase):
         """
         Opens a file dialog to select the output file path.
         """
-        file_path, _ = QFileDialog.getSaveFileName(self, _("Select Output File"), "", _("JSON Files (*.json);;Text Files (*.txt);;All Files (*.*)"))
+        file_path, selected_filter = QFileDialog.getSaveFileName(self, _("Select Output File"), "", _("JSON Files (*.json);;Text Files (*.txt);;All Files (*.*)"))
         if file_path:
             self.output_file_input.setText(file_path)
 
@@ -70,10 +70,7 @@ class FindDuplicatePoemsPanel(ScriptPanelBase):
         Validates the user inputs before running the script.
         """
         if not inputs.get("db"):
-            self.show_message(_("Validation Error"), _("Database Name cannot be empty."), QMessageBox.Warning)
-            return False
-        if not inputs.get("output"):
-            self.show_message(_("Validation Error"), _("Output File path cannot be empty."), QMessageBox.Warning)
+            self.show_message(_("Validation Error"), _("Database name cannot be empty."), QMessageBox.Warning)
             return False
         return True
 
@@ -82,9 +79,13 @@ class FindDuplicatePoemsPanel(ScriptPanelBase):
         Collects parameters from UI, validates them, and starts the ScriptWorker.
         """
         params = {
-            "db": self.db_name_input.text().strip(),
-            "output": self.output_file_input.text().strip()
+            "db": self.db_name_input.text().strip()
         }
+        
+        # Add optional output file parameter if specified
+        output_file = self.output_file_input.text().strip()
+        if output_file:
+            params["output-file"] = output_file
 
         if self.validate_input(params):
             logging.info(_("Starting '{}' with parameters: {}").format(self.script_name, params))

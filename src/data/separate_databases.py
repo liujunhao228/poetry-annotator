@@ -17,7 +17,7 @@ class SeparateDatabaseManager:
 
     def __init__(self, output_dir: str):
         self.logger = logging.getLogger(__name__)
-        self.output_dir = output_dir
+        self.output_dir = output_dir # 使用 output_dir
         self.db_configs = self._get_database_configs()
         
         # 为了保持向后兼容性，添加适配器属性
@@ -71,48 +71,54 @@ class SeparateDatabaseManager:
             conn.close()
     
     def _init_annotation_database(self, db_path: str):
-        """初始化标注数据数据库表结构"""
+        """初始化标注数据数据库表结构 (现在由插件定义)"""
+        # 此方法现在仅确保数据库文件存在，具体的表结构由插件负责创建
+        conn = sqlite3.connect(db_path)
+        conn.close() # 立即关闭连接，因为表创建将由 _initialize_annotation_db_from_plugins 处理
+        
+    def _initialize_annotation_db_from_plugins(self, db_path: str):
+        """从插件获取SQL脚本并初始化标注数据库"""
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         try:
-            cursor.executescript("""
-                CREATE TABLE IF NOT EXISTS annotations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    poem_id INTEGER,
-                    model_identifier TEXT,
-                    status TEXT,
-                    annotation_result TEXT,
-                    error_message TEXT,
-                    created_at TEXT,
-                    updated_at TEXT,
-                    UNIQUE(poem_id, model_identifier)
-                );
+            from src.plugin_system.manager import get_plugin_manager
+            from src.plugin_system.base import ComponentType
+
+            plugin_manager = get_plugin_manager()
+            
+            # 获取所有数据库初始化插件，通过 component_type 筛选
+            db_init_plugins = [
+                p for p in plugin_manager.plugins.values() 
+                if getattr(p, 'component_type', None) == ComponentType.DB_INITIALIZER.value
+            ]
+            
+            if not db_init_plugins:
+                self.logger.warning("未找到任何 component_type 为 'db_initializer' 的插件来初始化标注数据库。")
+                return
+
+            for plugin in db_init_plugins:
+                # 检查插件是否具有 get_db_init_sql 方法
+                if not hasattr(plugin, 'get_db_init_sql'):
+                    self.logger.warning(f"插件 '{plugin.get_name()}' 的 component_type 为 'db_initializer'，但缺少 'get_db_init_sql' 方法。")
+                    continue
                 
-                CREATE TABLE IF NOT EXISTS sentence_annotations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    annotation_id INTEGER,
-                    sentence_index INTEGER,
-                    sentence_text TEXT,
-                    emotions TEXT,
-                    created_at TEXT
-                );
-                
-                CREATE TABLE IF NOT EXISTS sentence_emotion_links (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    sentence_annotation_id INTEGER,
-                    emotion_category_id INTEGER,
-                    confidence REAL
-                );
-            """)
+                sql_script = plugin.get_db_init_sql()
+                if sql_script:
+                    self.logger.info(f"执行插件 '{plugin.get_name()}' 提供的数据库初始化SQL脚本...")
+                    cursor.executescript(sql_script)
+                else:
+                    self.logger.info(f"插件 '{plugin.get_name()}' 未提供数据库初始化SQL脚本。")
             
             conn.commit()
+            self.logger.info("标注数据库表结构已通过插件初始化完成。")
         except Exception as e:
             conn.rollback()
+            self.logger.error(f"通过插件初始化标注数据库失败: {e}")
             raise e
         finally:
             conn.close()
-    
+
     def _init_emotion_database(self, db_path: str):
         """初始化情感分类数据库表结构"""
         conn = sqlite3.connect(db_path)
@@ -140,59 +146,46 @@ class SeparateDatabaseManager:
         """初始化所有分离的数据库"""
         results = {}
         
-        # 初始化原始数据数据库
-        try:
-            self.logger.info(f"开始初始化原始数据数据库 ({self.db_configs['raw_data']})")
-            result = self._initialize_raw_data_database(clear_existing)
-            results['raw_data'] = result
-            self.logger.info("原始数据数据库初始化完成")
-        except Exception as e:
-            self.logger.error(f"初始化原始数据数据库失败: {e}")
-            results['raw_data'] = {"error": str(e)}
-            
-        # 初始化标注数据数据库
-        try:
-            self.logger.info(f"开始初始化标注数据数据库 ({self.db_configs['annotation']})")
-            result = self._initialize_annotation_database(clear_existing)
-            results['annotation'] = result
-            self.logger.info("标注数据数据库初始化完成")
-        except Exception as e:
-            self.logger.error(f"初始化标注数据数据库失败: {e}")
-            results['annotation'] = {"error": str(e)}
-            
-        # 初始化情感分类数据库
-        try:
-            self.logger.info(f"开始初始化情感分类数据库 ({self.db_configs['emotion']})")
-            result = self._initialize_emotion_database(clear_existing)
-            results['emotion'] = result
-            self.logger.info("情感分类数据库初始化完成")
-        except Exception as e:
-            self.logger.error(f"初始化情感分类数据库失败: {e}")
-            results['emotion'] = {"error": str(e)}
+        db_types = ['raw_data', 'annotation', 'emotion']
+        for db_type in db_types:
+            db_path = self.db_configs[db_type]
+            if clear_existing and Path(db_path).exists():
+                try:
+                    Path(db_path).unlink()
+                    self.logger.info(f"已删除现有数据库文件: {db_path}")
+                except Exception as e:
+                    self.logger.error(f"删除数据库文件 {db_path} 失败: {e}")
+                    results[db_type] = {"error": f"删除数据库文件失败: {e}"}
+                    continue
+
+            try:
+                self.logger.info(f"开始初始化 {db_type} 数据库 ({db_path})")
+                if db_type == 'raw_data':
+                    self._init_raw_data_database(db_path)
+                elif db_type == 'annotation':
+                    # 先确保文件存在，再通过插件初始化表结构
+                    self._init_annotation_database(db_path) 
+                    self._initialize_annotation_db_from_plugins(db_path)
+                elif db_type == 'emotion':
+                    self._init_emotion_database(db_path)
+                results[db_type] = {
+                    "status": "success",
+                    "message": f"{db_type} 数据库初始化完成"
+                }
+                self.logger.info(f"{db_type} 数据库初始化完成")
+            except Exception as e:
+                self.logger.error(f"初始化 {db_type} 数据库失败: {e}")
+                results[db_type] = {"error": str(e)}
             
         return results
     
     def _initialize_raw_data_database(self, clear_existing: bool = False) -> Dict[str, Any]:
-        """初始化原始数据数据库"""
+        """初始化原始数据数据库 (此方法已不再直接使用 clear_existing 参数进行数据清空)"""
         # 确保数据库目录存在
         ensure_database_directory_exists(self.db_configs['raw_data'])
         
         # 初始化数据库表结构（仅初始化原始数据相关表）
         self._init_raw_data_database(self.db_configs['raw_data'])
-        
-        # 如果需要清空现有数据
-        if clear_existing:
-            conn = sqlite3.connect(self.db_configs['raw_data'])
-            cursor = conn.cursor()
-            try:
-                cursor.execute("DELETE FROM poems")
-                cursor.execute("DELETE FROM authors")
-                conn.commit()
-            except Exception as e:
-                conn.rollback()
-                raise e
-            finally:
-                conn.close()
         
         return {
             "status": "success",
@@ -200,27 +193,12 @@ class SeparateDatabaseManager:
         }
     
     def _initialize_annotation_database(self, clear_existing: bool = False) -> Dict[str, Any]:
-        """初始化标注数据数据库"""
+        """初始化标注数据数据库 (此方法已不再直接使用 clear_existing 参数进行数据清空)"""
         # 确保数据库目录存在
         ensure_database_directory_exists(self.db_configs['annotation'])
         
         # 初始化数据库表结构（仅初始化标注数据相关表）
         self._init_annotation_database(self.db_configs['annotation'])
-        
-        # 如果需要清空现有数据
-        if clear_existing:
-            conn = sqlite3.connect(self.db_configs['annotation'])
-            cursor = conn.cursor()
-            try:
-                cursor.execute("DELETE FROM annotations")
-                cursor.execute("DELETE FROM sentence_annotations")
-                cursor.execute("DELETE FROM sentence_emotion_links")
-                conn.commit()
-            except Exception as e:
-                conn.rollback()
-                raise e
-            finally:
-                conn.close()
         
         return {
             "status": "success",
@@ -228,25 +206,12 @@ class SeparateDatabaseManager:
         }
     
     def _initialize_emotion_database(self, clear_existing: bool = False) -> Dict[str, Any]:
-        """初始化情感分类数据库"""
+        """初始化情感分类数据库 (此方法已不再直接使用 clear_existing 参数进行数据清空)"""
         # 确保数据库目录存在
         ensure_database_directory_exists(self.db_configs['emotion'])
         
         # 初始化数据库表结构（仅初始化情感分类相关表）
         self._init_emotion_database(self.db_configs['emotion'])
-        
-        # 如果需要清空现有数据
-        if clear_existing:
-            conn = sqlite3.connect(self.db_configs['emotion'])
-            cursor = conn.cursor()
-            try:
-                cursor.execute("DELETE FROM emotion_categories")
-                conn.commit()
-            except Exception as e:
-                conn.rollback()
-                raise e
-            finally:
-                conn.close()
         
         # 情感分类体系导入现在由插件处理，这里不再直接导入
         
@@ -467,15 +432,13 @@ import threading
 _separate_db_manager_lock = threading.Lock()
 
 
-def get_separate_db_manager(project_name: str) -> SeparateDatabaseManager:
+def get_separate_db_manager(output_dir: str) -> SeparateDatabaseManager:
     """获取分离数据库管理器实例"""
     global separate_db_manager, _separate_db_manager_lock
     
-    # 使用双重检查锁定确保线程安全
-    if separate_db_manager is None or separate_db_manager.project_name != project_name:
-        with _separate_db_manager_lock:
-            # 再次检查，防止重复创建
-            if separate_db_manager is None or separate_db_manager.project_name != project_name:
-                separate_db_manager = SeparateDatabaseManager(project_name)
-    
+    with _separate_db_manager_lock:
+        # 如果实例不存在，或者输出目录不匹配，则创建一个新的实例
+        if separate_db_manager is None or getattr(separate_db_manager, 'output_dir', None) != output_dir:
+            separate_db_manager = SeparateDatabaseManager(output_dir=output_dir)
+            
     return separate_db_manager

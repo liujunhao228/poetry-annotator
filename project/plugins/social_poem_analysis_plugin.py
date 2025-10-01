@@ -21,7 +21,7 @@ from src.plugin_system.interfaces import (
 )
 from src.config.schema import PluginConfig
 from src.llm_services.schemas import PoemData, EmotionSchema
-from src.data.models import Poem, Author, Annotation
+from src.data.models import Poem, Author, Annotation, create_model_instance
 from src.data.separate_databases import get_separate_db_manager
 
 logger = logging.getLogger(__name__)
@@ -31,16 +31,54 @@ class SocialPoemAnalysisPlugin(BasePlugin):
     """《交际诗分析》项目统一插件"""
 
     def __init__(self, config: Optional[PluginConfig] = None, 
-                 separate_db_manager: Optional[Any] = None, **kwargs):
+                 separate_db_manager: Optional[Any] = None, 
+                 output_dir: Optional[str] = None, **kwargs):
         # 调用父类的__init__方法
         super().__init__(config)
         self.name = "social_poem_analysis"
-        self.component_type = None  # 初始化为None
+        # 明确指定组件类型为数据库初始化器，以便插件管理器正确加载
+        from src.plugin_system.base import ComponentType
+        self.component_type = ComponentType.DB_INITIALIZER.value
         # 从kwargs中获取description参数，如果有的话
         self.description = kwargs.get("description", "《交际诗分析》项目统一插件，集成数据查询、Prompt构建、标签解析、数据库初始化和标注管理功能")
         self._load_emotion_categories()
-        # 初始化数据库管理器
+        
         self.separate_db_manager = separate_db_manager
+
+        # 记录接收到的参数
+        logger.debug(f"SocialPoemAnalysisPlugin.__init__ received initial output_dir: '{output_dir}'")
+        logger.debug(f"SocialPoemAnalysisPlugin.__init__ received config.settings: {config.settings if config and config.settings else 'N/A'}")
+        logger.debug(f"SocialPoemAnalysisPlugin.__init__ received **kwargs: {kwargs}")
+
+        # 初始化数据库管理器和输出目录
+        # 优先使用传入的 output_dir 参数
+        self.output_dir = output_dir
+        logger.debug(f"SocialPoemAnalysisPlugin.__init__ output_dir after direct assignment: '{self.output_dir}'")
+        
+        # 如果 output_dir 仍然没有设置，尝试从 separate_db_manager 获取
+        if not self.output_dir and separate_db_manager and hasattr(separate_db_manager, 'output_dir'):
+            self.output_dir = separate_db_manager.output_dir
+            logger.debug(f"SocialPoemAnalysisPlugin.__init__ output_dir after separate_db_manager check: '{self.output_dir}'")
+        
+        # 如果 output_dir 仍然没有设置，尝试从配置中获取
+        if not self.output_dir and config and config.settings and 'output_dir' in config.settings:
+            self.output_dir = config.settings['output_dir']
+            logger.debug(f"SocialPoemAnalysisPlugin.__init__ output_dir after config check: '{self.output_dir}'")
+        
+        # 如果 output_dir 仍然没有设置，则抛出错误
+        if not self.output_dir:
+            logger.error("output_dir 未设置，无法初始化数据库管理器。请在插件配置中提供 'output_dir'。")
+            raise ValueError("output_dir 未设置，无法初始化数据库管理器。请在插件配置中提供 'output_dir'。")
+        
+        logger.debug(f"SocialPoemAnalysisPlugin.__init__ final output_dir: '{self.output_dir}'")
+
+    def _ensure_db_manager(self):
+        """确保数据库管理器已初始化"""
+        logger.debug(f"_ensure_db_manager called. self.separate_db_manager: {self.separate_db_manager is not None}, self.output_dir: '{self.output_dir}'")
+        if not self.separate_db_manager:
+            logger.debug(f"Initializing separate_db_manager with output_dir: '{self.output_dir}'")
+            self.separate_db_manager = get_separate_db_manager(self.output_dir)
+            logger.debug(f"separate_db_manager initialized: {self.separate_db_manager is not None}")
 
     # 实现插件基本信息方法
     def get_name(self) -> str:
@@ -197,13 +235,11 @@ class SocialPoemAnalysisPlugin(BasePlugin):
                     },
                     {
                         "id": "RS02",
-                        "name_zh": "杠杆牌",
                         "name_en": "Leverage Card",
                         "description": "中度风险，意在以小博大，可能提升地位也可能被拒"
                     },
                     {
                         "id": "RS03",
-                        "name_zh": "炸弹牌",
                         "name_en": "Bomb Card",
                         "description": "高风险行为，可能带来巨大回报，也可能导致关系破裂或政治灾难"
                     }
@@ -404,19 +440,18 @@ class SocialPoemAnalysisPlugin(BasePlugin):
         return extended
 
     # DatabaseInitPlugin 接口实现
-    def initialize_database(self, db_name: str, clear_existing: bool = False) -> Dict[str, Any]:
+    def initialize_database(self, clear_existing: bool = False) -> Dict[str, Any]:
         """初始化数据库表结构"""
         try:
-            # 获取数据库适配器
-            self.separate_db_manager = get_separate_db_manager()
+            # 确保数据库管理器已初始化，它会使用 self.output_dir
+            self._ensure_db_manager()
             
-            # 初始化项目特定表
-            self._initialize_project_tables()
-            
-            logger.info(f"成功初始化《交际诗分析》项目数据库表结构")
+            # 现在初始化过程由 SeparateDatabaseManager 统一管理
+            # 这里可以保留为空，或者记录一条日志
+            logger.info(f"《交际诗分析》插件的数据库初始化请求已收到，将由数据管理器统一处理。")
             return {
                 "status": "success",
-                "message": "数据库初始化成功"
+                "message": "数据库初始化请求已提交"
             }
         except Exception as e:
             logger.error(f"初始化数据库失败: {e}")
@@ -424,29 +459,46 @@ class SocialPoemAnalysisPlugin(BasePlugin):
                 "status": "error",
                 "message": str(e)
             }
-    
-    def _initialize_project_tables(self):
-        """初始化项目特定表结构"""
-        if not self.separate_db_manager:
-            raise ValueError("数据库管理器未初始化")
-            
-        # 创建项目特定的表
-        create_table_sql = """
-        CREATE TABLE IF NOT EXISTS social_analysis_results (
+
+    def get_db_init_sql(self) -> Optional[str]:
+        """提供项目特定的数据库表结构SQL"""
+        return """
+        CREATE TABLE IF NOT EXISTS annotations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             poem_id INTEGER NOT NULL,
-            sentence_id TEXT NOT NULL,
+            model_identifier TEXT NOT NULL DEFAULT 'default',
+            relationship_action TEXT,
+            emotional_strategy TEXT,
+            communication_scene TEXT,
+            risk_level TEXT,
+            rationale TEXT,
+            status TEXT DEFAULT 'pending',
+            annotation_result TEXT,
+            error_message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (poem_id) REFERENCES poems (id),
+            UNIQUE (poem_id, model_identifier)
+        );
+        
+        CREATE TABLE IF NOT EXISTS sentence_annotations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            annotation_id INTEGER,
+            poem_id INTEGER NOT NULL,
+            sentence_uid TEXT NOT NULL,
+            sentence_index INTEGER NOT NULL,
+            sentence_text TEXT NOT NULL,
             relationship_action TEXT,
             emotional_strategy TEXT,
             communication_scene TEXT,
             risk_level TEXT,
             rationale TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (poem_id) REFERENCES poems (id)
+            FOREIGN KEY (annotation_id) REFERENCES annotations (id),
+            FOREIGN KEY (poem_id) REFERENCES poems (id),
+            UNIQUE (annotation_id, sentence_uid)
         );
         """
-        self.separate_db_manager.annotation_db.execute_script(create_table_sql)
-        
     def on_database_initialized(self, db_name: str, result: Dict[str, Any]):
         """数据库初始化完成后的回调方法"""
         pass
@@ -466,8 +518,7 @@ class SocialPoemAnalysisPlugin(BasePlugin):
         """批量插入作者信息"""
         logger.info(f"开始批量插入 {len(authors_data)} 位作者信息...")
         
-        if not self.separate_db_manager:
-            self.separate_db_manager = get_separate_db_manager()
+        self._ensure_db_manager()
             
         inserted_count = 0
         from datetime import datetime, timezone, timedelta
@@ -529,8 +580,7 @@ class SocialPoemAnalysisPlugin(BasePlugin):
         
         logger.info(f"开始批量插入 {len(poems_data)} 首诗词...")
         
-        if not self.separate_db_manager:
-            self.separate_db_manager = get_separate_db_manager()
+        self._ensure_db_manager()
             
         inserted_count = 0
         current_id = start_id or 1
@@ -596,8 +646,7 @@ class SocialPoemAnalysisPlugin(BasePlugin):
         """保存标注结果到annotations表 (UPSERT)，时间戳带时区"""
         logger.debug(f"保存标注结果 - 诗词ID: {poem_id}, 模型: {model_identifier}, 状态: {status}")
         
-        if not self.separate_db_manager:
-            self.separate_db_manager = get_separate_db_manager()
+        self._ensure_db_manager()
 
         from datetime import datetime, timezone, timedelta
         tz = timezone(timedelta(hours=8))
@@ -605,22 +654,97 @@ class SocialPoemAnalysisPlugin(BasePlugin):
 
         # 将同步数据库操作包装在 asyncio.to_thread 中
         def _sync_save():
-            with self.separate_db_manager.annotation_db.get_connection() as conn:
+            with self.separate_db_manager.annotation_db.get_connection(db_type='annotation') as conn:
                 cursor = conn.cursor()
                 try:
-                    cursor.execute('''
-                        INSERT INTO annotations (poem_id, model_identifier, status, annotation_result, error_message, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ON CONFLICT(poem_id, model_identifier) DO UPDATE SET
-                            status = excluded.status,
-                            annotation_result = excluded.annotation_result,
-                            error_message = excluded.error_message,
-                            updated_at = excluded.updated_at
-                    ''', (poem_id, model_identifier, status, annotation_result, error_message, now, now))
+                    # 首先插入或更新主标注记录
+                    if status == 'completed' and annotation_result:
+                        try:
+                            annotation_data = json.loads(annotation_result)
+                            # 验证 annotation_data 是否为非空列表
+                            if not isinstance(annotation_data, list) or not annotation_data:
+                                raise ValueError("Annotation result is not a non-empty list.")
+                        except (json.JSONDecodeError, ValueError) as e:
+                            logger.error(f"解析或验证annotation_result JSON失败 - 诗词ID: {poem_id}, 模型: {model_identifier}, 错误: {e}")
+                            # 如果解析或验证失败，将状态设置为 'failed' 并记录错误
+                            cursor.execute('''
+                            INSERT INTO annotations (poem_id, model_identifier, status, annotation_result, error_message, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(poem_id, model_identifier) DO UPDATE SET
+                                status = excluded.status,
+                                annotation_result = excluded.annotation_result,
+                                error_message = excluded.error_message,
+                                updated_at = excluded.updated_at
+                            ''', (poem_id, model_identifier, 'failed', annotation_result, str(e), now, now))
+                            conn.commit()
+                            return False
+
+                        # 1. 插入诗词级别的完整标注记录
+                        cursor.execute('''
+                            INSERT INTO annotations (
+                                poem_id, model_identifier, status,
+                                annotation_result, error_message, created_at, updated_at
+                            )
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(poem_id, model_identifier) DO UPDATE SET
+                                status = excluded.status,
+                                annotation_result = excluded.annotation_result,
+                                error_message = excluded.error_message,
+                                updated_at = excluded.updated_at
+                        ''', (poem_id, model_identifier, status, annotation_result, None, now, now))
+                        
+                        # 获取刚刚插入的 annotation_id
+                        cursor.execute("SELECT id FROM annotations WHERE poem_id = ? AND model_identifier = ?", (poem_id, model_identifier))
+                        annotation_id = cursor.fetchone()[0]
+
+                        # 2. 解析并存储句子级标注到 sentence_annotations 表
+                        for sentence_index, item in enumerate(annotation_data):
+                            sentence_uid = item.get('id', '')
+                            relationship_action = item.get('relationship_action')
+                            emotional_strategy = item.get('emotional_strategy', item.get('context_analysis', {}).get('emotional_strategy'))
+                            communication_scene = item.get('context_analysis', {}).get('communication_scene', [])
+                            risk_level = item.get('context_analysis', {}).get('risk_level')
+                            rationale = item.get('brief_rationale', item.get('rationale', ''))
+                            sentence_text = item.get('sentence', '') # 假设item中包含sentence字段
+
+                            communication_scene_json = json.dumps(communication_scene, ensure_ascii=False) if communication_scene else '[]'
+
+                            cursor.execute('''
+                                INSERT INTO sentence_annotations (
+                                    annotation_id, poem_id, sentence_uid, sentence_index, sentence_text,
+                                    relationship_action, emotional_strategy, communication_scene, risk_level, rationale,
+                                    created_at
+                                )
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                ON CONFLICT(annotation_id, sentence_uid) DO UPDATE SET
+                                    sentence_index = excluded.sentence_index,
+                                    sentence_text = excluded.sentence_text,
+                                    relationship_action = excluded.relationship_action,
+                                    emotional_strategy = excluded.emotional_strategy,
+                                    communication_scene = excluded.communication_scene,
+                                    risk_level = excluded.risk_level,
+                                    rationale = excluded.rationale,
+                                    created_at = excluded.created_at
+                            ''', (
+                                annotation_id, poem_id, sentence_uid, sentence_index, sentence_text,
+                                relationship_action, emotional_strategy, communication_scene_json, risk_level, rationale,
+                                now
+                            ))
+                    elif status == 'failed':
+                        # 对于失败的标注，插入一条特殊的记录
+                        cursor.execute('''
+                            INSERT INTO annotations (poem_id, model_identifier, status, annotation_result, error_message, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(poem_id, model_identifier) DO UPDATE SET
+                                status = excluded.status,
+                                annotation_result = excluded.annotation_result,
+                                error_message = excluded.error_message,
+                                updated_at = excluded.updated_at
+                        ''', (poem_id, model_identifier, status, annotation_result, error_message, now, now))
+                    
                     conn.commit()
-                    success = cursor.rowcount > 0
-                    if success:
-                        logger.debug(f"标注结果保存成功 - 诗词ID: {poem_id}, 模型: {model_identifier}")
+                    success = True # 只要执行到这里，就认为操作成功
+                    logger.debug(f"标注结果保存成功 - 诗词ID: {poem_id}, 模型: {model_identifier}, 状态: {status}")
                     return success
                 except Exception as e:
                     logger.error(f"保存标注结果失败 - 诗词ID: {poem_id}, 模型: {model_identifier}, 错误: {e}")
@@ -629,6 +753,64 @@ class SocialPoemAnalysisPlugin(BasePlugin):
         
         return await asyncio.to_thread(_sync_save)
             
+    async def update_annotations(self, poem_id: int, model_identifier: str, annotations: List[Dict[str, Any]]) -> bool:
+        """更新或插入诗词的句子标注数据到 sentence_annotations 表 (UPSERT)，时间戳带时区"""
+        logger.debug(f"更新标注数据 - 诗词ID: {poem_id}, 模型: {model_identifier}, 标注数量: {len(annotations)}")
+        
+        self._ensure_db_manager()
+
+        from datetime import datetime, timezone, timedelta
+        tz = timezone(timedelta(hours=8))
+        now = datetime.now(tz).isoformat()
+
+        # 将同步数据库操作包装在 asyncio.to_thread 中
+        def _sync_update():
+            with self.separate_db_manager.annotation_db.get_connection(db_type='annotation') as conn:
+                cursor = conn.cursor()
+                try:
+                    # 首先获取主标注记录的 annotation_id
+                    cursor.execute("SELECT id FROM annotations WHERE poem_id = ? AND model_identifier = ?", (poem_id, model_identifier))
+                    result = cursor.fetchone()
+                    if not result:
+                        logger.warning(f"未找到诗词 {poem_id} 和模型 {model_identifier} 的主标注记录，无法更新句子标注。")
+                        return False
+                    annotation_id = result[0]
+
+                    for annotation in annotations:
+                        sentence_uid = annotation.get('sentence_uid')
+                        sentence_index = annotation.get('sentence_index')
+                        sentence_text = annotation.get('sentence_text')
+                        relationship_action = annotation.get('relationship_action')
+                        emotional_strategy = annotation.get('emotional_strategy')
+                        communication_scene = annotation.get('communication_scene', [])
+                        risk_level = annotation.get('risk_level')
+                        rationale = annotation.get('rationale', '')
+
+                        # 将 communication_scene 列表转换为 JSON 字符串存储
+                        communication_scene_json = json.dumps(communication_scene, ensure_ascii=False) if communication_scene else '[]'
+
+                        cursor.execute('''
+                            INSERT OR REPLACE INTO sentence_annotations (
+                                annotation_id, poem_id, sentence_uid, sentence_index, sentence_text,
+                                relationship_action, emotional_strategy, communication_scene, risk_level, rationale,
+                                created_at
+                            )
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            annotation_id, poem_id, sentence_uid, sentence_index, sentence_text,
+                            relationship_action, emotional_strategy, communication_scene_json, risk_level, rationale,
+                            now
+                        ))
+                    conn.commit()
+                    logger.debug(f"标注数据更新成功 - 诗词ID: {poem_id}, 模型: {model_identifier}, 更新条数: {len(annotations)}")
+                    return True
+                except Exception as e:
+                    logger.error(f"更新标注数据失败 - 诗词ID: {poem_id}, 模型: {model_identifier}, 错误: {e}")
+                    conn.rollback()
+                    return False
+        
+        return await asyncio.to_thread(_sync_update)
+            
     # DataQueryPlugin 接口实现
     def get_poems_to_annotate(self, model_identifier: str, 
                              limit: Optional[int] = None, 
@@ -636,8 +818,7 @@ class SocialPoemAnalysisPlugin(BasePlugin):
                              end_id: Optional[int] = None,
                              force_rerun: bool = False) -> List[Poem]:
         """获取指定模型待标注的诗词"""
-        if not self.separate_db_manager:
-            self.separate_db_manager = get_separate_db_manager()
+        self._ensure_db_manager()
             
         params = []
         
@@ -671,46 +852,76 @@ class SocialPoemAnalysisPlugin(BasePlugin):
             query += " LIMIT ?"
             params.append(limit)
         
-        rows = self.separate_db_manager.raw_data_db.execute_query(query, tuple(params))
+        # 使用 raw_data_db 的连接，并附加 annotation.db
+        with self.separate_db_manager.raw_data_db.get_connection() as conn:
+            # 附加 annotation 数据库
+            annotation_db_path = self.separate_db_manager.db_configs['annotation']
+            conn.execute(f"ATTACH DATABASE '{annotation_db_path}' AS annotation_db")
+            
+            cursor = conn.cursor()
+            cursor.execute(query, tuple(params))
+            rows = cursor.fetchall()
 
         poems = []
         for row in rows:
             poem_dict = dict(row)
             if poem_dict.get('paragraphs'):
                 poem_dict['paragraphs'] = json.loads(poem_dict['paragraphs'])
-            poems.append(Poem.from_dict(poem_dict))
+            poems.append(create_model_instance("Poem", poem_dict))
 
         return poems
     
     def get_poem_by_id(self, poem_id: int) -> Optional[Poem]:
         """根据ID获取单首诗词信息"""
+        logger.debug(f"get_poem_by_id called for poem_id: {poem_id}")
+        self._ensure_db_manager()
+        
         if not self.separate_db_manager:
-            self.separate_db_manager = get_separate_db_manager()
-            
+            logger.error("Database manager not initialized in get_poem_by_id.")
+            return None
+
         # 查询 'title'
-        rows = self.separate_db_manager.raw_data_db.execute_query("""
+        query = """
             SELECT p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc
             FROM poems p
             LEFT JOIN authors au ON p.author = au.name
             WHERE p.id = ?
-        """, (poem_id,))
+        """
+        logger.debug(f"Executing query in get_poem_by_id: {query} with params: ({poem_id},)")
         
-        if rows:
-            row = rows[0]
-            poem_dict = dict(row)
-            if poem_dict.get('paragraphs'):
-                poem_dict['paragraphs'] = json.loads(poem_dict['paragraphs'])
-            return Poem.from_dict(poem_dict)
-        
-        return None
+        # 使用 raw_data_db 的连接，并附加 annotation.db
+        try:
+            with self.separate_db_manager.raw_data_db.get_connection() as conn:
+                # 附加 annotation 数据库
+                annotation_db_path = self.separate_db_manager.db_configs['annotation']
+                conn.execute(f"ATTACH DATABASE '{annotation_db_path}' AS annotation_db")
+                logger.debug(f"Attached annotation_db: {annotation_db_path}")
+                
+                cursor = conn.cursor()
+                cursor.execute(query, (poem_id,))
+                rows = cursor.fetchall()
+                logger.debug(f"Query for poem_id {poem_id} returned {len(rows)} rows.")
+            
+            if rows:
+                row = rows[0]
+                poem_dict = dict(row)
+                if poem_dict.get('paragraphs'):
+                    poem_dict['paragraphs'] = json.loads(poem_dict['paragraphs'])
+                logger.debug(f"Poem found: {poem_dict.get('title')} by {poem_dict.get('author')}")
+                return create_model_instance("Poem", poem_dict)
+            else:
+                logger.debug(f"No poem found with ID: {poem_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error in get_poem_by_id for poem_id {poem_id}: {e}")
+            return None
     
     def get_poems_by_ids(self, poem_ids: List[int]) -> List[Poem]:
         """根据ID列表获取诗词信息"""
         if not poem_ids:
             return []
             
-        if not self.separate_db_manager:
-            self.separate_db_manager = get_separate_db_manager()
+        self._ensure_db_manager()
             
         # 查询 'title'
         placeholders = ','.join('?' * len(poem_ids))
@@ -721,31 +932,47 @@ class SocialPoemAnalysisPlugin(BasePlugin):
             WHERE p.id IN ({placeholders})
         """
         
-        rows = self.separate_db_manager.raw_data_db.execute_query(query, tuple(poem_ids))
+        # 使用 raw_data_db 的连接，并附加 annotation.db
+        with self.separate_db_manager.raw_data_db.get_connection() as conn:
+            # 附加 annotation 数据库
+            annotation_db_path = self.separate_db_manager.db_configs['annotation']
+            conn.execute(f"ATTACH DATABASE '{annotation_db_path}' AS annotation_db")
+            
+            cursor = conn.cursor()
+            cursor.execute(query, tuple(poem_ids))
+            rows = cursor.fetchall()
         
         poems = []
         for row in rows:
             poem_dict = dict(row)
             if poem_dict.get('paragraphs'):
                 poem_dict['paragraphs'] = json.loads(poem_dict['paragraphs'])
-            poems.append(Poem.from_dict(poem_dict))
+            poems.append(create_model_instance("Poem", poem_dict))
         
         return poems
     
     def get_all_authors(self) -> List[Author]:
         """获取所有作者信息"""
-        if not self.separate_db_manager:
-            self.separate_db_manager = get_separate_db_manager()
+        self._ensure_db_manager()
             
-        rows = self.separate_db_manager.raw_data_db.execute_query("SELECT name, description, short_description FROM authors ORDER BY name")
+        query = "SELECT name, description, short_description FROM authors ORDER BY name"
         
-        return [Author.from_dict(dict(row)) for row in rows]
+        # 使用 raw_data_db 的连接，并附加 annotation.db
+        with self.separate_db_manager.raw_data_db.get_connection() as conn:
+            # 附加 annotation 数据库
+            annotation_db_path = self.separate_db_manager.db_configs['annotation']
+            conn.execute(f"ATTACH DATABASE '{annotation_db_path}' AS annotation_db")
+            
+            cursor = conn.cursor()
+            cursor.execute(query)
+            rows = cursor.fetchall()
+        
+        return [create_model_instance("Author", dict(row)) for row in rows]
     
     def search_poems(self, author: Optional[str] = None, title: Optional[str] = None, 
                      page: int = 1, per_page: int = 10) -> Dict[str, Any]:
         """根据作者和标题搜索诗词，并支持分页"""
-        if not self.separate_db_manager:
-            self.separate_db_manager = get_separate_db_manager()
+        self._ensure_db_manager()
             
         # 查询 'title'
         query = "SELECT p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc FROM poems p LEFT JOIN authors au ON p.author = au.name"
@@ -766,22 +993,32 @@ class SocialPoemAnalysisPlugin(BasePlugin):
         
         # Get total count for pagination
         count_query = query.replace("p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc", "COUNT(*)")
-        count_rows = self.separate_db_manager.raw_data_db.execute_query(count_query, tuple(params))
-        total_count = count_rows[0][0]
-
+        
         # Add pagination to the main query
         offset = (page - 1) * per_page
         query += " ORDER BY p.id LIMIT ? OFFSET ?"
         params.extend([per_page, offset])
 
-        rows = self.separate_db_manager.raw_data_db.execute_query(query, tuple(params))
+        # 使用 raw_data_db 的连接，并附加 annotation.db
+        with self.separate_db_manager.raw_data_db.get_connection() as conn:
+            # 附加 annotation 数据库
+            annotation_db_path = self.separate_db_manager.db_configs['annotation']
+            conn.execute(f"ATTACH DATABASE '{annotation_db_path}' AS annotation_db")
+            
+            cursor = conn.cursor()
+            cursor.execute(count_query, tuple(params[:-2]))  # Exclude LIMIT and OFFSET for count query
+            count_rows = cursor.fetchall()
+            total_count = count_rows[0][0]
+
+            cursor.execute(query, tuple(params))
+            rows = cursor.fetchall()
 
         poems = []
         for row in rows:
             poem_dict = dict(row)
             if poem_dict.get('paragraphs'):
                 poem_dict['paragraphs'] = json.loads(poem_dict['paragraphs'])
-            poems.append(Poem.from_dict(poem_dict))
+            poems.append(create_model_instance("Poem", poem_dict))
 
         return {
             "poems": poems,
@@ -796,8 +1033,7 @@ class SocialPoemAnalysisPlugin(BasePlugin):
         if not poem_ids:
             return set()
             
-        if not self.separate_db_manager:
-            self.separate_db_manager = get_separate_db_manager()
+        self._ensure_db_manager()
 
         completed_ids = set()
         try:
@@ -813,7 +1049,7 @@ class SocialPoemAnalysisPlugin(BasePlugin):
             """
             
             params = poem_ids + [model_identifier]
-            rows = self.separate_db_manager.annotation_db.execute_query(query, tuple(params))
+            rows = self.separate_db_manager.annotation_db.execute_query(query, tuple(params), db_type='annotation')
             
             # 使用生成器表达式和 set.update 最高效地处理结果
             completed_ids.update(row[0] for row in rows)
@@ -822,6 +1058,68 @@ class SocialPoemAnalysisPlugin(BasePlugin):
             logger.error(f"检查标注状态时发生数据库错误: {e}")
         
         return completed_ids
+    
+    def get_annotation_sources_for_poem(self, poem_id: int) -> List[str]:
+        """获取指定诗词的所有可用标注来源 (model_identifier)"""
+        self._ensure_db_manager()
+        
+        query = """
+            SELECT DISTINCT model_identifier
+            FROM annotations
+            WHERE poem_id = ?
+            ORDER BY model_identifier
+        """
+        
+        rows = self.separate_db_manager.annotation_db.execute_query(query, (poem_id,), db_type='annotation')
+        return [row[0] for row in rows]
+
+    def get_annotations_for_poem(self, poem_id: int, model_identifier: str) -> List[Dict[str, Any]]:
+        """获取指定诗词和模型标识符的所有句子标注"""
+        self._ensure_db_manager()
+
+        # 首先获取主标注记录的 annotation_id
+        query_annotation_id = """
+            SELECT id FROM annotations
+            WHERE poem_id = ? AND model_identifier = ?
+        """
+        result = self.separate_db_manager.annotation_db.execute_query(query_annotation_id, (poem_id, model_identifier), db_type='annotation')
+        if not result:
+            logger.warning(f"未找到诗词 {poem_id} 和模型 {model_identifier} 的主标注记录。")
+            return []
+        annotation_id = result[0][0]
+
+        query = """
+            SELECT sentence_uid, sentence_index, sentence_text, relationship_action, emotional_strategy, communication_scene, risk_level, rationale
+            FROM sentence_annotations
+            WHERE annotation_id = ? AND poem_id = ?
+            ORDER BY sentence_index
+        """
+        
+        rows = self.separate_db_manager.annotation_db.execute_query(query, (annotation_id, poem_id), db_type='annotation')
+        
+        annotations_list = []
+        for row in rows:
+            annotation_dict = {
+                'sentence_uid': row[0],
+                'sentence_index': row[1],
+                'sentence_text': row[2],
+                'relationship_action': row[3],
+                'emotional_strategy': row[4],
+                'communication_scene': row[5],
+                'risk_level': row[6],
+                'rationale': row[7]
+            }
+            # communication_scene 字段可能存储为 JSON 字符串，需要解析
+            if 'communication_scene' in annotation_dict and annotation_dict['communication_scene']:
+                try:
+                    annotation_dict['communication_scene'] = json.loads(annotation_dict['communication_scene'])
+                except json.JSONDecodeError:
+                    logger.warning(f"无法解析 communication_scene 字段为 JSON: {annotation_dict['communication_scene']}")
+                    annotation_dict['communication_scene'] = [] # 解析失败则设为空列表
+            else:
+                annotation_dict['communication_scene'] = [] # 如果为空或None，则设为空列表
+            annotations_list.append(annotation_dict)
+        return annotations_list
         
     # DataProcessingPlugin 接口实现
     def load_data_from_json(self, source_dir: str, json_file: str) -> List[Dict[str, Any]]:
@@ -904,15 +1202,74 @@ class SocialPoemAnalysisPlugin(BasePlugin):
     # AnnotationManagementPlugin 接口实现
     def get_statistics(self) -> Dict[str, Any]:
         """获取数据库统计信息"""
-        if not self.separate_db_manager:
-            self.separate_db_manager = get_separate_db_manager()
+        self._ensure_db_manager()
             
-        return self.separate_db_manager.get_database_stats()
+        # 使用 raw_data_db 的连接，并附加 annotation.db
+        with self.separate_db_manager.raw_data_db.get_connection() as conn:
+            # 附加 annotation 数据库
+            annotation_db_path = self.separate_db_manager.db_configs['annotation']
+            conn.execute(f"ATTACH DATABASE '{annotation_db_path}' AS annotation_db")
+            
+            # 获取数据库统计信息
+            stats = {}
+            
+            # 统计原始数据数据库
+            try:
+                # 获取表统计信息
+                tables_stats = {}
+                tables = ['poems', 'authors']
+                
+                cursor = conn.cursor()
+                for table in tables:
+                    try:
+                        cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                        rows = cursor.fetchall()
+                        tables_stats[table] = rows[0][0] if rows else 0
+                    except Exception:
+                        tables_stats[table] = "N/A"
+                
+                stats['raw_data'] = {
+                    "status": "ok",
+                    "path": self.separate_db_manager.db_configs['raw_data'],
+                    "tables": tables_stats
+                }
+            except Exception as e:
+                stats['raw_data'] = {
+                    "status": "error",
+                    "message": str(e)
+                }
+                
+            # 统计标注数据数据库
+            try:
+                # 获取表统计信息
+                tables_stats = {}
+                tables = ['annotations']
+                
+                cursor = conn.cursor()
+                for table in tables:
+                    try:
+                        cursor.execute(f"SELECT COUNT(*) FROM annotation_db.{table}")
+                        rows = cursor.fetchall()
+                        tables_stats[table] = rows[0][0] if rows else 0
+                    except Exception:
+                        tables_stats[table] = "N/A"
+                
+                stats['annotation'] = {
+                    "status": "ok",
+                    "path": self.separate_db_manager.db_configs['annotation'],
+                    "tables": tables_stats
+                }
+            except Exception as e:
+                stats['annotation'] = {
+                    "status": "error",
+                    "message": str(e)
+                }
+            
+        return stats
     
     def get_annotation_statistics(self) -> Dict[str, Any]:
         """获取标注统计信息"""
-        if not self.separate_db_manager:
-            self.separate_db_manager = get_separate_db_manager()
+        self._ensure_db_manager()
             
         # 获取标注统计信息
         try:
@@ -921,11 +1278,11 @@ class SocialPoemAnalysisPlugin(BasePlugin):
             total_poems = total_poems_rows[0][0] if total_poems_rows else 0
             
             # 统计已标注诗词数
-            annotated_poems_rows = self.separate_db_manager.annotation_db.execute_query("SELECT COUNT(DISTINCT poem_id) FROM annotations WHERE status = 'completed'")
+            annotated_poems_rows = self.separate_db_manager.annotation_db.execute_query("SELECT COUNT(DISTINCT poem_id) FROM annotations WHERE status = 'completed'", db_type='annotation')
             annotated_poems = annotated_poems_rows[0][0] if annotated_poems_rows else 0
             
             # 统计标注失败数
-            failed_annotations_rows = self.separate_db_manager.annotation_db.execute_query("SELECT COUNT(*) FROM annotations WHERE status = 'failed'")
+            failed_annotations_rows = self.separate_db_manager.annotation_db.execute_query("SELECT COUNT(*) FROM annotations WHERE status = 'failed'", db_type='annotation')
             failed_annotations = failed_annotations_rows[0][0] if failed_annotations_rows else 0
             
             return {

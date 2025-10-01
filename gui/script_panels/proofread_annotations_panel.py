@@ -61,7 +61,7 @@ class ProofreadAnnotationsPanel(ScriptPanelBase):
         """
         Opens a file dialog to select the output file path.
         """
-        file_path, _ = QFileDialog.getSaveFileName(self, _("Select Output File"), "", _("JSON Files (*.json);;Text Files (*.txt);;All Files (*.*)"))
+        file_path, selected_filter = QFileDialog.getSaveFileName(self, _("Select Output File"), "", _("JSON Files (*.json);;Text Files (*.txt);;All Files (*.*)"))
         if file_path:
             self.output_file_input.setText(file_path)
 

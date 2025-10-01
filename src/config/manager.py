@@ -106,12 +106,6 @@ class ConfigManager:
         # 检查项目配置中是否有任何数据库相关设置
         config = {}
         
-        # 处理主数据库路径配置
-        if project_db.db_paths:
-            config['db_paths'] = project_db.db_paths
-        elif project_db.db_path:
-            config['db_path'] = project_db.db_path
-            
         # 处理分离数据库配置
         separate_db_config = self._get_effective_separate_database_config()
         if separate_db_config:

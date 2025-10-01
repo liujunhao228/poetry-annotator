@@ -11,7 +11,7 @@ class PluginType(Enum):
     QUERY = "query"
     PREPROCESSING = "preprocessing"
     PROMPT_BUILDER = "prompt_builder"
-    LABEL_PARSER = "label_parser"
+    EMOTION_CLASSIFICATION = "emotion_classification"
     DATABASE_INIT = "database_init"
     CUSTOM = "custom"
     DATA_STORAGE = "data_storage"

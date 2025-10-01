@@ -55,15 +55,15 @@ class DataModelDefinitionPlugin(ModelDefinitionPlugin):
                 ("id", str),
                 ("name_zh", str),
                 ("name_en", str, field(default=None)),
-                ("category_type", str),  # relationship_action, emotional_strategy, communication_scene, risk_level
+                ("category_type", str, field(default=None)),  # relationship_action, emotional_strategy, communication_scene, risk_level
                 ("parent_id", str, field(default=None)),
-                ("level", int)
+                ("level", int, field(default=0))
             ],
             "Annotation": [
                 ("id", int, field(default=None)),
-                ("poem_id", int),
-                ("model_identifier", str),
-                ("status", str),  # 'completed' or 'failed'
+                ("poem_id", int, field(default=0)),
+                ("model_identifier", str, field(default="")),
+                ("status", str, field(default="pending")),  # 'completed' or 'failed'
                 ("annotation_result", str, field(default=None)),
                 ("error_message", str, field(default=None)),
                 ("created_at", str, field(default=None)),
@@ -71,16 +71,16 @@ class DataModelDefinitionPlugin(ModelDefinitionPlugin):
             ],
             "SentenceAnnotation": [
                 ("id", int, field(default=None)),
-                ("annotation_id", int),
-                ("poem_id", int),
-                ("sentence_uid", str),
-                ("sentence_text", str)
+                ("annotation_id", int, field(default=None)),
+                ("poem_id", int, field(default=0)),
+                ("sentence_uid", str, field(default="")),
+                ("sentence_text", str, field(default=""))
             ],
             "SentenceStrategyLink": [
                 ("sentence_annotation_id", int),
                 ("strategy_id", str),
-                ("strategy_type", str),  # relationship_action, emotional_strategy, communication_scene, risk_level
-                ("is_primary", bool)
+                ("strategy_type", str, field(default=None)),  # relationship_action, emotional_strategy, communication_scene, risk_level
+                ("is_primary", bool, field(default=False))
             ]
         }
         

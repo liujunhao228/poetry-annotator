@@ -20,7 +20,7 @@ class ComponentType(Enum):
     QUERY_BUILDER = "query_builder"
     PROMPT_BUILDER = "prompt_builder"
     DB_INITIALIZER = "db_initializer"
-    LABEL_PARSER = "label_parser"
+    EMOTION_CLASSIFICATION = "emotion_classification"
     CUSTOM_QUERY = "custom_query"
     PREPROCESSING = "preprocessing"
     # 数据相关插件类型

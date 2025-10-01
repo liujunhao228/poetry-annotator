@@ -78,8 +78,16 @@ class Annotator:
             from .component_system import get_component_system, ComponentType
             project_root = Path(__file__).parent.parent
             component_system = get_component_system(project_root)
-            label_parser = component_system.get_component(ComponentType.LABEL_PARSER)
-            self.emotion_schema_text = label_parser.get_categories_text()
+            emotion_classifier = component_system.get_component(ComponentType.EMOTION_CLASSIFICATION)
+            
+            # 检查 emotion_classifier 是否为 None
+            if emotion_classifier is None:
+                logger.warning("情感分类器组件未找到，尝试直接初始化情感分类器")
+                # 直接初始化情感分类器
+                from .emotion_classification.plugin_adapter import EmotionClassifierPluginAdapter
+                emotion_classifier = EmotionClassifierPluginAdapter(project_root=project_root)
+            
+            self.emotion_schema_text = emotion_classifier.get_categories_text()
             # 导入EmotionSchema类
             from .llm_services.schemas import EmotionSchema
             self.emotion_schema = EmotionSchema(text=self.emotion_schema_text)

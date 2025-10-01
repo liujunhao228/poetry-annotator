@@ -108,7 +108,7 @@ class MainWindow(QMainWindow):
         self.log_handler = LogStreamHandler()
         self.log_handler.log_signal.connect(self._update_log_display)
         logging.getLogger().addHandler(self.log_handler)
-        logging.getLogger().setLevel(logging.INFO) # Set a default logging level
+        logging.getLogger().setLevel(logging.DEBUG) # Set logging level to DEBUG for detailed output
 
         logging.info(_("GUI application started."))
 

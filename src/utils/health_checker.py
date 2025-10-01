@@ -6,7 +6,7 @@ from typing import List, Tuple
 from pathlib import Path
 
 from ..llm_factory import llm_factory
-from ..plugin_label_parser import get_plugin_label_parser
+from ..emotion_classification.manager import get_emotion_classification_manager
 from ..config import config_manager # 导入以检查路径
 
 logger = logging.getLogger(__name__)
@@ -60,8 +60,8 @@ class HealthChecker:
             categories_config = config_manager.get_categories_config()
             md_path = categories_config.get('md_path')
             # 这是一个隐式检查，get_categories_text会尝试读取文件
-            label_parser = get_plugin_label_parser()
-            label_parser.get_categories_text()
+            emotion_classifier = get_emotion_classification_manager()
+            emotion_classifier.get_categories_text()
             logger.info(f"[✓] 情感分类体系文件加载成功 ({md_path})")
         except Exception as e:
             logger.error(f"[✗] 情感分类体系文件加载失败: {e}", exc_info=True)

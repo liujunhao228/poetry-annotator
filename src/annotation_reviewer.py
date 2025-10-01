@@ -16,6 +16,7 @@ import json
 import logging
 import sys
 import os
+import sqlite3 # 导入 sqlite3 模块
 from typing import Dict, List, Optional, Tuple, Any
 
 # 获取项目根目录并添加到 Python 路径
@@ -165,22 +166,14 @@ class AnnotationReviewerLogic:
                  如果未找到或出错，返回空列表。
         """
         try:
-            # 获取数据库路径
-            db_configs = self.data_manager.separate_db_manager.db_configs if hasattr(self.data_manager, 'separate_db_manager') else {}
-            annotation_db_path = db_configs.get('annotation', f"data/{self.data_manager.db_name}/annotation.db")
-            
-            # 获取数据库连接
-            conn = sqlite3.connect(annotation_db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
+            # 使用 data_manager 的 annotation_db 访问标注数据库
             query = """
                 SELECT model_identifier
                 FROM annotations
                 WHERE poem_id = ? AND status = 'completed'
             """
-            cursor.execute(query, (poem_id,))
-            rows = cursor.fetchall()
+            # execute_query 返回的是列表的元组，需要转换为列表的列表
+            rows = self.data_manager.annotation_db.execute_query(query, (poem_id,))
             models = [row[0] for row in rows]
             logger.debug(f"诗词ID {poem_id} 可用模型: {models}")
             logger.info(f"诗词ID {poem_id} 找到 {len(models)} 个可用模型")
@@ -211,27 +204,19 @@ class AnnotationReviewerLogic:
 
         # 2. 查询对应的标注结果
         try:
-            # 获取数据库路径
-            db_configs = self.data_manager.separate_db_manager.db_configs if hasattr(self.data_manager, 'separate_db_manager') else {}
-            annotation_db_path = db_configs.get('annotation', f"data/{self.data_manager.db_name}/annotation.db")
-            
-            # 获取数据库连接
-            conn = sqlite3.connect(annotation_db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
+            # 使用 data_manager 的 annotation_db 访问标注数据库
             query = """
                 SELECT annotation_result
                 FROM annotations
                 WHERE poem_id = ? AND model_identifier = ? AND status = 'completed'
             """
-            cursor.execute(query, (poem_id, model_identifier))
-            rows = cursor.fetchall()
+            rows = self.data_manager.annotation_db.execute_query(query, (poem_id, model_identifier))
             
             if not rows:
                 logger.warning(f"未找到诗词 {poem_id} 由模型 {model_identifier} 生成的 completed 标注。")
                 return poem_info, None
             
+            # execute_query 返回的是列表的元组，这里取第一个元素的第一个值
             annotation_result_str = rows[0][0]
             if not annotation_result_str:
                 logger.warning(f"诗词 {poem_id} 由模型 {model_identifier} 生成的标注结果为空。")

@@ -11,13 +11,21 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.data import get_data_manager
+try:
+    from src.data import get_data_manager
+except ImportError:
+    # 如果上面的方式失败，尝试另一种方式
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    from src.data import get_data_manager
 
 # 配置日志记录
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-def find_duplicate_full_text_groups(output_dir: str, source_dir: str) -> List[Dict[str, Any]]:
+def find_duplicate_full_text_groups(db_name: str) -> List[Dict[str, Any]]:
     """
     在数据库中查找 full_text 字段内容相同的诗词ID组。
 
@@ -26,17 +34,16 @@ def find_duplicate_full_text_groups(output_dir: str, source_dir: str) -> List[Di
     和处理最终的、已经分组好的结果，而不是将整个表加载到内存中。
 
     Args:
-        output_dir (str): 项目的输出目录，用于派生项目名称和数据库路径。
-        source_dir (str): 数据源目录。
+        db_name (str): 数据库名称，用于获取数据库路径。
 
     Returns:
         List[Dict[str, Any]]: 一个包含重复项信息的列表。每个字典代表一个重复组，
                                包含 'ids' (ID列表) 和 'text_preview' (文本预览)。
     """
-    logging.info(f"开始在项目输出目录 '{output_dir}' 中查找重复的 full_text 内容...")
+    logging.info(f"开始在数据库 '{db_name}' 中查找重复的 full_text 内容...")
     
     # 获取数据管理器
-    data_manager = get_data_manager(output_dir=output_dir, source_dir=source_dir)
+    data_manager = get_data_manager(db_name=db_name)
     
     # 获取数据库路径
     raw_data_db_path = data_manager.separate_db_paths.get('raw_data')
@@ -109,16 +116,10 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
-        '--output-dir',
+        '--db',
         type=str,
         required=True,
-        help='指定项目输出目录，用于派生项目名称和数据库路径。'
-    )
-    parser.add_argument(
-        '--source-dir',
-        type=str,
-        required=True,
-        help='指定数据源目录。'
+        help='指定数据库名称，用于获取数据库路径。'
     )
     parser.add_argument(
         '--output-file',
@@ -130,7 +131,7 @@ def main():
     args = parser.parse_args()
     
     # 查找重复组
-    groups = find_duplicate_full_text_groups(output_dir=args.output_dir, source_dir=args.source_dir)
+    groups = find_duplicate_full_text_groups(db_name=args.db)
 
     if groups:
         logging.info(f"查询完成！总共找到 {len(groups)} 个内容重复的组。")

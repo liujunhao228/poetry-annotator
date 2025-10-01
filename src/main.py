@@ -15,7 +15,7 @@ try:
     from .config import config_manager
     from .config.manager import ConfigManager  # 导入 ConfigManager 类
     from .data import get_data_manager
-    from .plugin_label_parser import get_plugin_label_parser
+    from .emotion_classification.manager import get_emotion_classification_manager
     from .llm_factory import llm_factory
     from .annotator import Annotator
     from .logging_config import setup_default_logging, get_logger
@@ -37,7 +37,7 @@ if relative_import_failed:
         from config import config_manager
         from config.manager import ConfigManager  # 导入 ConfigManager 类
         from data import get_data_manager
-        from plugin_label_parser import get_plugin_label_parser
+        from emotion_classification.manager import get_emotion_classification_manager
         from llm_factory import llm_factory
         from annotator import Annotator
         from logging_config import setup_default_logging, get_logger
@@ -46,8 +46,8 @@ if relative_import_failed:
         print(f"绝对导入也失败了: {e}")
         raise # Re-raise the exception to stop execution
 
-# 获取标签解析器实例
-label_parser = get_plugin_label_parser()
+# 获取情感分类管理器实例
+emotion_classifier = get_emotion_classification_manager()
 
 
 # 获取主日志记录器
@@ -165,9 +165,9 @@ def setup(config):
                 # 如果Markdown文件存在且比XML文件新，或者XML文件不存在，则重新生成XML
                 if md_file.exists() and (not xml_file.exists() or md_file.stat().st_mtime > xml_file.stat().st_mtime):
                     logger.info(f"检测到Markdown文件更新，正在重新生成XML文件...")
-                    # 重新创建label_parser实例以触发解析和生成
-                    from .plugin_label_parser import get_plugin_label_parser
-                    get_plugin_label_parser()  # 初始化时会自动处理Markdown到XML的转换
+                    # 重新创建emotion_classifier实例以触发解析和生成
+                    from .emotion_classification.manager import get_emotion_classification_manager
+                    get_emotion_classification_manager()  # 初始化时会自动处理Markdown到XML的转换
                     logger.info("情感分类体系XML文件已更新")
                 elif xml_file.exists():
                     logger.info("情感分类体系XML文件已是最新")

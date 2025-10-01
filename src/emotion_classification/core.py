@@ -27,7 +27,7 @@ class EmotionClassificationCore:
         self.plugin_manager = get_plugin_manager()
         
         # 获取所有已注册的情感分类插件
-        self.emotion_plugins = self.plugin_manager.get_plugins_by_type(PluginType.LABEL_PARSER)
+        self.emotion_plugins = self.plugin_manager.get_plugins_by_type(PluginType.EMOTION_CLASSIFICATION)
         self.emotion_plugins = [
             plugin for plugin in self.emotion_plugins 
             if isinstance(plugin, EmotionClassificationPlugin)

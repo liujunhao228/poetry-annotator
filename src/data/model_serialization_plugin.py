@@ -158,7 +158,11 @@ class DataModelSerializationPlugin(ModelSerializationPlugin):
         if 'data_status' not in data:
             data['data_status'] = "active"
         
-        return model_class(**data)
+        # 过滤掉不在模型字段中的额外数据
+        model_fields = {field.name for field in fields(model_class)}
+        filtered_data = {k: v for k, v in data.items() if k in model_fields}
+        
+        return model_class(**filtered_data)
     
     def _deserialize_author(self, model_class, data: Dict[str, Any]):
         """从字典创建Author实例"""

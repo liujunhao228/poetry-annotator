@@ -26,7 +26,7 @@ class EmotionClassifierPluginAdapter(Component, EmotionClassificationPlugin):
         :param project_root: 项目根目录路径
         :param config: 插件配置
         """
-        Component.__init__(self, ComponentType.LABEL_PARSER)  # 设置组件类型为标签解析器
+        Component.__init__(self, ComponentType.EMOTION_CLASSIFICATION)  # 设置组件类型为情感分类
         EmotionClassificationPlugin.__init__(self, config)
         self.project_root = project_root
         # 直接实例化具体的插件，避免循环依赖和重复初始化

@@ -33,12 +33,12 @@ class ProjectPluginConfigManager:
         enabled = plugin_section.getboolean('enabled', False)
         path = plugin_section.get('path', '')
         module = plugin_section.get('module', '')
-        class_name = plugin_section.get('class', '')
+        class_name = plugin_section.get('class_name', '') # 修改这里
         
         # 获取其他设置
         settings = {}
         for key, value in plugin_section.items():
-            if key not in ['enabled', 'path', 'module', 'class']:
+            if key not in ['enabled', 'path', 'module', 'class_name']: # 修改这里
                 settings[key] = value
                 
         return PluginConfig(

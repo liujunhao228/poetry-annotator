@@ -347,7 +347,7 @@ class BaseLLMService(ABC):
         try:
             self.logger.debug("开始使用注入的解析器统一解析并验证响应...")
             # 使用实例变量 self.response_parser 而不是全局变量
-            validated_list = self.response_parser.parse(response_text)
+            validated_list = self.response_parser.parse_and_validate(response_text)
             
             # [新增] 如果配置要求保存完整响应，则记录完整响应内容
             if save_full_response:

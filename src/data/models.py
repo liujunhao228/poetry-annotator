@@ -2,8 +2,11 @@
 数据模型定义模块
 此模块通过插件系统动态生成数据模型类
 """
+import logging
 from typing import Dict, Any, List, Optional, Type
 from src.data.plugin_manager import PluginManager
+
+logger = logging.getLogger(__name__)
 
 
 # 全局插件管理器实例
@@ -55,12 +58,26 @@ def create_model_instance(model_name: str, data: Dict[str, Any], plugin_type: st
     
     # 首先尝试通过指定的插件类型创建
     if plugin_type != "data_model_definition":
-        instance = _plugin_manager.create_model_instance_by_type(plugin_type, plugin_type, model_name, data)
-        if instance:
-            return instance
-    
+        # 尝试通过插件管理器的通用方法获取插件
+        specific_plugin = _plugin_manager.get_plugin(plugin_type)
+        if specific_plugin and hasattr(specific_plugin, 'create_model_instance'):
+            try:
+                return specific_plugin.create_model_instance(model_name, data)
+            except Exception as e:
+                logger.error(f"Error calling create_model_instance on specific plugin '{plugin_type}': {e}")
+                return None
+
     # 如果失败，回退到默认的data_model_definition插件
-    return _plugin_manager.create_model_instance("data_model_definition", model_name, data)
+    data_model_plugin = _plugin_manager.get_plugin("data_model_definition")
+    if data_model_plugin and hasattr(data_model_plugin, 'create_model_instance'):
+        try:
+            return data_model_plugin.create_model_instance(model_name, data)
+        except Exception as e:
+            logger.error(f"Error calling create_model_instance on default data_model_definition plugin: {e}")
+            return None
+    else:
+        logger.error("DataModelDefinitionPlugin not found or lacks create_model_instance method.")
+        return None
 
 
 def serialize_model(model_instance, plugin_type: str = "data_model_serialization") -> Dict[str, Any]:
