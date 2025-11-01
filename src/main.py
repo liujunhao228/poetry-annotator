@@ -6,120 +6,112 @@ from typing import Optional, Tuple
 import logging
 import os
 
-# 处理相对导入问题
-# 优先尝试相对导入（当作为包的一部分被导入时）
-relative_import_failed = False
-try:
-    # 当作为包运行时（推荐方式）
-    from .config_manager import config_manager
-    from .data_manager import get_data_manager
-    from .label_parser import label_parser
-    from .llm_factory import llm_factory
-    from .annotator import Annotator
-    from .logging_config import setup_default_logging, get_logger
-except ImportError as e:
-    relative_import_failed = True
-    print(f"相对导入失败: {e}")
+# 处理导入问题
+# 确保 src 目录在 sys.path 中，以便绝对导入可以找到 src 下的模块
+import sys
+import os
+src_dir = os.path.dirname(os.path.abspath(__file__))
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
+    print(f"已将 {src_dir} 添加到 sys.path")
 
-# 如果相对导入失败，则尝试绝对导入
-if relative_import_failed:
-    # 当直接运行时（兼容开发环境）
-    # 确保 src 目录在 sys.path 中，以便绝对导入可以找到 src 下的模块
-    src_dir = os.path.dirname(os.path.abspath(__file__))
-    if src_dir not in sys.path:
-        sys.path.insert(0, src_dir)
-        print(f"已将 {src_dir} 添加到 sys.path")
-        
-    try:
-        from config_manager import config_manager
-        from data_manager import get_data_manager
-        from label_parser import label_parser
-        from llm_factory import llm_factory
-        from annotator import Annotator
-        from logging_config import setup_default_logging, get_logger
-    except ImportError as e:
-        print(f"绝对导入也失败了: {e}")
-        raise # Re-raise the exception to stop execution
-
+# 使用绝对导入
+from project import Project
+from config_manager import ConfigManager
+from logging_config import setup_default_logging, get_logger
 
 # 获取主日志记录器
 logger = get_logger(__name__)
 
-
-# 获取主日志记录器
-logger = get_logger(__name__)
 
 
 @click.group()
 @click.option('--log-level', 
               type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR']), 
-              default=None,  # 改为None，优先使用配置文件
+              default=None, # 改为None，优先使用配置文件
               help='设置日志级别（可选，将覆盖配置文件设置）')
 @click.option('--log-file', help='指定日志文件路径（可选，将覆盖配置文件设置）')
 @click.option('--enable-file-log', is_flag=True, default=None, 
               help='启用文件日志输出（可选，将覆盖配置文件设置）')
-@click.option('--db-name', type=str, help='数据库名称（从配置文件中获取路径）')
-def cli(log_level, log_file, enable_file_log, db_name):
+@click.option('--project', type=str, required=True, help='项目名称')
+@click.option('--db-name', type=str, default="default", help='数据库名称（从项目配置文件中获取路径，默认为 "default"）')
+def cli(log_level, log_file, enable_file_log, project, db_name):
     """LLM诗词情感标注工具"""
-    # 设置日志配置 - 优先使用配置文件，CLI参数可覆盖
-    try:
-        config = config_manager.get_logging_config()
-        setup_default_logging(
-            log_level=log_level or config['log_level'],
-            enable_file_log=enable_file_log if enable_file_log is not None else config['enable_file_log'],
-            log_file=log_file or config['log_file']
-        )
-    except Exception as e:
-        # 如果配置文件有问题，使用CLI参数或默认值
-        setup_default_logging(log_level, enable_file_log, log_file)
+    # 1. 创建项目实例
+    project_instance = Project(project_name=project, project_root_dir=Path("projects"))
     
-    # 设置数据库
-    if db_name:
-        try:
-            get_data_manager(db_name=db_name)
-        except ValueError as e:
-            logger.error(f"数据库设置错误: {e}")
-            return
+    # 2. 根据项目配置设置日志
+    try:
+        project_instance.setup_project_logging()
+        # 重新获取 logger 实例，因为日志配置已更改
+        # Note: 在函数中重新赋值模块级别的logger变量，不需要global声明，
+        # 因为logger已经在模块级别定义了
+        globals()['logger'] = get_logger(__name__)
+        logger = globals()['logger']
+    except Exception as e:
+        # 如果项目日志配置有问题，使用CLI参数或默认值
+        # setup_default_logging 期望 console_level, file_level, enable_file_log, log_file
+        setup_default_logging(console_level=log_level, enable_file_log=enable_file_log, log_file=log_file)
+        # 重新获取 logger 实例，因为日志配置已更改
+        # Note: 在函数中重新赋值模块级别的logger变量，不需要global声明，
+        # 因为logger已经在模块级别定义了
+        globals()['logger'] = get_logger(__name__)
+        logger = globals()['logger']
+        logger.warning(f"使用默认日志配置，因为项目日志配置失败: {e}")
     
     # 记录启动信息
     logger.info("=" * 60)
-    logger.info("LLM诗词情感标注工具启动")
+    logger.info(f"LLM诗词情感标注工具启动 (项目: {project})")
     logger.info(f"Python版本: {sys.version}")
     logger.info(f"工作目录: {Path.cwd()}")
+    logger.info(f"项目根目录: {project_instance.root_path}")
     logger.info(f"日志级别: {logging.getLevelName(logger.level)}")
     logger.info("=" * 60)
 
 
 @cli.command()
-@click.option('--config', default='config/config.ini', help='配置文件路径')
+@click.option('--config', default='config.ini', help='项目配置文件路径 (相对于项目目录)')
 @click.option('--init-db', is_flag=True, help='初始化数据库（从JSON文件加载数据）')
 @click.option('--clear-existing', is_flag=True, help='清空现有数据后重新初始化')
 def setup(config, init_db, clear_existing):
     """初始化项目环境"""
     try:
+        # 从全局CLI上下文中获取项目实例
+        # 由于 `cli` 函数已经创建了 `Project` 实例并存储在局部变量 `project_instance` 中，
+        # 我们需要一种方式让子命令能够访问它。Click 提供了 `click.pass_context` 来传递上下文。
+        # 但更简单的方式是在 `cli` 中将 project_instance 存储到一个模块级变量或使用其他上下文管理方式。
+        # 为了保持简单和解耦，我们在这里重新创建 Project 实例，
+        # 这在实际应用中可能不是最优的，但对于此重构是可行的，因为 Project 使用了懒加载。
+        # 从命令行参数获取项目名称
+        ctx = click.get_current_context()
+        project_name = ctx.parent.params['project']
+        project_instance = Project(project_name=project_name, project_root_dir=Path("projects"))
+        
         logger.info("开始初始化项目环境...")
         
         # 检查配置文件
-        config_path = Path(config)
+        config_path = project_instance.root_path / config
         if not config_path.exists():
-            template_path = config_path.with_suffix('.ini.template')
-            logger.info(f"配置文件 {config} 不存在，自行从模板创建...")
-            logger.info(f"请复制 {template_path} 为 {config} 并配置您的API密钥。")
+            template_path = config_path.with_suffix(config_path.suffix + '.template')
+            logger.info(f"配置文件 {config_path} 不存在。")
+            if template_path.exists():
+                logger.info(f"请复制模板文件 {template_path} 为 {config_path} 并配置您的API密钥。")
+            else:
+                logger.warning(f"模板文件 {template_path} 也不存在。您需要手动创建配置文件 {config_path}。")
             return
 
-        config_manager.config_path = config
-        config_manager._load_config()
+        # 项目实例的 config_manager 已经在 __init__ 中加载了配置
         logger.info("配置文件加载成功")
         
         # 记录配置信息
         try:
-            llm_config = config_manager.get_llm_config()
+            llm_config = project_instance.config_manager.get_llm_config()
             logger.info(f"LLM配置 - 并发数: {llm_config.get('max_workers')}")
             
-            db_config = config_manager.get_database_config()
-            logger.info(f"数据库配置 - 路径: {db_config.get('db_path')}")
+            db_config = project_instance.config_manager.get_database_config()
+            logger.info(f"数据库配置 - 路径: {db_config.get('db_path', 'N/A')}")
             
-            data_config = config_manager.get_data_config()
+            data_config = project_instance.config_manager.get_data_config()
             logger.info(f"数据配置 - 源目录: {data_config.get('source_dir')}, 输出目录: {data_config.get('output_dir')}")
             
         except Exception as e:
@@ -128,38 +120,42 @@ def setup(config, init_db, clear_existing):
         # 确保情感分类体系是最新的（从Markdown文件生成XML文件）
         try:
             logger.info("检查情感分类体系文件...")
-            categories_config = config_manager.get_categories_config()
-            xml_path = categories_config.get('xml_path')
-            md_path = categories_config.get('md_path')
+            categories_config = project_instance.config_manager.get_categories_config()
+            xml_path = project_instance.root_path / categories_config.get('xml_path', 'categories.xml')
+            md_path = project_instance.root_path / categories_config.get('md_path', 'classification_schema.md')
             
-            if xml_path and md_path:
-                xml_file = Path(xml_path)
-                md_file = Path(md_path)
-                
+            if xml_path.exists() and md_path.exists():
                 # 如果Markdown文件存在且比XML文件新，或者XML文件不存在，则重新生成XML
-                if md_file.exists() and (not xml_file.exists() or md_file.stat().st_mtime > xml_file.stat().st_mtime):
+                if md_path.stat().st_mtime > xml_path.stat().st_mtime:
                     logger.info(f"检测到Markdown文件更新，正在重新生成XML文件...")
                     # 重新创建label_parser实例以触发解析和生成
-                    from .label_parser import LabelParser
-                    LabelParser()  # 初始化时会自动处理Markdown到XML的转换
-                    logger.info("情感分类体系XML文件已更新")
-                elif xml_file.exists():
-                    logger.info("情感分类体系XML文件已是最新")
+                    # 从项目上下文获取标签解析器
+                    label_parser_instance = project_instance.label_parser
+                    # 重新解析和生成，如果需要的话
+                    # Note: LabelParser 的 _load_categories 方法会检查文件修改时间并决定是否重新生成
+                    logger.info("情感分类体系XML文件已更新或已是最新")
                 else:
-                    logger.warning("未找到情感分类体系文件（Markdown或XML）")
+                    logger.info("情感分类体系XML文件已是最新")
+            elif md_path.exists():
+                logger.info("仅发现Markdown文件，正在生成XML文件...")
+                label_parser_instance = project_instance.label_parser
+                logger.info("情感分类体系XML文件已生成")
             else:
-                logger.warning("未配置情感分类体系文件路径")
+                logger.warning(f"未找到情感分类体系文件（{md_path} 或 {xml_path}）")
         except Exception as e:
             logger.warning(f"情感分类体系文件检查失败: {e}")
         
         if init_db:
             logger.info("开始从JSON文件初始化数据库...")
             try:
-                # 使用新的多数据库初始化方法
-                results = data_manager.initialize_all_databases_from_source_folders(clear_existing=clear_existing)
-                logger.info("所有数据库初始化完成!")
-                for folder_name, result in results.items():
-                    logger.info(f"数据库 [{folder_name}]: 作者: {result['authors']}, 诗词: {result['poems']}")
+                # 使用项目实例的 DataManager 来初始化数据库
+                # 这里我们直接调用 DataManager 的方法，而不是旧的全局方法
+                data_manager_instance = project_instance.get_data_manager(db_name=ctx.parent.params['db_name'])
+                # 从项目配置中获取数据源目录
+                source_dir = project_instance.root_path / data_config.get('source_dir', 'data')
+                # 加载数据并初始化
+                result = data_manager_instance.initialize_database_from_json(clear_existing=clear_existing)
+                logger.info(f"数据库初始化完成! 作者: {result['authors']}, 诗词: {result['poems']}")
             except Exception as e:
                 logger.error(f"数据库初始化失败: {e}")
                 return
@@ -170,7 +166,7 @@ def setup(config, init_db, clear_existing):
         logger.error(f"初始化失败: {e}", exc_info=True)
 
 
-async def run_multi_model_annotation(models: Tuple[str], limit: Optional[int], id_range: Optional[str], force_rerun: bool):
+async def run_multi_model_annotation(models: Tuple[str], limit: Optional[int], id_range: Optional[str], force_rerun: bool, project_instance: Project):
     """异步调度器，用于运行多模型标注任务"""
     start_id, end_id = None, None
     if id_range:
@@ -198,7 +194,8 @@ async def run_multi_model_annotation(models: Tuple[str], limit: Optional[int], i
         try:
             logger.info(f"创建模型配置 '{model_alias}' 的标注器...")
             # 不再设置环境变量用于批次日志
-            annotator = Annotator(config_name=model_alias)
+            # 使用项目实例来获取 Annotator
+            annotator = project_instance.get_annotator(config_name=model_alias)
             task = annotator.run(
                 limit=limit,
                 start_id=start_id,
@@ -253,12 +250,17 @@ async def run_multi_model_annotation(models: Tuple[str], limit: Optional[int], i
 def annotate(models, limit, id_range, force_rerun):
     """启动一个或多个模型的并发标注任务"""
     try:
+        # 从全局CLI上下文中获取项目实例
+        ctx = click.get_current_context()
+        project_name = ctx.parent.params['project']
+        project_instance = Project(project_name=project_name, project_root_dir=Path("projects"))
+        
         logger.info("启动多模型并发标注任务...")
         
         # 记录任务参数
         logger.info(f"任务参数 - 模型: {models or '未指定'}, 限制: {limit or '无'}, 范围: {id_range or '全部'}, 强制重跑: {force_rerun}")
         
-        asyncio.run(run_multi_model_annotation(models, limit, id_range, force_rerun))
+        asyncio.run(run_multi_model_annotation(models, limit, id_range, force_rerun, project_instance))
         
         logger.info("标注任务执行完成")
     except Exception as e:
@@ -268,8 +270,15 @@ def annotate(models, limit, id_range, force_rerun):
 def status():
     """显示标注进度统计 (按模型配置)"""
     try:
+        # 从全局CLI上下文中获取项目实例
+        ctx = click.get_current_context()
+        project_name = ctx.parent.params['project']
+        project_instance = Project(project_name=project_name, project_root_dir=Path("projects"))
+        
         logger.info("获取标注进度统计...")
-        stats = data_manager.get_statistics()
+        # 使用项目实例的 DataManager 来获取统计信息
+        data_manager_instance = project_instance.get_data_manager(db_name=ctx.parent.params['db_name'])
+        stats = data_manager_instance.get_statistics()
         
         print("\n=== 标注进度统计 ===")
         print(f"总诗词数量: {stats.get('total_poems', 0)}")
@@ -308,12 +317,19 @@ def status():
 def export(output_format, output, model_filter):
     """导出标注结果"""
     try:
+        # 从全局CLI上下文中获取项目实例
+        ctx = click.get_current_context()
+        project_name = ctx.parent.params['project']
+        project_instance = Project(project_name=project_name, project_root_dir=Path("projects"))
+        
         if model_filter:
             logger.info(f"导出模型配置 [{model_filter}] 的标注结果，格式: {output_format}")
         else:
             logger.info(f"导出所有已完成的标注结果，格式: {output_format}")
         
-        output_file = data_manager.export_results(
+        # 使用项目实例的 DataManager 来导出结果
+        data_manager_instance = project_instance.get_data_manager(db_name=ctx.parent.params['db_name'])
+        output_file = data_manager_instance.export_results(
             output_format=output_format,
             output_file=output,
             model_filter=model_filter
@@ -329,12 +345,19 @@ def export(output_format, output, model_filter):
 def list_models():
     """列出在config.ini中已配置的模型"""
     try:
+        # 从全局CLI上下文中获取项目实例
+        ctx = click.get_current_context()
+        project_name = ctx.parent.params['project']
+        project_instance = Project(project_name=project_name, project_root_dir=Path("projects"))
+        
         logger.info("获取已配置的模型列表...")
-        configured_models = llm_factory.list_configured_models()
+        # 使用项目实例的 LLMFactory 来获取配置的模型列表
+        llm_factory_instance = project_instance.llm_factory
+        configured_models = llm_factory_instance.list_configured_models()
         
         print("\n=== 已配置的模型 ===")
         if not configured_models:
-            print("⚠️  没有在 config.ini 中找到任何 [Model.*] 配置。")
+            print("⚠️ 没有在 config.ini 中找到任何 [Model.*] 配置。")
             print("请参考 config.ini.template 添加您的模型配置。")
             logger.warning("未找到任何模型配置")
         else:

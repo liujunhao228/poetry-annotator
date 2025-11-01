@@ -249,17 +249,3 @@ class ConfigManager:
         except Exception as e:
             print(f"配置验证失败: {e}")
             return False
-
-# 全局配置实例
-try:
-    # 假设config.ini在项目根目录下的config文件夹
-    root_dir = os.path.dirname(os.path.abspath(__file__))
-    # 如果src/config_manager.py，则根目录是 os.path.dirname(root_dir)
-    if os.path.basename(root_dir) == 'src':
-        root_dir = os.path.dirname(root_dir)
-    config_path = os.path.join(root_dir, 'config', 'config.ini')
-    config_manager = ConfigManager(config_path)
-except Exception as e:
-    # Fallback for unexpected structures
-    print(f"无法定位config.ini, 尝试默认路径 'config/config.ini'. Error: {e}")
-    config_manager = ConfigManager()

@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 import logging
 
+# 使用绝对导入，因为此模块将被动态加载，不再是包的一部分
+
 
 class LabelParser:
     """Markdown情感体系解析器，支持从Markdown文件解析并生成XML配置"""

@@ -1,9 +1,18 @@
-# LLM诗词情感标注工具 (Poetry Annotator)
+# Poetry Annotator
 
-基于大语言模型的中国古典诗词情感分类标注工具。该工具旨在利用LLM对海量诗词文本进行自动化情感分类标注，支持多种模型提供商和丰富的自定义配置。
+LLM诗词情感标注工具
+
+## 项目结构
+
+- `src/`: 源代码目录
+- `projects/`: 项目配置和数据目录（每个子目录代表一个独立项目）
+- `scripts/`: 脚本目录
+- `poetry-annotator-data-visualizer/`: 数据可视化工具 (可选)
+- `poetry-label-editor/`: 标签编辑器 (可选)
 
 ## 功能特性
 
+- **多项目支持**：支持管理多个独立的标注项目，每个项目拥有独立的配置、数据和处理逻辑
 - **多模型支持**：支持多种大语言模型以及多种API格式
 - **情感分类体系**：采用17大类、200+细项的中国古典诗词情感分类体系
 - **多种运行模式**：提供命令行、图形界面和数据可视化三种交互方式
@@ -12,24 +21,6 @@
 - **灵活配置**：支持多模型配置、数据库配置、日志配置等
 - **数据可视化**：集成Streamlit数据可视化界面，便于分析标注结果
 - **辅助工具**：提供任务分发、随机抽样、日志恢复等实用工具，以及对应的GUI界面
-
-## 目录结构
-
-```
-poetry-annotator/
-├── config/                 # 配置文件目录
-├── data/                   # 数据目录
-├── docs/                   # 文档目录
-├── ids/                    # 诗词ID文件目录
-├── logs/                   # 日志目录
-├── poetry-annotator-data-visualizer/  # 数据可视化模块
-├── poetry-label-editor/    # 分类定义编辑器模块
-├── scripts/                # 脚本目录
-├── src/                    # 核心源代码目录
-├── main.py                 # 程序入口
-├── README.md               # 说明文档
-└── requirements.txt        # 依赖包列表
-```
 
 ## 安装与配置
 
@@ -59,89 +50,74 @@ poetry-annotator/
    pip install -r requirements.txt
    ```
 
-### 配置文件设置
+### 创建和配置项目
 
-1. 复制配置模板：
+1. 在 `projects` 目录下创建一个新的项目文件夹，例如 `my_project`：
    ```bash
-   cp config/config - 副本.ini config/config.ini
+   mkdir projects/my_project
    ```
 
-2. 编辑 `config/config.ini` 文件，根据需要修改以下配置：
+2. 在项目文件夹内创建配置文件 `config.ini`。您可以复制 `projects/default_project/config.ini` 作为模板：
+   ```bash
+   cp projects/default_project/config.ini projects/my_project/config.ini
+   ```
+
+3. 编辑 `projects/my_project/config.ini` 文件，根据需要修改以下配置：
    - LLM模型配置（API密钥、模型名称等）
-   - 数据库路径
+   - 数据库路径（相对于项目目录，如 `data/poetry.db`）
+   - 数据源路径（相对于项目目录，如 `data/source_json`）
    - 日志设置
-   - 情感分类体系文件路径
+   - 情感分类体系文件路径（相对于项目目录）
 
-3. 配置模型提供商：
-   目前支持多种模型提供商，需要在配置文件中设置相应的API密钥和模型名称：
-   
-   ```ini
-   [Model.gemini-1.5-pro]
-   provider = gemini
-   model_name = models/gemini-2.5-flash
-   api_key = your_gemini_api_key_here
-   
-   [Model.qwen-long]
-   provider = siliconflow
-   model_name = Qwen/Qwen3-235B-A22B-Instruct-2507
-   api_key = your_api_key_here
-   base_url = https://api-inference.modelscope.cn/v1/chat/completions # OpenAI 格式的 API 均可
-   ```
-4. 数据库配置：
-   ```ini
-   # 单数据库模式
-   db_path = data/poetry.db
-
-   # 多数据库模式
-   db_paths = TangShi=data/TangShi.db,SongCi=data/SongCi.db
-   ```
+4. 在项目目录下创建必要的子目录（如 `data`, `logs`）并放置相关文件（诗词数据、分类体系等）。
 
 ## 使用方法
 
-### 准备数据
+### 命令行模式（CLI）
 
-在开始标注之前，需要准备诗词数据（[chinese-poetry](https://github.com/chinese-poetry/chinese-poetry)）并复制至对应目录：
-例如`data\source_json\TangShi`、`data\source_json\SongCi`
-之后程序会自行初始化数据库并导入数据
-
-### 命令行模式（不推荐）
+在使用任何命令时，都需要指定 `--project` 参数来指明操作的目标项目。
 
 ```bash
 # 查看帮助信息
 python main.py --help
 
 # 启动命令行模式（默认）
-python main.py
+python main.py --project my_project
 
-# 指定运行模式
-python main.py --mode cli
+# 初始化项目环境（例如，从JSON文件加载数据到数据库）
+python main.py --project my_project setup --init-db
+
+# 启动标注任务
+python main.py --project my_project annotate --model gpt-4o
+
+# 查看标注进度
+python main.py --project my_project status
+
+# 导出标注结果
+python main.py --project my_project export --format jsonl
 ```
 
-### 图形界面模式（推荐使用）
+### 图形界面模式（GUI）
+
+图形界面模式也已更新以支持项目管理。
 
 ```bash
 # 启动图形界面
 python main.py --mode gui
 ```
 
-图形界面提供以下功能：
-- 任务分发管理
-- 随机抽样工具
-- 日志恢复功能
-- 实时监控标注进度
+GUI 中需要在启动时或设置中指定项目名称。
 
 ### 数据可视化模式
+
+数据可视化模式同样支持项目隔离。
 
 ```bash
 # 启动数据可视化界面
 python main.py --mode visualizer
 ```
 
-数据可视化界面提供以下功能：
-- 标注结果统计分析
-- 情感分类分布图表
-- 标注质量评估
-- 导出分析报告
+可视化界面将根据项目配置加载相应的数据。
 
 ## 情感分类体系
 
@@ -166,18 +142,14 @@ python main.py --mode visualizer
 17. 日常体悟 (DailyInsights)
 
 每个一级类别下包含若干二级类别，总计200多个具体的情感分类标签。
-您可以使用`poetry-label-editor`模块来快速编辑：
-```bash
-python poetry-label-editor/editor_app_refactored.py
-```
 
 ## 项目模块
 
 ### 核心功能模块
 
 - **src/** - 核心源代码，包含标注逻辑、数据管理等
+- **projects/** - 项目配置和数据（每个子目录为一个独立项目）
 - **scripts/** - 辅助脚本，如任务分发、随机抽样等
-- **config/** - 配置文件和情感分类体系定义
 
 ### 可视化模块
 

@@ -1,4 +1,4 @@
-# src/annotator.py
+# projects/default_project/src/annotator.py
 
 import json
 import logging
@@ -11,42 +11,12 @@ from tqdm import tqdm
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 import pybreaker
 
-# 处理相对导入问题
-# 优先尝试相对导入（当作为包的一部分被导入时）
-relative_import_failed = False
-try:
-    # 当作为包运行时（推荐方式）
-    from .data_manager import DataManager # 导入类而不是全局实例
-    from .llm_factory import LLMFactory # 导入类而不是全局实例
-    from .config_manager import ConfigManager # 导入类而不是全局实例
-    from .label_parser import LabelParser # 导入类而不是全局实例
-    from .annotation_data_logger import AnnotationDataLogger
-except ImportError as e:
-    relative_import_failed = True
-    print(f"Annotator模块相对导入失败: {e}")
-
-# 如果相对导入失败，则尝试绝对导入
-if relative_import_failed:
-    # 当直接运行时（兼容开发环境）
-    # 确保 src 目录在 sys.path 中，以便绝对导入可以找到 src 下的模块
-    import sys
-    import os
-    src_dir = os.path.dirname(os.path.abspath(__file__))
-    if src_dir not in sys.path:
-        sys.path.insert(0, src_dir)
-        print(f"已将 {src_dir} 添加到 sys.path")
-        
-    try:
-        from data_manager import DataManager # 导入类而不是全局实例
-        from llm_factory import LLMFactory # 导入类而不是全局实例
-        from config_manager import ConfigManager # 导入类而不是全局实例
-        from label_parser import LabelParser # 导入类而不是全局实例
-        from annotation_data_logger import AnnotationDataLogger
-    except ImportError as e:
-        print(f"Annotator模块绝对导入也失败了: {e}")
-        raise # Re-raise the exception to stop execution
-
-# from .model_specific_logging import ModelSpecificLogging  # 已注释：不再使用模型特定日志记录器
+# 使用绝对导入，因为此模块将被动态加载，不再是包的一部分
+from data_manager import DataManager # 导入类而不是全局实例
+from llm_factory import LLMFactory # 导入类而不是全局实例
+from config_manager import ConfigManager # 导入类而不是全局实例
+from label_parser import LabelParser # 导入类而不是全局实例
+from annotation_data_logger import AnnotationDataLogger
 
 logger = logging.getLogger(__name__)
 

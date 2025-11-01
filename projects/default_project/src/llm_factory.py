@@ -1,39 +1,13 @@
-# src/llm_factory.py
+# projects/default_project/src/llm_factory.py
 from typing import Dict, Any, Optional
 import logging
 
-# 处理相对导入问题
-# 优先尝试相对导入（当作为包的一部分被导入时）
-relative_import_failed = False
-try:
-    # 当作为包运行时（推荐方式）
-    from .config_manager import ConfigManager
-    from .llm_services.base_service import BaseLLMService
-    from .llm_services.siliconflow_service import SiliconFlowService
-    from .llm_services.gemini_service import GeminiService
-except ImportError as e:
-    relative_import_failed = True
-    print(f"LLMFactory模块相对导入失败: {e}")
-
-# 如果相对导入失败，则尝试绝对导入
-if relative_import_failed:
-    # 当直接运行时（兼容开发环境）
-    # 确保 src 目录在 sys.path 中，以便绝对导入可以找到 src 下的模块
-    import sys
-    import os
-    src_dir = os.path.dirname(os.path.abspath(__file__))
-    if src_dir not in sys.path:
-        sys.path.insert(0, src_dir)
-        print(f"已将 {src_dir} 添加到 sys.path")
-        
-    try:
-        from config_manager import ConfigManager
-        from llm_services.base_service import BaseLLMService
-        from llm_services.siliconflow_service import SiliconFlowService
-        from llm_services.gemini_service import GeminiService
-    except ImportError as e:
-        print(f"LLMFactory模块绝对导入也失败了: {e}")
-        raise # Re-raise the exception to stop execution
+# 使用绝对导入，因为此模块将被动态加载，不再是包的一部分
+from config_manager import ConfigManager
+# 假设 src 目录在 sys.path 中，可以直接从 llm_services 包导入
+from llm_services.base_service import BaseLLMService
+from llm_services.siliconflow_service import SiliconFlowService
+from llm_services.gemini_service import GeminiService
 
 from pybreaker import CircuitBreaker
 

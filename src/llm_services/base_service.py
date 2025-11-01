@@ -4,9 +4,38 @@ import json
 import logging
 import os
 from pathlib import Path
-from ..llm_response_parser import llm_response_parser
-from ..config_manager import config_manager
-from ..utils.rate_limiter import AsyncTokenBucket
+# 处理相对导入问题
+# 优先尝试相对导入（当作为包的一部分被导入时）
+relative_import_failed = False
+try:
+    # 当作为包运行时（推荐方式）
+    from ..llm_response_parser import llm_response_parser
+    from ..config_manager import ConfigManager
+    from ..utils.rate_limiter import AsyncTokenBucket
+except ImportError as e:
+    relative_import_failed = True
+    print(f"LLMService基类模块相对导入失败: {e}")
+
+# 如果相对导入失败，则尝试绝对导入
+if relative_import_failed:
+    # 当直接运行时（兼容开发环境）
+    # 确保 src 目录在 sys.path 中，以便绝对导入可以找到 src 下的模块
+    import sys
+    import os
+    src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if src_dir not in sys.path:
+        sys.path.insert(0, src_dir)
+        print(f"已将 {src_dir} 添加到 sys.path")
+        
+    try:
+        from llm_response_parser import llm_response_parser
+        from config_manager import ConfigManager
+        from utils.rate_limiter import AsyncTokenBucket
+    except ImportError as e:
+        print(f"LLMService基类模块绝对导入也失败了: {e}")
+        raise # Re-raise the exception to stop execution
+
+config_manager = ConfigManager()
 
 class BaseLLMService(ABC):
     """LLM服务抽象基类 (已重构)"""

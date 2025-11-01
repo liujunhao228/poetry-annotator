@@ -5,13 +5,9 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-try:
-    from .db_adapter import get_database_adapter, normalize_poem_data
-except ImportError:
-    # 当作为独立模块运行时
-    import sys
-    sys.path.append(str(Path(__file__).parent))
-    from db_adapter import get_database_adapter, normalize_poem_data
+
+# 使用绝对导入，因为此模块将被动态加载，不再是包的一部分
+from db_adapter import get_database_adapter, normalize_poem_data
 
 
 class DataManager:

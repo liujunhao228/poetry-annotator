@@ -165,8 +165,36 @@ def setup_default_logging(console_level: Optional[str] = None,
         log_file: 日志文件路径（可选，用于覆盖配置文件）
     """
     try:
-        from .config_manager import config_manager
-        config = config_manager.get_logging_config()
+        # 处理相对导入问题
+        # 优先尝试相对导入（当作为包的一部分被导入时）
+        relative_import_failed = False
+        try:
+            # 当作为包运行时（推荐方式）
+            from .config_manager import ConfigManager
+        except ImportError as e:
+            relative_import_failed = True
+            print(f"LoggingConfig模块相对导入失败: {e}")
+
+        # 如果相对导入失败，则尝试绝对导入
+        if relative_import_failed:
+            # 当直接运行时（兼容开发环境）
+            # 确保 src 目录在 sys.path 中，以便绝对导入可以找到 src 下的模块
+            import sys
+            import os
+            src_dir = os.path.dirname(os.path.abspath(__file__))
+            if src_dir not in sys.path:
+                sys.path.insert(0, src_dir)
+                print(f"已将 {src_dir} 添加到 sys.path")
+                
+            try:
+                from config_manager import ConfigManager
+            except ImportError as e:
+                print(f"LoggingConfig模块绝对导入也失败了: {e}")
+                raise # Re-raise the exception to stop execution
+
+        # 使用ConfigManager获取配置
+        config_manager_instance = ConfigManager()
+        config = config_manager_instance.get_logging_config()
         # 使用配置文件中的值，除非显式通过参数覆盖
         final_console_level = console_level or config['console_log_level']
         # 关键修改：如果命令行传入了 file_level，则使用它，否则使用配置中的
@@ -246,4 +274,4 @@ def log_error_with_context(error: Exception,
         context_str = ', '.join([f"{k}: {v}" for k, v in context.items()])
         error_msg += f" | 上下文: {context_str}"
     
-    logger.error(error_msg, exc_info=True) 
+    logger.error(error_msg, exc_info=True)
