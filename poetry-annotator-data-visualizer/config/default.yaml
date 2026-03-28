@@ -1,0 +1,45 @@
+# 诗词与标注数据可视化分析平台 - 默认配置
+
+# 数据库配置
+database:
+  # 相对路径相对于项目根目录 (E:\poetry-annotator)
+  paths:
+    TangShi: "data/TangShi.db"
+    SongCi: "data/SongCi.db"
+
+# 缓存配置
+cache:
+  # L1 内存缓存最大条目数
+  max_memory_items: 100
+  # 磁盘缓存目录 (相对于可视化模块根目录)
+  cache_dir: ".cache"
+  # 各类数据的缓存时间 (秒)
+  ttl_seconds:
+    model_performance: 3600
+    annotation_trends: 600
+    author_poem_counts: 1800
+    poem_length_distribution: 1800
+    emotion_distribution: 3600
+    emotion_combinations: 1800
+    poem_emotion_sets: 1800
+    apriori_results: 7200
+
+# UI 配置
+ui:
+  # 默认显示 Top N 数量
+  default_top_n: 20
+  # 是否启用自定义下载功能
+  enable_custom_download: false
+  # 日期范围默认天数
+  default_date_range_days: 90
+
+# Apriori 挖掘配置
+apriori:
+  # 默认最小支持度 (%)
+  default_min_support_percent: 1.0
+  # 默认最小项集长度
+  default_min_length: 2
+  # 默认最大事务数
+  default_max_transactions: 5000
+  # 警告阈值 (超过此值会提示用户)
+  warning_threshold: 10000
