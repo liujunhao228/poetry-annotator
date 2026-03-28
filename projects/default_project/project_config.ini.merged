@@ -1,0 +1,14 @@
+[Database]
+# Database configuration for the default_project
+# The path is relative to the project's root directory (e.g., projects/default_project/)
+db_path = poetry.db
+
+[Data]
+# Data path configuration for the default_project
+# Paths are relative to the project's root directory
+source_dir = data/source_json
+output_dir = data/output
+
+[Visualizer]
+# Data visualizer settings
+enable_custom_download = false

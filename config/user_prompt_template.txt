@@ -1,8 +1,0 @@
-# 开始标注
---- 输入 ---
-- 作者: {author}
-- 标题: {title}
-- 待标注句子:
-{sentences_with_id_json}
-
---- 输出 ---

@@ -199,42 +199,29 @@ class SiliconFlowService(BaseLLMService):
         # 如果没有适配器或者适配器名称不匹配，直接返回原始数据
         return response_data
 
-    # 实现基类的新抽象方法。
-    async def annotate_poem(self, poem: Dict[str, Any], emotion_schema: str) -> Dict[str, Any]:
+    async def get_completion(self, system_prompt: str, user_prompt: str) -> str:
         """
-        实现基类的抽象方法，并集成响应适配器和速率限制。
-        此方法是唯一的API调用入口，负责完整的处理流程。
+        Gets a completion from the SiliconFlow service.
         """
         request_data = None
-        user_prompt_for_logging: str = "Prompt未生成"
         try:
-            # 步骤 1: 使用基类方法准备提示词
-            system_prompt, user_prompt = self.prepare_prompts(poem, emotion_schema)
-            user_prompt_for_logging = user_prompt
-            
-            # 步骤 2: 构建请求体
             request_data = self.build_request_body(system_prompt, user_prompt)
             
-            # 步骤 3: 记录和发送请求
             self.log_request_details(
                 request_body=request_data,
                 headers=dict(self.client.headers.items()),
                 prompt=system_prompt
             )
-            # --- 应用速率限制器 ---
-            await self._ensure_rate_limiter()  # 确保限速器已初始化
+
+            await self._ensure_rate_limiter()
             if self.rate_limiter:
                 await self.rate_limiter.acquire()
-                self.logger.debug(f"[{self.provider.capitalize()}] 速率限制器：已获取令牌，继续执行API请求。")
             
             response = await self.client.post(f"{self.base_url}", json=request_data)
             response.raise_for_status()
             
-            # 步骤 4: 解析和适配响应
             response_data = response.json()
-            
             adapted_response_data = self._adapt_response(response_data)
-            
             self._validate_siliconflow_response(adapted_response_data)
             
             response_text = self._extract_response_content(adapted_response_data)
@@ -242,29 +229,23 @@ class SiliconFlowService(BaseLLMService):
             
             self.log_response_details(adapted_response_data, usage)
             
-            result = self.validate_response(response_text)
-            return result
+            return response_text
 
         except httpx.HTTPStatusError as e:
             status_code = e.response.status_code
+            self.log_error_details(e, request_data, user_prompt)
             if status_code in [429, 500, 502, 503, 504]:
-                self.logger.warning(f"[{self.provider.capitalize()}] API可重试HTTP错误 (status: {status_code}): {e}")
-                self.log_error_details(e, request_data, user_prompt_for_logging)
-                raise
+                raise  # Re-raise for tenacity to handle
             else:
-                self.logger.error(f"[{self.provider.capitalize()}] API不可重试HTTP错误 (status: {status_code}): {e}", exc_info=True)
-                self.log_error_details(e, request_data, user_prompt_for_logging)
-                return self.format_error_response(f"API HTTP错误 (status: {status_code}): {e.response.text}")
+                raise ValueError(f"API HTTP Error (status: {status_code}): {e.response.text}") from e
                 
         except (httpx.TimeoutException, httpx.ConnectError) as e:
-            self.logger.warning(f"[{self.provider.capitalize()}] API连接/超时错误: {e}")
-            self.log_error_details(e, request_data, user_prompt_for_logging)
-            raise
+            self.log_error_details(e, request_data, user_prompt)
+            raise  # Re-raise for tenacity to handle
             
         except Exception as e:
-            self.logger.error(f"[{self.provider.capitalize()}] API调用时发生未知错误: {e}", exc_info=True)
-            self.log_error_details(e, request_data, user_prompt_for_logging)
-            return self.format_error_response(str(e))
+            self.log_error_details(e, request_data, user_prompt)
+            raise ValueError(f"An unexpected error occurred: {e}") from e
 
     def _validate_siliconflow_response(self, response_data: Dict[str, Any]):
         """验证 SiliconFlow/OpenAI 兼容的API响应结构"""

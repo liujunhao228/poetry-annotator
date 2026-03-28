@@ -220,3 +220,4 @@ gui_state.json
 *test*
 
 *.db
+projects/default_project/data/

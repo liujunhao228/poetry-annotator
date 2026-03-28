@@ -1,625 +1,523 @@
-import sqlite3
+"""
+数据管理器 - 重构版
+
+基于 Repository 模式和 StorageEngine 架构的数据管理层
+"""
+
 import json
-import os
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Optional
-from datetime import datetime
-try:
-    from .db_adapter import get_database_adapter, normalize_poem_data
-except ImportError:
-    # 当作为独立模块运行时
-    import sys
-    sys.path.append(str(Path(__file__).parent))
-    from db_adapter import get_database_adapter, normalize_poem_data
+from typing import List, Dict, Any, Optional, Tuple
+from datetime import datetime, timezone, timedelta
+
+from .models.poetry import PoetryModel, PoetryCreate, AuthorModel, AuthorCreate
+from .models.annotation import AnnotationModel, AnnotationStatistics
+from .models.common import StatisticsResult, InitResult, QueryResult, DataFilter, ExportFormat
+from .storage.engine import StorageEngine
+from .storage.sqlite_engine import SQLiteEngine
+from .repositories import (
+    PoetryRepository, PoetryRepositoryImpl,
+    AuthorRepository, AuthorRepositoryImpl,
+    AnnotationRepository, AnnotationRepositoryImpl,
+)
+from .utils.id_generator import IDGenerator
+
+logger = logging.getLogger(__name__)
 
 
 class DataManager:
-    """数据管理器，负责数据库操作和数据预处理"""
+    """
+    数据管理器 - 业务逻辑协调层
     
-    def __init__(self, db_path: str, source_dir: str, output_dir: str, db_name_alias: str = "default"):
+    使用 Repository 模式组织数据访问，提供高层业务接口
+    """
+
+    def __init__(
+        self,
+        db_path: str,
+        source_dir: str,
+        output_dir: str,
+        db_name_alias: str = "default"
+    ):
+        """
+        初始化数据管理器
+        
+        Args:
+            db_path: 数据库文件路径
+            source_dir: 数据源目录（JSON 文件所在目录）
+            output_dir: 输出目录
+            db_name_alias: 数据库别名（用于 ID 前缀设置）
+        """
         self.db_path = db_path
-        self.source_dir = source_dir
-        self.output_dir = output_dir
-        self.db_name = db_name_alias # 用于ID前缀设置和日志记录
+        self.source_dir = Path(source_dir)
+        self.output_dir = Path(output_dir)
+        self.db_name = db_name_alias
 
-        self.logger = logging.getLogger(__name__)
-        self.logger.info(f"数据管理器初始化 - 数据库: {self.db_path}, 数据源: {self.source_dir}, 输出: {self.output_dir}")
-        
-        # 初始化数据库适配器
-        self.db_adapter = get_database_adapter('sqlite', self.db_path)
+        logger.info(f"数据管理器初始化 - 数据库：{self.db_path}, 数据源：{self.source_dir}, 输出：{self.output_dir}")
+
+        # 初始化存储引擎
+        self._storage_engine: StorageEngine = SQLiteEngine(db_path)
+
+        # 初始化 ID 生成器
+        self._id_generator = IDGenerator(db_name_alias)
+
+        # 初始化 Repository 层
+        self._poetry_repo: PoetryRepository = PoetryRepositoryImpl(self._storage_engine.connect)
+        self._author_repo: AuthorRepository = AuthorRepositoryImpl(self._storage_engine.connect)
+        self._annotation_repo: AnnotationRepository = AnnotationRepositoryImpl(self._storage_engine.connect)
+
+        # 初始化数据库表结构
         self._init_database()
-        
-        # 为不同数据库设置ID前缀，确保全局唯一性
-        self._set_id_prefix()
-        
-        # 初始化标注日志记录器
-        self._init_annotation_logger()
-    
-    def _init_annotation_logger(self):
-        """初始化标注结果专用日志记录器 - 已移除以避免重复日志记录"""
-        # 不再创建分散的日志记录器，使用AnnotationDataLogger进行统一聚合记录
-        self.annotation_logger = None
-    
-    def _log_annotation_result(self, poem_id: int, model_identifier: str, status: str, 
-                              annotation_result: Optional[str] = None, 
-                              error_message: Optional[str] = None):
-        """记录标注结果到专用日志文件（单行JSON格式） - 已移除以避免重复日志记录"""
-        # 不再记录分散的日志，使用AnnotationDataLogger进行统一聚合记录
-        pass
-    
-    def _set_id_prefix(self):
-        """为不同数据库设置ID前缀，确保全局唯一性"""
-        # 定义数据库名称到前缀的映射
-        db_prefixes = {
-            "TangShi": 1000000,  # 唐诗ID前缀
-            "SongCi": 2000000,   # 宋词ID前缀
-            "YuanQu": 3000000,   # 元曲ID前缀
-            "default": 0         # 默认数据库前缀
-        }
-        
-        # 根据数据库名称设置前缀
-        self.id_prefix = db_prefixes.get(self.db_name, 0)
-        self.logger.info(f"数据库 {self.db_name} 的ID前缀设置为: {self.id_prefix}")
-    
-    
-    def _init_database(self):
-        """初始化数据库 - 采用新表结构，时间戳字段不再用CURRENT_TIMESTAMP，需手动插入带时区的ISO时间字符串"""
-        self.logger.info("开始初始化数据库...")
-        self.db_adapter.init_database()
-        self.logger.info("数据库初始化完成")
 
-    def load_data_from_json(self, json_file: str) -> List[Dict[str, Any]]:
-        """从JSON文件加载数据"""
-        file_path = Path(self.source_dir) / json_file
-        
-        if not file_path.exists():
-            raise FileNotFoundError(f"JSON文件不存在: {file_path}")
-        
-        self.logger.debug(f"加载JSON文件: {file_path}")
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        self.logger.debug(f"JSON文件 {json_file} 加载完成，包含 {len(data)} 条记录")
-        return data
-    
-    def load_all_json_files(self) -> List[Dict[str, Any]]:
-        """加载所有JSON文件的数据 - [修改] 适配唐诗/宋诗文件格式"""
-        source_path = Path(self.source_dir)
-        if not source_path.exists():
-            raise FileNotFoundError(f"数据源目录不存在: {source_path}")
-        
-        all_data = []
-        
-        # [修改] 查找所有 poet.*.*.json 和 ci.*.*.json 文件
-        poet_files = list(source_path.glob('poet.*.*.json'))
-        ci_files = list(source_path.glob('ci.*.*.json'))
-        json_files = poet_files + ci_files
-        json_files.sort()  # 确保按文件名排序
-        
-        self.logger.info(f"找到 {len(json_files)} 个JSON文件 ({len(poet_files)} 个poet文件, {len(ci_files)} 个ci文件)")
-        
-        for json_file in json_files:
-            try:
-                self.logger.debug(f"处理文件: {json_file.name}")
-                with open(json_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                all_data.extend(data)
-                self.logger.debug(f"文件 {json_file.name} 处理完成，包含 {len(data)} 条记录")
-            except Exception as e:
-                self.logger.error(f"处理文件 {json_file.name} 时出错: {e}")
-        
-        self.logger.info(f"所有JSON文件加载完成，总计 {len(all_data)} 条记录")
-        return all_data
-    
+    def _init_database(self) -> None:
+        """初始化数据库表结构"""
+        logger.info("开始初始化数据库表结构...")
+        self._storage_engine.init_schema()
+        logger.info("数据库表结构初始化完成")
+
+    # ==================== 作者数据操作 ====================
+
     def load_author_data(self) -> List[Dict[str, Any]]:
-        """加载作者数据 - [修改] 适配唐诗/宋诗作者文件格式"""
-        source_path = Path(self.source_dir)
-        if not source_path.exists():
-            self.logger.warning(f"数据源目录不存在: {source_path}")
+        """
+        加载作者数据（从 JSON 文件）
+        
+        Returns:
+            作者数据列表
+        """
+        if not self.source_dir.exists():
+            logger.warning(f"数据源目录不存在：{self.source_dir}")
             return []
 
         all_authors = []
-        # 查找所有 authors.*.json 和 author.*.json 文件
-        authors_files = list(source_path.glob('authors.*.json'))
-        author_files = list(source_path.glob('author.*.json'))
-        author_files = sorted(authors_files + author_files)
+        author_files = list(self.source_dir.glob('authors.*.json')) + list(self.source_dir.glob('author.*.json'))
+        author_files.sort()
 
         if not author_files:
-            self.logger.warning("在数据源目录中未找到作者文件。")
+            logger.warning("未找到作者文件")
             return []
 
-        self.logger.info(f"找到 {len(author_files)} 个作者文件: {[f.name for f in author_files]}")
+        logger.info(f"找到 {len(author_files)} 个作者文件")
 
         for author_file in author_files:
             try:
                 with open(author_file, 'r', encoding='utf-8') as f:
                     authors = json.load(f)
                 all_authors.extend(authors)
-                self.logger.info(f"从 {author_file.name} 加载了 {len(authors)} 位作者信息。")
+                logger.debug(f"从 {author_file.name} 加载了 {len(authors)} 位作者")
             except Exception as e:
-                self.logger.error(f"加载作者文件 {author_file.name} 时出错: {e}")
-        
-        self.logger.info(f"所有作者文件加载完成，总计加载了 {len(all_authors)} 位作者信息。")
+                logger.error(f"加载作者文件 {author_file.name} 时出错：{e}")
+
+        logger.info(f"所有作者文件加载完成，总计 {len(all_authors)} 位作者")
         return all_authors
-    
+
     def batch_insert_authors(self, authors_data: List[Dict[str, Any]]) -> int:
-        """批量插入作者信息 - [修改] 适配新的 'desc' 字段"""
-        from datetime import datetime, timezone, timedelta
-        self.logger.info(f"开始批量插入 {len(authors_data)} 位作者信息...")
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        inserted_count = 0
-        tz = timezone(timedelta(hours=8))  # 东八区
-        now = datetime.now(tz).isoformat()
-        for author_data in authors_data:
-            try:
-                cursor.execute('''
-                    INSERT OR REPLACE INTO authors 
-                    (name, description, short_description, created_at)
-                    VALUES (?, ?, ?, ?)
-                ''', (
-                    author_data.get('name', ''),
-                    author_data.get('desc', ''),  # [修改] 使用 'desc' 字段
-                    author_data.get('short_description', ''), # 新格式无此字段，优雅降级
-                    now
-                ))
-                inserted_count += 1
-            except Exception as e:
-                self.logger.error(f"插入作者 {author_data.get('name', 'Unknown')} 时出错: {e}")
-
-        conn.commit()
-        conn.close()
-
-        self.logger.info(f"作者信息插入完成，成功插入 {inserted_count} 位作者")
-        return inserted_count
-    
-    def batch_insert_poems(self, poems_data: List[Dict[str, Any]], start_id: Optional[int] = None) -> int:
-        """批量插入诗词到数据库 - [修改] 适配 'title' 字段"""
-        from datetime import datetime, timezone, timedelta
-        self.logger.info(f"开始批量插入 {len(poems_data)} 首诗词...")
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        inserted_count = 0
-        current_id = start_id or 1
-        tz = timezone(timedelta(hours=8))
-        now = datetime.now(tz).isoformat()
-
-        for poem_data in poems_data:
-            # 标准化诗词数据，处理字段命名差异
-            normalized_data = normalize_poem_data(poem_data)
-            
-            paragraphs = normalized_data.get('paragraphs', [])
-            full_text = '\n'.join(paragraphs)
-
-            # 使用全局唯一ID
-            global_id = self.id_prefix + current_id
-
-            # 使用 'title' 字段
-            cursor.execute('''
-                INSERT OR REPLACE INTO poems 
-                (id, title, author, paragraphs, full_text, author_desc, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                global_id,  # 使用全局唯一ID
-                normalized_data.get('title', ''), # 从 'title' 获取
-                normalized_data.get('author', ''),
-                json.dumps(paragraphs, ensure_ascii=False),
-                full_text,
-                normalized_data.get('author_desc', ''),
-                now,
-                now
-            ))
-            inserted_count += 1
-            current_id += 1
-
-        conn.commit()
-        conn.close()
-
-        self.logger.info(f"诗词插入完成，成功插入 {inserted_count} 首诗词")
-        return inserted_count
-    
-    def get_poems_to_annotate(self, model_identifier: str, 
-                               limit: Optional[int] = None, 
-                               start_id: Optional[int] = None, 
-                               end_id: Optional[int] = None,
-                               force_rerun: bool = False) -> List[Dict[str, Any]]:
-        """获取指定模型待标注的诗词 - [修改] 查询 'title'"""
-        params = []
-        
-        # [修改] 查询 'title' 而不是 'rhythmic'
-        query = """
-            SELECT p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc
-            FROM poems p
-            LEFT JOIN authors au ON p.author = au.name
         """
+        批量插入作者信息
         
-        # 如果不是强制重跑，则排除已完成的
-        if not force_rerun:
-            query += """
-                LEFT JOIN annotations an ON p.id = an.poem_id AND an.model_identifier = ?
-                WHERE (an.status IS NULL OR an.status != 'completed')
-            """
-            params.append(model_identifier)
-        else:
-            query += " WHERE 1=1"
+        Args:
+            authors_data: 作者数据列表
+            
+        Returns:
+            插入的作者数量
+        """
+        logger.info(f"开始批量插入 {len(authors_data)} 位作者...")
 
-        if start_id is not None:
-             query += " AND p.id >= ?"
-             params.append(start_id)
-        if end_id is not None:
-             query += " AND p.id <= ?"
-             params.append(end_id)
-        
-        query += " ORDER BY p.id"
-        
-        if limit:
-            query += " LIMIT ?"
-            params.append(limit)
-        
-        rows = self.db_adapter.execute_query(query, tuple(params))
+        models = []
+        for data in authors_data:
+            try:
+                author = AuthorCreate(
+                    name=data.get('name', ''),
+                    desc=data.get('desc', ''),  # 兼容旧格式
+                    description=data.get('description'),
+                    short_description=data.get('short_description'),
+                )
+                models.append(author.to_author_model())
+            except Exception as e:
+                logger.error(f"创建作者模型失败 {data.get('name', 'Unknown')}: {e}")
 
-        poems = []
-        for row in rows:
-            poem = dict(row)
-            if poem.get('paragraphs'):
-                poem['paragraphs'] = json.loads(poem['paragraphs'])
-            poems.append(poem)
+        if models:
+            self._author_repo.add_batch(models)
+            logger.info(f"成功插入 {len(models)} 位作者")
+        return len(models)
 
-        return poems
+    def get_all_authors(self) -> List[AuthorModel]:
+        """获取所有作者信息"""
+        return self._author_repo.get_all()
+
+    # ==================== 诗词数据操作 ====================
+
+    def load_all_json_files(self) -> List[Dict[str, Any]]:
+        """
+        加载所有 JSON 文件的数据
+        
+        Returns:
+            诗词数据列表
+        """
+        if not self.source_dir.exists():
+            raise FileNotFoundError(f"数据源目录不存在：{self.source_dir}")
+
+        all_data = []
+        poet_files = list(self.source_dir.glob('poet.*.*.json'))
+        ci_files = list(self.source_dir.glob('ci.*.*.json'))
+        json_files = sorted(poet_files + ci_files)
+
+        logger.info(f"找到 {len(json_files)} 个 JSON 文件 ({len(poet_files)} 个 poet 文件，{len(ci_files)} 个 ci 文件)")
+
+        for json_file in json_files:
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                all_data.extend(data)
+                logger.debug(f"文件 {json_file.name} 处理完成，包含 {len(data)} 条记录")
+            except Exception as e:
+                logger.error(f"处理文件 {json_file.name} 时出错：{e}")
+
+        logger.info(f"所有 JSON 文件加载完成，总计 {len(all_data)} 条记录")
+        return all_data
+
+    def batch_insert_poems(self, poems_data: List[Dict[str, Any]], start_id: Optional[int] = None) -> int:
+        """
+        批量插入诗词到数据库
+        
+        Args:
+            poems_data: 诗词数据列表
+            start_id: 起始 ID（可选，默认使用 ID 生成器）
+            
+        Returns:
+            插入的诗词数量
+        """
+        logger.info(f"开始批量插入 {len(poems_data)} 首诗词...")
+
+        models = []
+        current_id = start_id if start_id else 0
+
+        for data in poems_data:
+            try:
+                # 标准化数据（处理 title/rhythmic 字段差异）
+                normalized = self._normalize_poem_data(data)
+                
+                if start_id:
+                    poem_id = current_id
+                    current_id += 1
+                else:
+                    poem_id = self._id_generator.generate()
+
+                paragraphs = normalized.get('paragraphs', [])
+                if isinstance(paragraphs, str):
+                    try:
+                        paragraphs = json.loads(paragraphs)
+                    except (json.JSONDecodeError, ValueError):
+                        paragraphs = [paragraphs] if paragraphs else []
+
+                poem = PoetryCreate(
+                    title=normalized.get('title', ''),
+                    author=normalized.get('author', ''),
+                    paragraphs=paragraphs,
+                    author_desc=normalized.get('author_desc'),
+                )
+                models.append(poem.to_poetry_model(poem_id))
+            except Exception as e:
+                logger.error(f"创建诗词模型失败：{e}")
+
+        if models:
+            self._poetry_repo.add_batch(models)
+            logger.info(f"成功插入 {len(models)} 首诗词")
+        return len(models)
+
+    def _normalize_poem_data(self, poem_data: Dict[str, Any]) -> Dict[str, Any]:
+        """标准化诗词数据，处理字段命名差异"""
+        normalized = poem_data.copy()
+
+        # 处理 title/rhythmic 字段差异
+        if 'rhythmic' in normalized and 'title' not in normalized:
+            normalized['title'] = normalized['rhythmic']
+        elif 'title' in normalized and 'rhythmic' not in normalized:
+            normalized['rhythmic'] = normalized['title']
+
+        return normalized
+
+    def get_poems_to_annotate(
+        self,
+        model_identifier: str,
+        limit: Optional[int] = None,
+        start_id: Optional[int] = None,
+        end_id: Optional[int] = None,
+        force_rerun: bool = False
+    ) -> List[Dict[str, Any]]:
+        """
+        获取待标注的诗词
+        
+        Args:
+            model_identifier: 模型标识符
+            limit: 限制数量
+            start_id: 起始 ID
+            end_id: 结束 ID
+            force_rerun: 是否强制重跑（忽略已标注的）
+            
+        Returns:
+            诗词列表（字典格式）
+        """
+        id_range = None
+        if start_id is not None or end_id is not None:
+            id_range = (start_id or 0, end_id or float('inf'))
+
+        models = self._poetry_repo.get_to_annotate(
+            model_identifier=model_identifier,
+            limit=limit,
+            id_range=id_range,
+            exclude_annotated=not force_rerun
+        )
+
+        return [self._model_to_dict(m) for m in models]
 
     def get_poems_by_ids(self, poem_ids: List[int]) -> List[Dict[str, Any]]:
-        """根据ID列表获取诗词信息 - [修改] 查询 'title'"""
+        """根据 ID 列表获取诗词"""
         if not poem_ids:
             return []
-        
-        # [修改] 查询 'title'
-        placeholders = ','.join('?' * len(poem_ids))
-        query = f"""
-            SELECT p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc
-            FROM poems p
-            LEFT JOIN authors au ON p.author = au.name
-            WHERE p.id IN ({placeholders})
-        """
-        
-        rows = self.db_adapter.execute_query(query, tuple(poem_ids))
-        
-        poems = []
-        for row in rows:
-            poem = dict(row)
-            if poem.get('paragraphs'):
-                poem['paragraphs'] = json.loads(poem['paragraphs'])
-            poems.append(poem)
-        
-        return poems
 
-    
+        models = self._poetry_repo.get_by_ids(poem_ids)
+        return [self._model_to_dict(m) for m in models]
+
     def get_poem_by_id(self, poem_id: int) -> Optional[Dict[str, Any]]:
-        """根据ID获取单首诗词信息 - [修改] 查询 'title'"""
-        # [修改] 查询 'title'
-        rows = self.db_adapter.execute_query("""
-            SELECT p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc
-            FROM poems p
-            LEFT JOIN authors au ON p.author = au.name
-            WHERE p.id = ?
-        """, (poem_id,))
-        
-        if rows:
-            row = rows[0]
-            poem = dict(row)
-            if poem.get('paragraphs'):
-                poem['paragraphs'] = json.loads(poem['paragraphs'])
-            return poem
-        
+        """根据 ID 获取单首诗词"""
+        model = self._poetry_repo.get_by_id(poem_id)
+        if model:
+            return self._model_to_dict(model)
         return None
-    
-    def save_annotation(self, poem_id: int, model_identifier: str, status: str,
-                        annotation_result: Optional[str] = None, 
-                        error_message: Optional[str] = None) -> bool:
-        """保存标注结果到annotations表 (UPSERT)，时间戳带时区"""
-        # 不再记录分散的日志，使用AnnotationDataLogger进行统一聚合记录
-        from datetime import datetime, timezone, timedelta
-        self.logger.debug(f"保存标注结果 - 诗词ID: {poem_id}, 模型: {model_identifier}, 状态: {status}")
 
-        tz = timezone(timedelta(hours=8))
-        now = datetime.now(tz).isoformat()
+    def _model_to_dict(self, model: PoetryModel) -> Dict[str, Any]:
+        """将 PoetryModel 转换为字典"""
+        return {
+            'id': model.id,
+            'title': model.title,
+            'author': model.author,
+            'paragraphs': model.paragraphs,
+            'full_text': model.full_text,
+            'author_desc': model.author_desc,
+        }
+
+    def search_poems(
+        self,
+        author: Optional[str] = None,
+        title: Optional[str] = None,
+        page: int = 1,
+        per_page: int = 10
+    ) -> Dict[str, Any]:
+        """搜索诗词"""
+        models, total = self._poetry_repo.search(
+            author=author,
+            title=title,
+            page=page,
+            per_page=per_page
+        )
+
+        return {
+            "poems": [self._model_to_dict(m) for m in models],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": (total + per_page - 1) // per_page
+        }
+
+    # ==================== 标注结果操作 ====================
+
+    def save_annotation(
+        self,
+        poem_id: int,
+        model_identifier: str,
+        status: str,
+        annotation_result: Optional[str] = None,
+        error_message: Optional[str] = None
+    ) -> bool:
+        """
+        保存标注结果（UPSERT）
+        
+        Args:
+            poem_id: 诗词 ID
+            model_identifier: 模型标识符
+            status: 状态 (completed/failed)
+            annotation_result: 标注结果（JSON 字符串）
+            error_message: 错误信息
+            
+        Returns:
+            是否成功
+        """
+        logger.debug(f"保存标注结果 - 诗词 ID: {poem_id}, 模型：{model_identifier}, 状态：{status}")
 
         try:
-            rowcount = self.db_adapter.execute_update('''
-                INSERT INTO annotations (poem_id, model_identifier, status, annotation_result, error_message, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(poem_id, model_identifier) DO UPDATE SET
-                    status = excluded.status,
-                    annotation_result = excluded.annotation_result,
-                    error_message = excluded.error_message,
-                    updated_at = excluded.updated_at
-            ''', (poem_id, model_identifier, status, annotation_result, error_message, now, now))
-
-            success = rowcount > 0
+            success = self._annotation_repo.update_or_insert(
+                poem_id=poem_id,
+                model_identifier=model_identifier,
+                status=status,
+                annotation_result=annotation_result,
+                error_message=error_message
+            )
             if success:
-                self.logger.debug(f"标注结果保存成功 - 诗词ID: {poem_id}, 模型: {model_identifier}")
+                logger.debug(f"标注结果保存成功 - 诗词 ID: {poem_id}, 模型：{model_identifier}")
             return success
         except Exception as e:
-            self.logger.error(f"保存标注结果失败 - 诗词ID: {poem_id}, 模型: {model_identifier}, 错误: {e}")
+            logger.error(f"保存标注结果失败 - 诗词 ID: {poem_id}, 模型：{model_identifier}, 错误：{e}")
             return False
 
+    def get_completed_poem_ids(self, poem_ids: List[int], model_identifier: str) -> set:
+        """
+        高效检查一组 poem_id 是否已被特定模型成功标注
+        
+        Args:
+            poem_ids: 诗词 ID 列表
+            model_identifier: 模型标识符
+            
+        Returns:
+            已成功标注的 ID 集合
+        """
+        if not poem_ids:
+            return set()
+        return self._poetry_repo.get_completed_ids(poem_ids, model_identifier)
+
+    # ==================== 统计与导出 ====================
+
     def get_statistics(self) -> Dict[str, Any]:
-        """获取数据库统计信息 (增强版)"""
-        self.logger.debug("开始获取数据库统计信息...")
-        
-        # 总诗词数量
-        rows = self.db_adapter.execute_query("SELECT COUNT(*) FROM poems")
-        total_poems = rows[0][0]
-        
-        # 总作者数
-        rows = self.db_adapter.execute_query("SELECT COUNT(*) FROM authors")
-        total_authors = rows[0][0]
-        
-        # 按模型和状态统计标注数量
-        rows = self.db_adapter.execute_query("""
-            SELECT model_identifier, status, COUNT(*) 
-            FROM annotations 
-            GROUP BY model_identifier, status
-        """)
-        model_status_counts = rows
-        
-        # 格式化模型统计
+        """获取数据库统计信息"""
+        logger.debug("开始获取数据库统计信息...")
+
+        stats = self._annotation_repo.get_statistics()
+
+        # 格式化按模型统计
         stats_by_model = {}
-        for model, status, count in model_status_counts:
-            if model not in stats_by_model:
-                stats_by_model[model] = {'completed': 0, 'failed': 0, 'total_annotated': 0}
-            stats_by_model[model][status] = count
-            stats_by_model[model]['total_annotated'] += count
-        
-        self.logger.debug(f"统计信息获取完成 - 诗词: {total_poems}, 作者: {total_authors}, 模型数: {len(stats_by_model)}")
-        
+        for model, data in stats.by_model.items():
+            stats_by_model[model] = {
+                'completed': data.get('completed', 0),
+                'failed': data.get('failed', 0),
+                'total_annotated': data.get('total', 0)
+            }
+
         return {
-            'total_poems': total_poems,
-            'total_authors': total_authors,
+            'total_poems': stats.total_poems,
+            'total_authors': self._author_repo.count(),
             'stats_by_model': stats_by_model
         }
-    
-    def initialize_database_from_json(self, clear_existing: bool = False) -> Dict[str, int]:
-        """从JSON文件初始化数据库"""
-        self.logger.info("开始初始化数据库...")
-        
-        if clear_existing:
-            self.logger.info("清空现有数据...")
-            self.db_adapter.execute_update("DELETE FROM annotations")
-            self.db_adapter.execute_update("DELETE FROM poems")
-            self.db_adapter.execute_update("DELETE FROM authors")
-            self.logger.info("现有数据已清空")
-        
-        # 加载作者数据
-        authors = self.load_author_data()
-        author_count = 0
-        if authors:
-            author_count = self.batch_insert_authors(authors)
-            self.logger.info(f"插入了 {author_count} 位作者信息")
-        
-        # 加载诗词数据
-        poems = self.load_all_json_files()
-        poem_count = 0
-        if poems:
-            # 使用 batch_insert_poems 并从ID=1开始
-            poem_count = self.batch_insert_poems(poems, start_id=1)
-            print(f"插入了 {poem_count} 首诗词")
-        
-        print("数据库初始化完成!")
+
+    def get_annotation_statistics(self) -> Dict[str, Any]:
+        """获取标注统计信息"""
+        stats = self._annotation_repo.get_statistics()
         return {
-            'authors': author_count,
-            'poems': poem_count
+            'overall': {
+                'total_poems': stats.total_poems,
+                'total_annotations': stats.total_annotations,
+                'completed_annotations': stats.completed_annotations,
+                'failed_annotations': stats.failed_annotations,
+                'success_rate': stats.success_rate
+            },
+            'by_model': stats.by_model,
+            'by_status': stats.by_status
         }
-    
-    def export_results(self, output_format: str = 'jsonl', 
-                       output_file: Optional[str] = None,
-                       model_filter: Optional[str] = None) -> str:
-        """导出标注结果 - [修改] 导出 'title'"""
-        # 构建查询条件
-        where_clause = ""
-        params = []
-        if model_filter:
-            where_clause = "WHERE a.model_identifier = ?"
-            params.append(model_filter)
-        
-        # [修改] 查询 'title'
-        query = f"""
-            SELECT 
-                p.id as poem_id,
-                p.title,
-                p.author,
-                p.paragraphs,
-                p.full_text,
-                p.author_desc,
-                a.model_identifier,
-                a.status,
-                a.annotation_result,
-                a.error_message,
-                a.created_at,
-                a.updated_at
-            FROM poems p
-            INNER JOIN annotations a ON p.id = a.poem_id
-            {where_clause}
-            ORDER BY p.id, a.model_identifier
+
+    def export_results(
+        self,
+        output_format: str = 'jsonl',
+        output_file: Optional[str] = None,
+        model_filter: Optional[str] = None
+    ) -> str:
         """
+        导出标注结果
         
-        results = self.db_adapter.execute_query(query, tuple(params))
-        
+        Args:
+            output_format: 导出格式 (jsonl/json/csv)
+            output_file: 输出文件路径
+            model_filter: 模型过滤器
+            
+        Returns:
+            输出文件路径
+        """
+        # 获取所有标注
+        annotations = self._annotation_repo.get_all()
+
+        # 应用过滤器
+        if model_filter:
+            annotations = [a for a in annotations if a.model_identifier == model_filter]
+
         # 确定输出文件路径
         if not output_file:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             model_suffix = f"_{model_filter}" if model_filter else ""
-            output_file = f"data/output/export_{timestamp}{model_suffix}.{output_format}"
-        
+            output_file = str(self.output_dir / f"export_{timestamp}{model_suffix}.{output_format}")
+
         # 确保输出目录存在
         output_path = Path(output_file)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
+        # 导出为 JSONL
         if output_format == 'jsonl':
             with open(output_path, 'w', encoding='utf-8') as f:
-                for row in results:
+                for anno in annotations:
+                    poem = self._poetry_repo.get_by_id(anno.poem_id)
                     result_dict = {
-                        'poem_id': row[0],
-                        'title': row[1], # [修改]
-                        'author': row[2],
-                        'paragraphs': row[3],
-                        'full_text': row[4],
-                        'author_desc': row[5],
-                        'model_identifier': row[6],
-                        'status': row[7],
-                        'annotation_result': row[8],
-                        'error_message': row[9],
-                        'created_at': row[10],
-                        'updated_at': row[11]
+                        'poem_id': anno.poem_id,
+                        'title': poem.title if poem else '',
+                        'author': poem.author if poem else '',
+                        'paragraphs': poem.paragraphs if poem else [],
+                        'full_text': poem.full_text if poem else '',
+                        'author_desc': poem.author_desc if poem else '',
+                        'model_identifier': anno.model_identifier,
+                        'status': anno.status,
+                        'annotation_result': anno.annotation_result,
+                        'error_message': anno.error_message,
+                        'created_at': anno.created_at.isoformat(),
+                        'updated_at': anno.updated_at.isoformat()
                     }
                     f.write(json.dumps(result_dict, ensure_ascii=False) + '\n')
-        
+
         return str(output_file)
 
-    def get_annotation_statistics(self) -> Dict[str, Any]:
-        """获取标注统计信息"""
-        # 获取总体统计
-        rows = self.db_adapter.execute_query("""
-            SELECT 
-                COUNT(DISTINCT p.id) as total_poems,
-                COUNT(a.id) as total_annotations,
-                COUNT(CASE WHEN a.status = 'completed' THEN 1 END) as completed_annotations,
-                COUNT(CASE WHEN a.status = 'failed' THEN 1 END) as failed_annotations
-            FROM poems p
-            LEFT JOIN annotations a ON p.id = a.poem_id
-        """)
+    # ==================== 数据库初始化 ====================
+
+    def initialize_database_from_json(self, clear_existing: bool = False) -> Dict[str, int]:
+        """
+        从 JSON 文件初始化数据库
         
-        overall_stats = rows[0]
-        
-        # 按模型统计
-        model_stats = self.db_adapter.execute_query("""
-            SELECT 
-                model_identifier,
-                COUNT(*) as total,
-                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
-                COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed
-            FROM annotations
-            GROUP BY model_identifier
-            ORDER BY model_identifier
-        """)
-        
-        # 按状态统计
-        status_stats = self.db_adapter.execute_query("""
-            SELECT 
-                status,
-                COUNT(*) as count
-            FROM annotations
-            GROUP BY status
-        """)
-        
+        Args:
+            clear_existing: 是否清空现有数据
+            
+        Returns:
+            初始化结果 {authors: count, poems: count}
+        """
+        logger.info("开始初始化数据库...")
+
+        if clear_existing:
+            logger.info("清空现有数据...")
+            # 注意：SQLite 不支持 TRUNCATE，使用 DELETE
+            self._storage_engine.execute_update("DELETE FROM annotations")
+            self._storage_engine.execute_update("DELETE FROM poems")
+            self._storage_engine.execute_update("DELETE FROM authors")
+            logger.info("现有数据已清空")
+
+        # 加载并插入作者数据
+        authors = self.load_author_data()
+        author_count = 0
+        if authors:
+            author_count = self.batch_insert_authors(authors)
+
+        # 加载并插入诗词数据
+        poems = self.load_all_json_files()
+        poem_count = 0
+        if poems:
+            poem_count = self.batch_insert_poems(poems, start_id=1)
+
+        logger.info(f"数据库初始化完成 - 作者：{author_count}, 诗词：{poem_count}")
         return {
-            'overall': {
-                'total_poems': overall_stats[0],
-                'total_annotations': overall_stats[1],
-                'completed_annotations': overall_stats[2],
-                'failed_annotations': overall_stats[3],
-                'success_rate': (overall_stats[2] / overall_stats[1] * 100) if overall_stats[1] > 0 else 0
-            },
-            'by_model': {
-                model: {
-                    'total': total,
-                    'completed': completed,
-                    'failed': failed,
-                    'success_rate': (completed / total * 100) if total > 0 else 0
-                }
-                for model, total, completed, failed in model_stats
-            },
-            'by_status': {
-                status: count for status, count in status_stats
-            }
+            'authors': author_count,
+            'poems': poem_count
         }
 
-    def get_all_authors(self) -> List[Dict[str, Any]]:
-        """获取所有作者信息"""
-        rows = self.db_adapter.execute_query("SELECT name, description, short_description FROM authors ORDER BY name")
-        
-        return [dict(row) for row in rows]
+    # ==================== 资源管理 ====================
 
-    def search_poems(self, author: Optional[str] = None, title: Optional[str] = None, page: int = 1, per_page: int = 10) -> Dict[str, Any]:
-        """根据作者和标题搜索诗词，并支持分页 - [修改] 适配 'title'"""
-        # [修改] 查询 'title'
-        query = "SELECT p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc FROM poems p LEFT JOIN authors au ON p.author = au.name"
-        conditions = []
-        params = []
+    def close(self) -> None:
+        """关闭数据库连接"""
+        self._storage_engine.disconnect()
+        logger.info("数据库连接已关闭")
 
-        if author:
-            conditions.append("p.author LIKE ?")
-            params.append(f"%{author}%")
-        
-        if title:
-            # [修改] 按 'title' 字段搜索
-            conditions.append("p.title LIKE ?")
-            params.append(f"%{title}%")
+    def __enter__(self):
+        return self
 
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-        
-        # Get total count for pagination
-        count_query = query.replace("p.id, p.title, p.author, p.paragraphs, p.full_text, au.description as author_desc", "COUNT(*)")
-        count_rows = self.db_adapter.execute_query(count_query, tuple(params))
-        total_count = count_rows[0][0]
-
-        # Add pagination to the main query
-        offset = (page - 1) * per_page
-        query += " ORDER BY p.id LIMIT ? OFFSET ?"
-        params.extend([per_page, offset])
-
-        rows = self.db_adapter.execute_query(query, tuple(params))
-
-        poems = []
-        for row in rows:
-            poem = dict(row)
-            if poem.get('paragraphs'):
-                poem['paragraphs'] = json.loads(poem['paragraphs'])
-            poems.append(poem)
-
-        return {
-            "poems": poems,
-            "total": total_count,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total_count + per_page - 1) // per_page
-        }
-
-    def get_completed_poem_ids(self, poem_ids: List[int], model_identifier: str) -> set[int]:
-        """
-        高效检查一组 poem_id 是否已被特定模型成功标注。
-        仅查询必要的 'completed' 状态的 poem_id，非常节省资源。
-
-        :param poem_ids: 需要检查的诗词ID列表。
-        :param model_identifier: 要检查的模型的标识符。
-        :return: 一个包含在这批ID中且已成功标注的 poem_id 的集合。
-        """
-        if not poem_ids:
-            return set()
-
-        completed_ids = set()
-        try:
-            # 使用参数化查询防止SQL注入
-            placeholders = ','.join('?' * len(poem_ids))
-            query = f"""
-                SELECT poem_id
-                FROM annotations
-                WHERE 
-                    poem_id IN ({placeholders})
-                    AND model_identifier = ?
-                    AND status = 'completed'
-            """
-            
-            params = poem_ids + [model_identifier]
-            rows = self.db_adapter.execute_query(query, tuple(params))
-            
-            # 使用生成器表达式和 set.update 最高效地处理结果
-            completed_ids.update(row[0] for row in rows)
-            
-        except Exception as e:
-            self.logger.error(f"检查标注状态时发生数据库错误: {e}")
-        
-        return completed_ids
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()

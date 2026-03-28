@@ -4,38 +4,23 @@ import json
 import logging
 import os
 from pathlib import Path
-# 处理相对导入问题
-# 优先尝试相对导入（当作为包的一部分被导入时）
-relative_import_failed = False
+import sys
+import os
+
+# Ensure the project root is in sys.path for absolute imports
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+    # print(f"Added {project_root} to sys.path for absolute imports.") # Commented out to reduce log noise
+
 try:
-    # 当作为包运行时（推荐方式）
-    from ..llm_response_parser import llm_response_parser
-    from ..config_manager import ConfigManager
-    from ..utils.rate_limiter import AsyncTokenBucket
+    from src.llm_response_parser import llm_response_parser
+    from src.config_manager import ConfigManager
+    from src.utils.rate_limiter import AsyncTokenBucket
 except ImportError as e:
-    relative_import_failed = True
-    print(f"LLMService基类模块相对导入失败: {e}")
+    print(f"Failed to import core modules absolutely: {e}")
+    raise # Re-raise the exception to stop execution
 
-# 如果相对导入失败，则尝试绝对导入
-if relative_import_failed:
-    # 当直接运行时（兼容开发环境）
-    # 确保 src 目录在 sys.path 中，以便绝对导入可以找到 src 下的模块
-    import sys
-    import os
-    src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if src_dir not in sys.path:
-        sys.path.insert(0, src_dir)
-        print(f"已将 {src_dir} 添加到 sys.path")
-        
-    try:
-        from llm_response_parser import llm_response_parser
-        from config_manager import ConfigManager
-        from utils.rate_limiter import AsyncTokenBucket
-    except ImportError as e:
-        print(f"LLMService基类模块绝对导入也失败了: {e}")
-        raise # Re-raise the exception to stop execution
-
-config_manager = ConfigManager()
 
 class BaseLLMService(ABC):
     """LLM服务抽象基类 (已重构)"""
@@ -77,11 +62,8 @@ class BaseLLMService(ABC):
                     f"无法为模型 '{self.model_config_name}' 解析速率限制配置，将不启用。错误: {e}"
                 )
 
-        self.system_prompt_instruction_template: Optional[str] = None
-        self.system_prompt_example_template: Optional[str] = None
-        self.user_prompt_template: Optional[str] = None
-
-        self._load_prompt_templates()
+        # Prompt templates are no longer loaded in the base service.
+        # This is now handled by the project-specific PromptBuilder.
 
     # --- 按需创建速率限制器的辅助方法 ---
     async def _ensure_rate_limiter(self):
@@ -91,37 +73,6 @@ class BaseLLMService(ABC):
             self.logger.debug("首次异步调用，正在初始化 AsyncTokenBucket...")
             self.rate_limiter = AsyncTokenBucket(self._rate_limit_qps, self._rate_limit_burst)
             self.logger.info("AsyncTokenBucket 速率限制器已成功初始化。")
-
-    def _load_prompt_templates(self):
-        """
-        统一加载提示词模板的逻辑。
-        """
-        try:
-            # 优先使用模型特定的模板配置
-            prompt_config = config_manager.get_model_prompt_config(self.model_config_name)
-            self.logger.info(f"为模型 '{self.model_config_name}' 加载提示词模板... ")
-        except Exception as e:
-            self.logger.warning(f"无法获取模型 '{self.model_config_name}' 的特定提示词配置，将回退到全局默认配置: {e} ")
-            prompt_config = config_manager.get_prompt_config()
-        # 加载拆分后的系统提示词模板
-        instruction_path = prompt_config.get('system_prompt_instruction_template')
-        example_path = prompt_config.get('system_prompt_example_template')
-        user_path = prompt_config.get('user_prompt_template')
-        if instruction_path:
-            self.system_prompt_instruction_template = self._load_template_file(instruction_path)
-            self.logger.info(f"系统提示词（指令部分）加载成功: {instruction_path} ")
-        else:
-            raise ValueError("系统提示词（指令部分）路径未配置 ")
-        if example_path:
-            self.system_prompt_example_template = self._load_template_file(example_path)
-            self.logger.info(f"系统提示词（示例部分）加载成功: {example_path} ")
-        else:
-            raise ValueError("系统提示词（示例部分）路径未配置 ")
-        if user_path:
-            self.user_prompt_template = self._load_template_file(user_path)
-            self.logger.info(f"用户提示词模板加载成功: {user_path} ")
-        else:
-            raise ValueError("用户提示词模板路径未配置 ")
 
     def _mask_api_key(self, text: str) -> str:
         """对API密钥进行掩码处理"""
@@ -154,102 +105,18 @@ class BaseLLMService(ABC):
                 masked_data[key] = self._mask_api_key(value)
         return masked_data
 
-    def _load_template_file(self, template_path: str) -> str:
-        """
-        加载模板文件内容
-        """
-        try:
-            if not os.path.isabs(template_path):
-                project_root = Path(__file__).parent.parent.parent
-                template_path_abs = project_root / template_path
-            else:
-                template_path_abs = Path(template_path)
-
-            if not template_path_abs.exists():
-                raise FileNotFoundError(f"模板文件不存在: {template_path_abs}")
-
-            content = template_path_abs.read_text(encoding='utf-8')
-
-            if not content.strip():
-                raise ValueError(f"模板文件为空: {template_path_abs} ")
-            self.logger.debug(f"成功加载模板文件: {template_path_abs} (大小: {len(content)} 字符) ")
-            return content
-
-        except Exception as e:
-            self.logger.error(f"加载模板文件失败 '{template_path}': {e} ")
-            raise
-
-    def _build_system_prompt(self, emotion_schema: str) -> str:
-        """
-        构建系统提示词的内部方法。
-        现在会格式化指令部分，然后拼接静态的示例部分。
-        """
-        if self.system_prompt_instruction_template is None or self.system_prompt_example_template is None:
-            raise RuntimeError("系统提示词模板（指令或示例）未加载。")
-        
-        # 1. 格式化包含变量的指令部分
-        formatted_instruction = self.system_prompt_instruction_template.format(emotion_schema=emotion_schema)
-        
-        # 2. 拼接指令和静态示例，用换行符分隔
-        # 示例模板是静态的，无需格式化
-        full_system_prompt = f"{formatted_instruction}\n\n{self.system_prompt_example_template}"
-        
-        return full_system_prompt
-
-    def _build_user_prompt(self, author: str, title: str, sentences_with_id_json: str) -> str:
-        """
-        构建用户提示词的内部方法 - [修改] 使用 title 替代 rhythmic
-        """
-        if self.user_prompt_template is None:
-            raise RuntimeError("用户提示词模板未加载。 ")
-        return self.user_prompt_template.format(
-            author=author,
-            title=title,
-            sentences_with_id_json=sentences_with_id_json
-        )
-
-    def _generate_sentences_with_id(self, paragraphs: List[str]) -> List[Dict[str, str]]:
-        """
-        为句子生成ID并构建JSON格式（从Annotator迁移而来）
-        """
-        return [{"id": f"S{i+1}", "sentence": sentence} for i, sentence in enumerate(paragraphs)]
-
-    def prepare_prompts(self, poem_data: Dict[str, Any], emotion_schema: str) -> Tuple[str, str]:
-        """
-        集中化的提示词构建逻辑。
-        这是服务类提供给外部的核心能力之一。
-        [修改] 使用 poem_data['title']
-        """
-        sentences_with_id = self._generate_sentences_with_id(poem_data['paragraphs'])
-        sentences_json = json.dumps(sentences_with_id, ensure_ascii=False, indent=2)
-
-        system_prompt = self._build_system_prompt(emotion_schema)
-        user_prompt = self._build_user_prompt(
-            author=poem_data['author'],
-            title=poem_data['title'],
-            sentences_with_id_json=sentences_json
-        )
-        return system_prompt, user_prompt
 
     @abstractmethod
-    async def annotate_poem(self, poem: Dict[str, Any], emotion_schema: str) -> Dict[str, Any]:
+    async def get_completion(self, system_prompt: str, user_prompt: str) -> str:
         """
-        [修改] 抽象方法签名已更新。
-        现在接收原始诗词数据和情感体系，负责完整的标注流程。
-        !! 重要 !!
-        子类在实现此方法时，应在发起实际网络请求前，先调用 self._ensure_rate_limiter()，
-        然后再检查并调用速率限制器：
-        
-        await self._ensure_rate_limiter() # 确保实例存在
-        if self.rate_limiter:
-            await self.rate_limiter.acquire()
-        
-        # ... 之后是 httpx.AsyncClient.post(...) 等网络请求代码 ...
+        Gets a completion from the LLM service using pre-built prompts.
+
         Args:
-            poem: 包含诗词信息的字典。
-            emotion_schema: 情感分类体系的文本。
+            system_prompt: The system prompt.
+            user_prompt: The user prompt.
+
         Returns:
-            包含标注结果的字典。
+            The raw string response from the LLM.
         """
         pass
 

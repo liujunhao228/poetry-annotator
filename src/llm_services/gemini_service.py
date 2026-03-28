@@ -116,16 +116,13 @@ class GeminiService(BaseLLMService):
             self.logger.error(error_message, exc_info=True)
             return False, error_message
 
-    async def annotate_poem(self, poem: Dict[str, Any], emotion_schema: str) -> Dict[str, Any]:
+    async def get_completion(self, system_prompt: str, user_prompt: str) -> str:
         """
-        使用 Gemini API 标注一首诗词。
+        Gets a completion from the Gemini service using pre-built prompts.
         """
         request_data_for_log = None
-        full_prompt = "提示词未生成"
+        full_prompt = f"{system_prompt}\n\n{user_prompt}"
         try:
-            system_prompt, user_prompt = self.prepare_prompts(poem, emotion_schema)
-            full_prompt = f"{system_prompt}\n\n{user_prompt}"
-
             request_options = {'timeout': self.timeout}
             if self.thinking_budget:
                 request_options['thinking_budget'] = self.thinking_budget
@@ -138,19 +135,16 @@ class GeminiService(BaseLLMService):
             }
             self.log_request_details(request_data_for_log, headers={"Authorization": f"Bearer {self.api_key}"}, prompt=full_prompt)
 
-            # --- 应用速率限制器 ---
-            await self._ensure_rate_limiter()  # 首先确保限速器已初始化
+            await self._ensure_rate_limiter()
             if self.rate_limiter:
                 await self.rate_limiter.acquire()
-                self.logger.debug("速率限制器：已获取令牌，继续执行API请求。")
             
             response = await self.genai_model.generate_content_async(
-                full_prompt,
+                [system_prompt, user_prompt], # Gemini expects a list of messages
                 request_options=request_options
             )
             
             response_text = response.text
-            # 确保从 `usage_metadata` (如果存在) 获取 token 统计信息
             usage = {}
             if hasattr(response, 'usage_metadata'):
                 usage = {
@@ -161,23 +155,22 @@ class GeminiService(BaseLLMService):
             
             self.log_response_details(response.to_dict(), usage)
 
-            return self.validate_response(response_text)
+            return response_text
             
         except (google_exceptions.RetryError, google_exceptions.DeadlineExceeded) as e:
-            self.logger.warning(f"[Gemini] API 连接/超时错误，可重试: {e}")
+            self.logger.warning(f"[Gemini] API connection/timeout error, retriable: {e}")
             self.log_error_details(e, request_data_for_log, full_prompt)
-            raise # 重新抛出，让 tenacity 和 pybreaker 处理
+            raise # Re-raise for tenacity to handle
         
         except (google_exceptions.GoogleAPICallError, google_exceptions.InvalidArgument) as e:
-            self.logger.error(f"[Gemini] API 不可重试错误: {e}", exc_info=True)
+            self.logger.error(f"[Gemini] API non-retriable error: {e}", exc_info=True)
             self.log_error_details(e, request_data_for_log, full_prompt)
-            # 对于不可重试的错误，直接抛出，让外层捕获并标记为失败
             raise ValueError(f"Gemini API Error: {e}") from e
 
         except Exception as e:
-            self.logger.error(f"[Gemini] API 调用时发生未知错误: {e}", exc_info=True)
+            self.logger.error(f"[Gemini] An unexpected error occurred during API call: {e}", exc_info=True)
             self.log_error_details(e, request_data_for_log, full_prompt)
-            raise # 重新抛出，让 tenacity 和 pybreaker 处理
+            raise # Re-raise for tenacity to handle
 
     def get_service_info(self) -> Dict[str, Any]:
         """获取当前服务的详细配置信息。"""
