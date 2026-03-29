@@ -55,6 +55,19 @@ class AnnotationRepository(Repository[AnnotationModel], ABC):
         """更新或插入标注（UPSERT）"""
         pass
 
+    @abstractmethod
+    def get_with_poems(
+        self,
+        model_identifier: Optional[str] = None,
+        status: Optional[str] = None,
+        author: Optional[str] = None,
+        title: Optional[str] = None,
+        page: int = 1,
+        per_page: int = 20
+    ) -> Tuple[List[Tuple[AnnotationModel, Any]], int]:
+        """获取标注数据（带诗词信息），支持分页和过滤"""
+        pass
+
 
 class AnnotationRepositoryImpl(AnnotationRepository):
     """
@@ -279,6 +292,107 @@ class AnnotationRepositoryImpl(AnnotationRepository):
         ))
         conn.commit()
         return cursor.rowcount > 0
+
+    def get_with_poems(
+        self,
+        model_identifier: Optional[str] = None,
+        status: Optional[str] = None,
+        author: Optional[str] = None,
+        title: Optional[str] = None,
+        page: int = 1,
+        per_page: int = 20
+    ) -> Tuple[List[Tuple[AnnotationModel, Any]], int]:
+        """
+        获取标注数据（带诗词信息），支持分页和过滤
+
+        Args:
+            model_identifier: 模型标识符过滤
+            status: 状态过滤
+            author: 作者过滤
+            title: 标题过滤
+            page: 页码
+            per_page: 每页数量
+
+        Returns:
+            (标注列表，总数) - 每个标注是一个 (AnnotationModel, PoetryModel) 元组
+        """
+        conn = self._get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        # 构建查询条件
+        conditions = []
+        params = []
+
+        if model_identifier:
+            conditions.append("a.model_identifier = ?")
+            params.append(model_identifier)
+        if status:
+            conditions.append("a.status = ?")
+            params.append(status)
+        if author:
+            conditions.append("p.author LIKE ?")
+            params.append(f"%{author}%")
+        if title:
+            conditions.append("p.title LIKE ?")
+            params.append(f"%{title}%")
+
+        where_clause = ""
+        if conditions:
+            where_clause = " WHERE " + " AND ".join(conditions)
+
+        # 计算总数
+        count_query = f"""
+            SELECT COUNT(*)
+            FROM annotations a
+            JOIN poems p ON a.poem_id = p.id
+            {where_clause}
+        """
+        cursor.execute(count_query, params)
+        total = cursor.fetchone()[0]
+
+        # 获取分页数据
+        offset = (page - 1) * per_page
+        query = f"""
+            SELECT
+                a.id, a.poem_id, a.model_identifier, a.status, a.annotation_result,
+                a.error_message, a.created_at, a.updated_at,
+                p.id as poem_id_col, p.title, p.author, p.paragraphs, p.full_text,
+                p.author_desc, p.created_at, p.updated_at
+            FROM annotations a
+            JOIN poems p ON a.poem_id = p.id
+            {where_clause}
+            ORDER BY a.created_at DESC
+            LIMIT ? OFFSET ?
+        """
+        params.extend([per_page, offset])
+        cursor.execute(query, params)
+
+        results = []
+        for row in cursor.fetchall():
+            # 创建 AnnotationModel
+            annotation = self._row_to_model(row)
+            # 创建 PoetryModel
+            from datetime import datetime
+            paragraphs = row['paragraphs']
+            if isinstance(paragraphs, str):
+                import json
+                try:
+                    paragraphs = json.loads(paragraphs)
+                except (json.JSONDecodeError, ValueError):
+                    paragraphs = [paragraphs] if paragraphs else []
+
+            poem = type('PoetryModel', (), {})()
+            poem.id = row['poem_id_col']
+            poem.title = row['title']
+            poem.author = row['author']
+            poem.paragraphs = paragraphs
+            poem.full_text = row['full_text']
+            poem.author_desc = row['author_desc']
+
+            results.append((annotation, poem))
+
+        return results, total
 
     def get_statistics(self) -> AnnotationStatistics:
         """获取标注统计信息"""

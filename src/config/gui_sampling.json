@@ -1,0 +1,13 @@
+{
+    "sample_count": 100,
+    "filter_missing": false,
+    "exclude_annotated": false,
+    "model_identifier": "",
+    "sort_mode": "shuffle",
+    "output_mode": "dir",
+    "output_dir": "",
+    "output_file": "",
+    "num_files": 1,
+    "db_choice": "select",
+    "selected_db": ""
+}

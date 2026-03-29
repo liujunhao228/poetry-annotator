@@ -1,0 +1,6 @@
+{
+    "log_path": "",
+    "log_path_type": "dir",
+    "db_path": "",
+    "dry_run": true
+}

@@ -21,6 +21,7 @@ from .repositories import (
     AnnotationRepository, AnnotationRepositoryImpl,
 )
 from .utils.id_generator import IDGenerator
+from .label_parser import LabelParser
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 class DataManager:
     """
     数据管理器 - 业务逻辑协调层
-    
+
     使用 Repository 模式组织数据访问，提供高层业务接口
     """
 
@@ -37,21 +38,24 @@ class DataManager:
         db_path: str,
         source_dir: str,
         output_dir: str,
-        db_name_alias: str = "default"
+        db_name_alias: str = "default",
+        label_parser: Optional[LabelParser] = None
     ):
         """
         初始化数据管理器
-        
+
         Args:
             db_path: 数据库文件路径
             source_dir: 数据源目录（JSON 文件所在目录）
             output_dir: 输出目录
             db_name_alias: 数据库别名（用于 ID 前缀设置）
+            label_parser: 标签解析器实例（用于获取情感分类）
         """
         self.db_path = db_path
         self.source_dir = Path(source_dir)
         self.output_dir = Path(output_dir)
         self.db_name = db_name_alias
+        self._label_parser = label_parser
 
         logger.info(f"数据管理器初始化 - 数据库：{self.db_path}, 数据源：{self.source_dir}, 输出：{self.output_dir}")
 
@@ -508,6 +512,135 @@ class DataManager:
             'authors': author_count,
             'poems': poem_count
         }
+
+    # ==================== 标注浏览与编辑 ====================
+
+    def get_annotations_with_poems(
+        self,
+        model_identifier: Optional[str] = None,
+        status: Optional[str] = None,
+        author: Optional[str] = None,
+        title: Optional[str] = None,
+        page: int = 1,
+        per_page: int = 20
+    ) -> Dict[str, Any]:
+        """
+        获取标注数据（带诗词信息），支持分页和过滤
+
+        Args:
+            model_identifier: 模型标识符过滤
+            status: 状态过滤 (completed/failed)
+            author: 作者过滤
+            title: 标题过滤
+            page: 页码
+            per_page: 每页数量
+
+        Returns:
+            {
+                "items": [...],
+                "total": int,
+                "page": int,
+                "per_page": int,
+                "pages": int
+            }
+        """
+        logger.debug(f"获取标注数据 - 模型：{model_identifier}, 状态：{status}, 页码：{page}")
+
+        # 使用 AnnotationRepository 的查询方法
+        items, total = self._annotation_repo.get_with_poems(
+            model_identifier=model_identifier,
+            status=status,
+            author=author,
+            title=title,
+            page=page,
+            per_page=per_page
+        )
+
+        # 转换为字典格式
+        result_items = []
+        for item in items:
+            annotation, poem = item
+            # 直接使用 annotation_result 字符串，不解析
+            # GUI 层会根据需要自行解析
+            result_items.append({
+                'annotation_id': annotation.id,
+                'poem_id': poem.id,
+                'title': poem.title,
+                'author': poem.author,
+                'paragraphs': poem.paragraphs,
+                'full_text': poem.full_text,
+                'author_desc': poem.author_desc,
+                'model_identifier': annotation.model_identifier,
+                'status': annotation.status,
+                'annotation_result': annotation.annotation_result,  # 直接返回 JSON 字符串
+                'error_message': annotation.error_message,
+                'created_at': annotation.created_at.isoformat(),
+                'updated_at': annotation.updated_at.isoformat()
+            })
+
+        pages = (total + per_page - 1) // per_page if per_page > 0 else 0
+
+        return {
+            'items': result_items,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'pages': pages
+        }
+
+    def update_annotation_result(
+        self,
+        poem_id: int,
+        model_identifier: str,
+        annotation_result: List[Dict[str, Any]]
+    ) -> bool:
+        """
+        手动更新标注结果
+
+        Args:
+            poem_id: 诗词 ID
+            model_identifier: 模型标识符
+            annotation_result: 标注结果列表
+
+        Returns:
+            是否成功
+        """
+        logger.info(f"手动更新标注结果 - 诗词 ID: {poem_id}, 模型：{model_identifier}")
+
+        try:
+            # 转换为 JSON 字符串
+            annotation_result_json = json.dumps(annotation_result, ensure_ascii=False)
+
+            # 使用 UPSERT 方法更新
+            success = self._annotation_repo.update_or_insert(
+                poem_id=poem_id,
+                model_identifier=model_identifier,
+                status='completed',
+                annotation_result=annotation_result_json,
+                error_message=None
+            )
+
+            if success:
+                logger.info(f"标注结果更新成功 - 诗词 ID: {poem_id}, 模型：{model_identifier}")
+            return success
+
+        except Exception as e:
+            logger.error(f"更新标注结果失败 - 诗词 ID: {poem_id}, 模型：{model_identifier}, 错误：{e}")
+            return False
+
+    def get_available_emotions(self) -> List[str]:
+        """
+        获取可用的情感分类列表
+
+        Returns:
+            情感分类列表
+        """
+        try:
+            label_parser: LabelParser = self._label_parser
+            return label_parser.get_emotion_categories()
+        except Exception as e:
+            logger.warning(f"获取情感分类失败：{e}")
+            return []
 
     # ==================== 资源管理 ====================
 
